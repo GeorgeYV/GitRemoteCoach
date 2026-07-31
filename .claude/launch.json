@@ -1,0 +1,16 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "tennis-live-capture-web",
+      "runtimeExecutable": "C:\\Users\\jorge\\OneDrive\\Documents\\Claude\\Remote Coach\\.tools\\node-v20.18.1-win-x64\\npx.cmd",
+      "runtimeArgs": ["expo", "start", "--web"],
+      "port": 8081
+    },
+    {
+      "name": "tennis-live-capture-attach",
+      "url": "http://localhost:8081",
+      "port": 8081
+    }
+  ]
+}

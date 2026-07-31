@@ -3,6 +3,9 @@
 # dependencies
 node_modules/
 
+# portable Node runtime (local dev only, not for commit)
+.tools/
+
 # Expo
 .expo/
 dist/
@@ -32,6 +35,7 @@ yarn-error.*
 
 # local env files
 .env*.local
+server/.env
 
 # typescript
 *.tsbuildinfo
