@@ -49,6 +49,121 @@ export interface AvailabilityDay {
   afternoonAvailable: boolean;
 }
 
+export type BookingPeriod = 'morning' | 'afternoon';
+
+export const BOOKING_PERIOD_LABELS: Record<BookingPeriod, string> = {
+  morning: 'Mañana',
+  afternoon: 'Tarde',
+};
+
+export interface BookingSlotSelection {
+  dayLabel: string;
+  period: BookingPeriod;
+}
+
+export interface PaymentMethod {
+  id: string;
+  brand: string;
+  last4: string;
+}
+
+export const mockPaymentMethods: PaymentMethod[] = [
+  { id: 'card-1', brand: 'Visa', last4: '4242' },
+  { id: 'card-2', brand: 'Mastercard', last4: '8850' },
+];
+
+export const PARENT_QUICK_REPLIES = [
+  '¿Punto de encuentro confirmado?',
+  'Ya llegamos a la cancha',
+  'Vamos en camino',
+  '¡Gracias!',
+];
+
+/** Mirrors the subset of the server's booking_status enum (db/schema.sql) a parent needs to see. */
+export type BookingHistoryStatus = 'requested' | 'confirmed' | 'completed' | 'cancelled' | 'rejected';
+
+export const BOOKING_HISTORY_STATUS_LABELS: Record<BookingHistoryStatus, string> = {
+  requested: 'Esperando confirmación',
+  confirmed: 'Confirmada',
+  completed: 'Completada',
+  cancelled: 'Cancelada',
+  rejected: 'Rechazada',
+};
+
+export interface BookingHistoryEntry {
+  id: string;
+  trainerName: string;
+  trainerInitial: string;
+  tournamentName: string;
+  date: string;
+  time: string;
+  venue: string;
+  price: number;
+  status: BookingHistoryStatus;
+  /** Only meaningful once status is 'completed' — whether the parent already left a review. */
+  reviewed?: boolean;
+}
+
+export const mockBookingHistory: BookingHistoryEntry[] = [
+  {
+    id: 'book-1',
+    trainerName: 'Carlos Medina',
+    trainerInitial: 'C',
+    tournamentName: 'Copa Nacional Juvenil',
+    date: 'Vie 5 Ago',
+    time: '10:00 AM',
+    venue: 'Club Deportivo Bosques · Cancha 3',
+    price: 35,
+    status: 'confirmed',
+  },
+  {
+    id: 'book-2',
+    trainerName: 'Ana Beltrán',
+    trainerInitial: 'A',
+    tournamentName: 'Abierto Regional Sub-16',
+    date: 'Jue 20 Ago',
+    time: '9:00 AM',
+    venue: 'Club Guadalajara Tenis',
+    price: 28,
+    status: 'requested',
+  },
+  {
+    id: 'book-3',
+    trainerName: 'Marcela Ruiz',
+    trainerInitial: 'M',
+    tournamentName: 'Copa Nacional Juvenil',
+    date: 'Dom 7 Ago',
+    time: '4:00 PM',
+    venue: 'Club Deportivo Bosques · Cancha 2',
+    price: 40,
+    status: 'cancelled',
+  },
+  {
+    id: 'book-4',
+    trainerName: 'Jorge Salas',
+    trainerInitial: 'J',
+    tournamentName: 'Copa de Verano U14',
+    date: '3 Sep 2025',
+    time: '11:00 AM',
+    venue: 'Club Puebla Racquet',
+    price: 30,
+    status: 'completed',
+    reviewed: false,
+  },
+  {
+    id: 'book-5',
+    trainerName: 'Ana Beltrán',
+    trainerInitial: 'A',
+    tournamentName: 'Copa Nacional Juvenil',
+    date: '8 Ago 2025',
+    time: '5:30 PM',
+    venue: 'Club Deportivo Bosques · Cancha 1',
+    price: 28,
+    status: 'completed',
+    reviewed: true,
+  },
+];
+
 export interface TrainerProfile {
   trainer: Trainer;
   bio: string;

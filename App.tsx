@@ -21,7 +21,12 @@ import CoachVerificationPendingScreen from './screens/coach/CoachVerificationPen
 import ParentHomeScreen from './screens/parent/ParentHomeScreen';
 import TrainerListScreen from './screens/parent/TrainerListScreen';
 import TrainerProfileScreen from './screens/parent/TrainerProfileScreen';
-import { Tournament } from './mock/parentFlow';
+import BookingConfirmScreen from './screens/parent/BookingConfirmScreen';
+import BookingPaymentScreen from './screens/parent/BookingPaymentScreen';
+import BookingStatusScreen from './screens/parent/BookingStatusScreen';
+import ParentChatScreen from './screens/parent/ParentChatScreen';
+import BookingHistoryScreen from './screens/parent/BookingHistoryScreen';
+import { BookingSlotSelection, Tournament } from './mock/parentFlow';
 import { MatchConfig } from './lib/types';
 
 type PreviewScreen =
@@ -37,12 +42,16 @@ type PreviewScreen =
   | 'coachClubInvitation'
   | 'parentHome'
   | 'parentList'
-  | 'parentProfile';
+  | 'parentProfile'
+  | 'parentChat'
+  | 'parentHistory';
 
 const PREVIEW_OPTIONS: { key: PreviewScreen; label: string }[] = [
   { key: 'parentHome', label: 'Padre · Inicio' },
   { key: 'parentList', label: 'Padre · Lista' },
-  { key: 'parentProfile', label: 'Padre · Perfil' },
+  { key: 'parentProfile', label: 'Padre · Reservar' },
+  { key: 'parentChat', label: 'Padre · Chat' },
+  { key: 'parentHistory', label: 'Padre · Historial' },
   { key: 'coachRegister', label: 'Coach · Registro' },
   { key: 'coachPending', label: 'Coach · Verificación' },
   { key: 'coachAvailability', label: 'Coach · Disponibilidad' },
@@ -70,6 +79,46 @@ function CoachAvailabilityFlow() {
   }
 
   return <CoachAvailabilityScreen tournament={tournament} onBack={() => setTournament(null)} />;
+}
+
+/** Local four-step flow: trainer profile → pick day/slot → pay → booking status. */
+function ParentBookingFlow() {
+  const [step, setStep] = useState<'profile' | 'confirm' | 'payment' | 'status'>('profile');
+  const [selection, setSelection] = useState<BookingSlotSelection | null>(null);
+  const [note, setNote] = useState('');
+
+  if (step === 'profile') {
+    return <TrainerProfileScreen onReserve={() => setStep('confirm')} />;
+  }
+
+  if (step === 'confirm') {
+    return (
+      <BookingConfirmScreen
+        onBack={() => setStep('profile')}
+        onContinue={(nextSelection, nextNote) => {
+          setSelection(nextSelection);
+          setNote(nextNote);
+          setStep('payment');
+        }}
+      />
+    );
+  }
+
+  if (step === 'payment') {
+    if (!selection) return null;
+    return (
+      <BookingPaymentScreen
+        selection={selection}
+        note={note}
+        onBack={() => setStep('confirm')}
+        onConfirm={() => setStep('status')}
+      />
+    );
+  }
+
+  if (!selection) return null;
+
+  return <BookingStatusScreen selection={selection} onDone={() => setStep('profile')} />;
 }
 
 /**
@@ -142,8 +191,12 @@ function ScreenPreviewSwitcher() {
           <ParentHomeScreen />
         ) : screen === 'parentList' ? (
           <TrainerListScreen />
+        ) : screen === 'parentChat' ? (
+          <ParentChatScreen />
+        ) : screen === 'parentHistory' ? (
+          <BookingHistoryScreen />
         ) : (
-          <TrainerProfileScreen />
+          <ParentBookingFlow />
         )}
       </View>
 

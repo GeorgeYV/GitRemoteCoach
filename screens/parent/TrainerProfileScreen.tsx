@@ -9,7 +9,7 @@ import VerificationRow from '../../components/shared/VerificationRow';
 import { colors, radius } from '../../lib/theme';
 import { mockCarlosMedinaProfile } from '../../mock/parentFlow';
 
-export default function TrainerProfileScreen() {
+export default function TrainerProfileScreen({ onReserve }: { onReserve?: () => void }) {
   const profile = mockCarlosMedinaProfile;
   const { trainer } = profile;
 
@@ -87,7 +87,7 @@ export default function TrainerProfileScreen() {
 
       <View style={styles.footer}>
         <Text style={styles.footerNote}>${trainer.price} · sin costo de viáticos</Text>
-        <Pressable style={styles.reserveButton}>
+        <Pressable style={styles.reserveButton} onPress={onReserve}>
           <Text style={styles.reserveLabel}>Reservar con {trainer.name.split(' ')[0]}</Text>
         </Pressable>
       </View>
