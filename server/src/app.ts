@@ -1,4 +1,5 @@
 import Fastify from 'fastify';
+import cors from '@fastify/cors';
 import { AppError } from './lib/errors.js';
 import { bookingRoutes } from './routes/bookings.js';
 import { webhookRoutes } from './routes/webhooks.js';
@@ -11,6 +12,10 @@ import { reviewRoutes } from './routes/reviews.js';
 
 export function buildApp() {
   const app = Fastify({ logger: true });
+
+  // El target web de Expo (lib/api.ts) llama a esta API desde otro origen —
+  // sin CORS el navegador bloquea el preflight antes de que llegue cualquier ruta.
+  app.register(cors, { origin: true });
 
   app.setErrorHandler((err, _req, reply) => {
     if (err instanceof AppError) {

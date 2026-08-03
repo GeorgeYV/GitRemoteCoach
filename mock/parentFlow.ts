@@ -1,4 +1,6 @@
 export interface ParentUser {
+  /** UUID real — usado como parentId al enviar una reseña (POST /bookings/:id/review). */
+  id: string;
   name: string;
   initial: string;
   childName: string;
@@ -29,13 +31,6 @@ export interface Trainer {
 export interface VerificationDetail {
   title: string;
   subtitle: string;
-}
-
-export interface ParentReview {
-  initial: string;
-  name: string;
-  stars: number;
-  quote: string;
 }
 
 export interface ReportStat {
@@ -139,14 +134,16 @@ export const mockBookingHistory: BookingHistoryEntry[] = [
     status: 'cancelled',
   },
   {
-    id: 'book-4',
-    trainerName: 'Jorge Salas',
-    trainerInitial: 'J',
+    // UUID real — coincide con la reserva completada sembrada para pruebas manuales
+    // contra el backend real (ver server/test/_manualDevServer.ts).
+    id: '44444444-4444-4444-8444-444444444444',
+    trainerName: 'Carlos Medina',
+    trainerInitial: 'C',
     tournamentName: 'Copa de Verano U14',
     date: '3 Sep 2025',
     time: '11:00 AM',
     venue: 'Club Puebla Racquet',
-    price: 30,
+    price: 35,
     status: 'completed',
     reviewed: false,
   },
@@ -169,13 +166,15 @@ export interface TrainerProfile {
   bio: string;
   tags: string[];
   verifications: VerificationDetail[];
-  review: ParentReview;
   reportStats: ReportStat[];
   availability: AvailabilityDay[];
   officialClub: string;
 }
 
 export const mockParentUser: ParentUser = {
+  // UUID real — coincide con el padre sembrado en server/test/seed.ts (parentUserId,
+  // full_name "María Guardián") para poder probar POST /bookings/:id/review contra el backend real.
+  id: '00000000-0000-0000-0000-000000000003',
   name: 'María',
   initial: 'M',
   childName: 'Valentina',
@@ -216,7 +215,9 @@ export const mockActiveTournaments: Tournament[] = [
 
 export const mockTrainers: Trainer[] = [
   {
-    id: 'carlos-medina',
+    // UUID real — coincide con coachAUserId en server/test/seed.ts (full_name
+    // "Carlos Medina") para poder probar GET /coaches/:id/reviews contra el backend real.
+    id: '00000000-0000-0000-0000-000000000004',
     name: 'Carlos Medina',
     rating: 4.9,
     reviews: 32,
@@ -267,12 +268,6 @@ export const mockCarlosMedinaProfile: TrainerProfile = {
     { title: 'Certificación federativa', subtitle: 'Certificado por la federación de tenis' },
     { title: 'Entrenador oficial', subtitle: 'Club Deportivo Bosques' },
   ],
-  review: {
-    initial: 'L',
-    name: 'Laura P.',
-    stars: 5,
-    quote: 'Carlos fue puntual, profesional, y el reporte que nos mandó fue súper claro.',
-  },
   reportStats: [
     { value: '18', label: 'Winners' },
     { value: '9', label: 'Errores' },

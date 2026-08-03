@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import InitialAvatar from '../../components/shared/InitialAvatar';
 import StarRatingInput from '../../components/parent/StarRatingInput';
+import { ApiError, submitBookingReview } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
-import { BookingHistoryEntry } from '../../mock/parentFlow';
+import { BookingHistoryEntry, mockParentUser } from '../../mock/parentFlow';
 
 const RATING_HINTS: Record<number, string> = {
   1: 'Muy mala experiencia',
@@ -25,8 +26,28 @@ export default function BookingReviewScreen({
 }) {
   const [stars, setStars] = useState(0);
   const [quote, setQuote] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const canSubmit = stars > 0;
+  const canSubmit = stars > 0 && !submitting;
+
+  async function handleSubmit() {
+    if (stars === 0) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      await submitBookingReview(booking.id, {
+        parentId: mockParentUser.id,
+        rating: stars,
+        comment: quote.trim() || undefined,
+      });
+      onSubmit(stars, quote.trim());
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'No se pudo enviar la reseña. Intenta de nuevo.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -68,12 +89,17 @@ export default function BookingReviewScreen({
       </ScrollView>
 
       <View style={styles.footer}>
+        {error && <Text style={styles.errorText}>{error}</Text>}
         <Pressable
           style={[styles.submitButton, !canSubmit && styles.submitButtonDisabled]}
           disabled={!canSubmit}
-          onPress={() => onSubmit(stars, quote.trim())}
+          onPress={handleSubmit}
         >
-          <Text style={styles.submitLabel}>Enviar reseña</Text>
+          {submitting ? (
+            <ActivityIndicator color={colors.courtBlueDeep} />
+          ) : (
+            <Text style={styles.submitLabel}>Enviar reseña</Text>
+          )}
         </Pressable>
       </View>
     </SafeAreaView>
@@ -192,6 +218,12 @@ const styles = StyleSheet.create({
   },
   submitButtonDisabled: {
     backgroundColor: withOpacity(colors.ballLime, 0.3),
+  },
+  errorText: {
+    color: colors.errorCoral,
+    fontSize: 12,
+    textAlign: 'center',
+    marginBottom: 10,
   },
   submitLabel: {
     color: colors.courtBlueDeep,

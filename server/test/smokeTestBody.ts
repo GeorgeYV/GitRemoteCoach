@@ -230,6 +230,7 @@ console.log('\n=== Escenario 9: reseña del padre tras un partido completado ===
     Array.isArray(listRes) && listRes.length === 1 && listRes[0].bookingId === (globalThis as any).__booking1Id,
     'GET /coaches/:id/reviews devuelve la reseña recién creada',
   );
+  assertEqual(listRes[0].parentName, 'María Guardián', 'la reseña trae el nombre del padre (JOIN con users)');
 
   const dupRes = await app.inject({
     method: 'POST',

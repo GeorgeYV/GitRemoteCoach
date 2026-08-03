@@ -163,3 +163,8 @@ export interface Review {
   comment: string | null;
   createdAt: string;
 }
+
+/** Lo que devuelve el listado por coach (TrainerProfileScreen) — el nombre del padre viene de un JOIN con users. */
+export interface ReviewWithParent extends Review {
+  parentName: string;
+}

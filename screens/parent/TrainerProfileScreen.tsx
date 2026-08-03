@@ -1,17 +1,37 @@
-import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AvailabilitySlotPill from '../../components/parent/AvailabilitySlotPill';
 import InitialAvatar from '../../components/shared/InitialAvatar';
 import StatTile from '../../components/shared/StatTile';
 import TrainerAvatarPlaceholder from '../../components/shared/TrainerAvatarPlaceholder';
 import VerificationRow from '../../components/shared/VerificationRow';
+import { ApiError, listCoachReviews, ReviewWithParent } from '../../lib/api';
 import { colors, radius } from '../../lib/theme';
 import { mockCarlosMedinaProfile } from '../../mock/parentFlow';
 
 export default function TrainerProfileScreen({ onReserve }: { onReserve?: () => void }) {
   const profile = mockCarlosMedinaProfile;
   const { trainer } = profile;
+
+  const [reviews, setReviews] = useState<ReviewWithParent[] | null>(null);
+  const [reviewsError, setReviewsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setReviewsError(null);
+    listCoachReviews(trainer.id)
+      .then((result) => {
+        if (!cancelled) setReviews(result);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setReviewsError(err instanceof ApiError ? err.message : 'No se pudieron cargar las reseñas.');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [trainer.id]);
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -52,16 +72,28 @@ export default function TrainerProfileScreen({ onReserve }: { onReserve?: () => 
         </Section>
 
         <Section label="Reseñas de padres">
-          <View style={styles.reviewCard}>
-            <View style={styles.reviewHeader}>
-              <InitialAvatar initial={profile.review.initial} size={32} />
-              <View style={styles.reviewHeaderText}>
-                <Text style={styles.reviewName}>{profile.review.name}</Text>
-                <Text style={styles.reviewStars}>{'★'.repeat(profile.review.stars)}</Text>
-              </View>
+          {reviewsError ? (
+            <Text style={styles.reviewsMessage}>{reviewsError}</Text>
+          ) : reviews === null ? (
+            <ActivityIndicator color={colors.ballLime} />
+          ) : reviews.length === 0 ? (
+            <Text style={styles.reviewsMessage}>Todavía no hay reseñas para {trainer.name.split(' ')[0]}.</Text>
+          ) : (
+            <View style={styles.reviewList}>
+              {reviews.map((review) => (
+                <View key={review.id} style={styles.reviewCard}>
+                  <View style={styles.reviewHeader}>
+                    <InitialAvatar initial={review.parentName[0] ?? '?'} size={32} />
+                    <View style={styles.reviewHeaderText}>
+                      <Text style={styles.reviewName}>{review.parentName}</Text>
+                      <Text style={styles.reviewStars}>{'★'.repeat(review.rating)}</Text>
+                    </View>
+                  </View>
+                  {review.comment && <Text style={styles.reviewQuote}>“{review.comment}”</Text>}
+                </View>
+              ))}
             </View>
-            <Text style={styles.reviewQuote}>“{profile.review.quote}”</Text>
-          </View>
+          )}
         </Section>
 
         <Section label="Ejemplo de reporte (anonimizado)">
@@ -190,6 +222,14 @@ const styles = StyleSheet.create({
     color: colors.textSoft,
     fontSize: 12,
     fontWeight: '600',
+  },
+  reviewsMessage: {
+    color: colors.textDim,
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  reviewList: {
+    gap: 12,
   },
   reviewCard: {
     backgroundColor: colors.panel,

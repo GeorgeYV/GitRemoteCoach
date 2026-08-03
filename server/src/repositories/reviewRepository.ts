@@ -1,7 +1,7 @@
 import type { Pool, PoolClient } from 'pg';
 import { pool } from '../lib/db.js';
 import { ConflictError } from '../lib/errors.js';
-import type { Review } from '../types.js';
+import type { Review, ReviewWithParent } from '../types.js';
 
 type Queryable = Pool | PoolClient;
 
@@ -17,6 +17,10 @@ function mapRow(row: any): Review {
     comment: row.comment,
     createdAt: row.created_at,
   };
+}
+
+function mapRowWithParent(row: any): ReviewWithParent {
+  return { ...mapRow(row), parentName: row.parent_name };
 }
 
 export async function createReview(
@@ -40,7 +44,15 @@ export async function createReview(
   }
 }
 
-export async function listReviewsForCoach(coachId: string, db: Queryable = pool): Promise<Review[]> {
-  const { rows } = await db.query(`SELECT * FROM reviews WHERE coach_id = $1 ORDER BY created_at DESC`, [coachId]);
-  return rows.map(mapRow);
+/** TrainerProfileScreen: reseñas con el nombre del padre (JOIN con users), más recientes primero. */
+export async function listReviewsForCoach(coachId: string, db: Queryable = pool): Promise<ReviewWithParent[]> {
+  const { rows } = await db.query(
+    `SELECT r.*, u.full_name AS parent_name
+     FROM reviews r
+     JOIN users u ON u.id = r.parent_id
+     WHERE r.coach_id = $1
+     ORDER BY r.created_at DESC`,
+    [coachId],
+  );
+  return rows.map(mapRowWithParent);
 }
