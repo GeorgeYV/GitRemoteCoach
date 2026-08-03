@@ -63,3 +63,34 @@ export function submitBookingReview(
 export function listCoachReviews(coachId: string): Promise<ReviewWithParent[]> {
   return request(`/coaches/${coachId}/reviews`);
 }
+
+export type BookingStatus =
+  | 'requested'
+  | 'accepted'
+  | 'rejected'
+  | 'expired'
+  | 'payment_failed'
+  | 'paid'
+  | 'completed'
+  | 'cancelled';
+
+/** Subconjunto de server/src/types.ts#Booking — lo que BookingCancelScreen necesita mostrar tras cancelar. */
+export interface Booking {
+  id: string;
+  status: BookingStatus;
+  refundAmount: string | null;
+  coachCompensationAmount: string | null;
+  cancelledAt: string | null;
+  cancellationReason: string | null;
+}
+
+/** POST /bookings/:id/cancel — BookingCancelScreen. */
+export function cancelBooking(
+  bookingId: string,
+  params: { actor: 'parent'; actorUserId: string; reason?: string },
+): Promise<Booking> {
+  return request(`/bookings/${bookingId}/cancel`, {
+    method: 'POST',
+    body: JSON.stringify(params),
+  });
+}

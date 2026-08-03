@@ -101,7 +101,8 @@ export interface BookingHistoryEntry {
 
 export const mockBookingHistory: BookingHistoryEntry[] = [
   {
-    id: 'book-1',
+    // UUID real — booking pagada de prueba manual contra el backend real (cancelar dispara reembolso).
+    id: '55555555-5555-4555-8555-555555555555',
     trainerName: 'Carlos Medina',
     trainerInitial: 'C',
     tournamentName: 'Copa Nacional Juvenil',
@@ -112,7 +113,8 @@ export const mockBookingHistory: BookingHistoryEntry[] = [
     status: 'confirmed',
   },
   {
-    id: 'book-2',
+    // UUID real — booking 'requested' de prueba manual (cancelar es directo, sin reembolso).
+    id: '66666666-6666-4666-8666-666666666666',
     trainerName: 'Ana Beltrán',
     trainerInitial: 'A',
     tournamentName: 'Abierto Regional Sub-16',

@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import InitialAvatar from '../../components/shared/InitialAvatar';
+import { ApiError, cancelBooking } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
-import { BookingHistoryEntry } from '../../mock/parentFlow';
+import { BookingHistoryEntry, mockParentUser } from '../../mock/parentFlow';
 
 export default function BookingCancelScreen({
   booking,
@@ -15,6 +16,25 @@ export default function BookingCancelScreen({
   onConfirm: (reason: string) => void;
 }) {
   const [reason, setReason] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleConfirm() {
+    setSubmitting(true);
+    setError(null);
+    try {
+      await cancelBooking(booking.id, {
+        actor: 'parent',
+        actorUserId: mockParentUser.id,
+        reason: reason.trim() || undefined,
+      });
+      onConfirm(reason.trim());
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'No se pudo cancelar la reserva. Intenta de nuevo.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -67,11 +87,12 @@ export default function BookingCancelScreen({
       </ScrollView>
 
       <View style={styles.footer}>
-        <Pressable style={styles.keepButton} onPress={onBack}>
+        {error && <Text style={styles.errorText}>{error}</Text>}
+        <Pressable style={styles.keepButton} onPress={onBack} disabled={submitting}>
           <Text style={styles.keepLabel}>Mantener reserva</Text>
         </Pressable>
-        <Pressable style={styles.cancelButton} onPress={() => onConfirm(reason.trim())}>
-          <Text style={styles.cancelLabel}>Cancelar reserva</Text>
+        <Pressable style={[styles.cancelButton, submitting && styles.cancelButtonDisabled]} onPress={handleConfirm} disabled={submitting}>
+          {submitting ? <ActivityIndicator color={colors.lineWhite} /> : <Text style={styles.cancelLabel}>Cancelar reserva</Text>}
         </Pressable>
       </View>
     </SafeAreaView>
@@ -217,9 +238,18 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     alignItems: 'center',
   },
+  cancelButtonDisabled: {
+    backgroundColor: withOpacity(colors.errorCoral, 0.5),
+  },
   cancelLabel: {
     color: colors.lineWhite,
     fontSize: 15,
     fontWeight: '800',
+  },
+  errorText: {
+    color: colors.errorCoral,
+    fontSize: 12,
+    textAlign: 'center',
+    marginBottom: 2,
   },
 });
