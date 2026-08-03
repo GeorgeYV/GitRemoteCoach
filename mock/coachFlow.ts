@@ -362,6 +362,89 @@ export interface ClubInvitation {
   message: string;
 }
 
+export type CoachBookingStatus = 'confirmed' | 'completed' | 'cancelled';
+
+export const COACH_BOOKING_STATUS_LABELS: Record<CoachBookingStatus, string> = {
+  confirmed: 'Confirmada',
+  completed: 'Completada',
+  cancelled: 'Cancelada',
+};
+
+export interface CoachBooking {
+  id: string;
+  parentName: string;
+  parentInitial: string;
+  playerName: string;
+  playerInitial: string;
+  category: string;
+  tournamentName: string;
+  date: string;
+  time: string;
+  venue: string;
+  agreedRate: number;
+  status: CoachBookingStatus;
+}
+
+/** The confirmed entry mirrors mockChatThread/mockPreMatchReminder (req-1) so it reads as the same booking. */
+export const mockCoachBookings: CoachBooking[] = [
+  {
+    id: 'req-1',
+    parentName: 'María Torres',
+    parentInitial: 'M',
+    playerName: 'Valentina Torres',
+    playerInitial: 'V',
+    category: 'U14 · Individual femenil',
+    tournamentName: 'Copa Nacional Juvenil',
+    date: 'Vie 5 Ago',
+    time: '10:00 AM',
+    venue: 'Club Deportivo Bosques · Cancha 3',
+    agreedRate: 35,
+    status: 'confirmed',
+  },
+  {
+    id: 'coach-book-2',
+    parentName: 'Sofía Solís',
+    parentInitial: 'S',
+    playerName: 'Renata Solís',
+    playerInitial: 'R',
+    category: 'U12 · Individual femenil',
+    tournamentName: 'Abierto Regional Sub-16',
+    date: '22 Ago 2025',
+    time: '9:00 AM',
+    venue: 'Club Guadalajara Tenis',
+    agreedRate: 30,
+    status: 'completed',
+  },
+  {
+    id: 'coach-book-3',
+    parentName: 'Luis Vidal',
+    parentInitial: 'L',
+    playerName: 'Mateo Vidal',
+    playerInitial: 'M',
+    category: 'U14 · Individual varonil',
+    tournamentName: 'Copa de Verano U14',
+    date: '3 Sep 2025',
+    time: '11:00 AM',
+    venue: 'Club Puebla Racquet',
+    agreedRate: 40,
+    status: 'completed',
+  },
+  {
+    id: 'coach-book-4',
+    parentName: 'Patricia Ruiz',
+    parentInitial: 'P',
+    playerName: 'Emilia Ruiz',
+    playerInitial: 'E',
+    category: 'U16 · Individual femenil',
+    tournamentName: 'Copa Nacional Juvenil',
+    date: 'Dom 7 Ago',
+    time: '4:00 PM',
+    venue: 'Club Deportivo Bosques · Cancha 2',
+    agreedRate: 35,
+    status: 'cancelled',
+  },
+];
+
 /** A fresh invitation still awaiting the coach's one required action: accept or decline. */
 export const mockPendingClubInvitation: ClubInvitation = {
   id: 'invite-1',

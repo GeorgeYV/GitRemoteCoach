@@ -8,16 +8,21 @@ import { mockMatchConfig, mockRoundLabel } from './mock/players';
 import LiveCaptureView from './screens/LiveCaptureView';
 import MatchSummaryView from './screens/MatchSummaryView';
 import CoachAvailabilityScreen from './screens/coach/CoachAvailabilityScreen';
+import CoachBookingCancelScreen from './screens/coach/CoachBookingCancelScreen';
+import CoachBookingDetailScreen from './screens/coach/CoachBookingDetailScreen';
 import CoachChatScreen from './screens/coach/CoachChatScreen';
 import CoachClubInvitationScreen from './screens/coach/CoachClubInvitationScreen';
 import CoachEarningsScreen from './screens/coach/CoachEarningsScreen';
+import CoachHomeScreen from './screens/coach/CoachHomeScreen';
 import CoachMatchSetupScreen from './screens/coach/CoachMatchSetupScreen';
 import CoachPreMatchReminderScreen from './screens/coach/CoachPreMatchReminderScreen';
 import CoachRegistrationScreen from './screens/coach/CoachRegistrationScreen';
 import CoachReputationScreen from './screens/coach/CoachReputationScreen';
 import CoachRequestInboxScreen from './screens/coach/CoachRequestInboxScreen';
+import CoachSessionHistoryScreen from './screens/coach/CoachSessionHistoryScreen';
 import CoachTournamentSearchScreen from './screens/coach/CoachTournamentSearchScreen';
 import CoachVerificationPendingScreen from './screens/coach/CoachVerificationPendingScreen';
+import { CoachBooking, mockCoachBookings } from './mock/coachFlow';
 import ParentHomeScreen from './screens/parent/ParentHomeScreen';
 import TrainerListScreen from './screens/parent/TrainerListScreen';
 import TrainerProfileScreen from './screens/parent/TrainerProfileScreen';
@@ -33,10 +38,12 @@ type PreviewScreen =
   | 'coachCapture'
   | 'coachRegister'
   | 'coachPending'
+  | 'coachHome'
   | 'coachAvailability'
   | 'coachInbox'
   | 'coachChat'
   | 'coachPreMatch'
+  | 'coachSessions'
   | 'coachEarnings'
   | 'coachReputation'
   | 'coachClubInvitation'
@@ -54,11 +61,13 @@ const PREVIEW_OPTIONS: { key: PreviewScreen; label: string }[] = [
   { key: 'parentHistory', label: 'Padre · Historial' },
   { key: 'coachRegister', label: 'Coach · Registro' },
   { key: 'coachPending', label: 'Coach · Verificación' },
+  { key: 'coachHome', label: 'Coach · Inicio' },
   { key: 'coachAvailability', label: 'Coach · Disponibilidad' },
   { key: 'coachInbox', label: 'Coach · Solicitudes' },
   { key: 'coachChat', label: 'Coach · Chat' },
   { key: 'coachPreMatch', label: 'Coach · Día de partido' },
   { key: 'coachCapture', label: 'Coach · Captura' },
+  { key: 'coachSessions', label: 'Coach · Sesiones' },
   { key: 'coachEarnings', label: 'Coach · Ingresos' },
   { key: 'coachReputation', label: 'Coach · Reputación' },
   { key: 'coachClubInvitation', label: 'Coach · Invitación club' },
@@ -121,6 +130,38 @@ function ParentBookingFlow() {
   return <BookingStatusScreen selection={selection} onDone={() => setStep('profile')} />;
 }
 
+/** Local three-step flow: home dashboard → booking detail → cancel, all sharing one local booking list. */
+function CoachHomeFlow() {
+  const [bookings, setBookings] = useState<CoachBooking[]>(mockCoachBookings);
+  const [step, setStep] = useState<'home' | 'detail' | 'cancel'>('home');
+  const nextBooking = bookings.find((b) => b.status === 'confirmed') ?? null;
+
+  function confirmCancel(_reason: string) {
+    if (!nextBooking) return;
+    const targetId = nextBooking.id;
+    setBookings((prev) => prev.map((b) => (b.id === targetId ? { ...b, status: 'cancelled' } : b)));
+    setStep('home');
+  }
+
+  if (step === 'detail' && nextBooking) {
+    return (
+      <CoachBookingDetailScreen
+        booking={nextBooking}
+        onBack={() => setStep('home')}
+        onCancel={() => setStep('cancel')}
+      />
+    );
+  }
+
+  if (step === 'cancel' && nextBooking) {
+    return (
+      <CoachBookingCancelScreen booking={nextBooking} onBack={() => setStep('detail')} onConfirm={confirmCancel} />
+    );
+  }
+
+  return <CoachHomeScreen nextBooking={nextBooking ?? undefined} onOpenBooking={() => setStep('detail')} />;
+}
+
 /**
  * Local three-step flow: pre-match reminder → confirm match setup → the existing,
  * unmodified live-capture wireframe. This is the "transición" requested — it does not
@@ -173,6 +214,8 @@ function ScreenPreviewSwitcher() {
           <CoachRegistrationScreen />
         ) : screen === 'coachPending' ? (
           <CoachVerificationPendingScreen />
+        ) : screen === 'coachHome' ? (
+          <CoachHomeFlow />
         ) : screen === 'coachAvailability' ? (
           <CoachAvailabilityFlow />
         ) : screen === 'coachInbox' ? (
@@ -181,6 +224,8 @@ function ScreenPreviewSwitcher() {
           <CoachChatScreen />
         ) : screen === 'coachPreMatch' ? (
           <CoachMatchDayFlow />
+        ) : screen === 'coachSessions' ? (
+          <CoachSessionHistoryScreen />
         ) : screen === 'coachEarnings' ? (
           <CoachEarningsScreen />
         ) : screen === 'coachReputation' ? (
