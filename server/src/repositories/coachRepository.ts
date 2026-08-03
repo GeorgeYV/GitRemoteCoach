@@ -44,6 +44,27 @@ export async function getCoachProfile(coachId: string, db: Queryable = pool): Pr
   return mapCoachProfileRow(rows[0]);
 }
 
+/**
+ * Recalcula coach_profiles.rating_avg/rating_count desde la tabla reviews.
+ * Espeja recalculate_coach_rating() en db/schema.sql — se llama explícitamente
+ * desde reviewService en vez de depender solo del trigger, porque el pool de
+ * pruebas (pg-mem) no ejecuta funciones PL/pgSQL (ver server/test/setupDb.ts).
+ */
+export async function recalculateRating(coachId: string, db: Queryable = pool): Promise<void> {
+  // Sin ROUND(): rating_avg es NUMERIC(3,2), la columna ya redondea a 2
+  // decimales al asignar. ROUND(numeric, integer) no es una función que
+  // pg-mem implemente (ver server/test/setupDb.ts), así que evitarlo aquí
+  // mantiene el smoke test funcionando sin cambiar el resultado en Postgres real.
+  await db.query(
+    `UPDATE coach_profiles
+     SET rating_avg = COALESCE((SELECT AVG(rating)::numeric FROM reviews WHERE coach_id = $1), 0),
+         rating_count = (SELECT COUNT(*) FROM reviews WHERE coach_id = $1),
+         updated_at = now()
+     WHERE user_id = $1`,
+    [coachId],
+  );
+}
+
 /** Reemplaza por completo las categorías de edad del entrenador (selección múltiple en CoachRegistrationScreen). */
 export async function setCoachAgeCategories(
   coachId: string,

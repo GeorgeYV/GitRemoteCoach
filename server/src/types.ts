@@ -153,3 +153,13 @@ export interface BookingMessage {
   body: string;
   createdAt: string;
 }
+
+export interface Review {
+  id: string;
+  bookingId: string;
+  parentId: string;
+  coachId: string;
+  rating: number;
+  comment: string | null;
+  createdAt: string;
+}

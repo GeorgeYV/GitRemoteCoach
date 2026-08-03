@@ -7,6 +7,7 @@ import { coachRoutes } from './routes/coaches.js';
 import { clubInvitationRoutes } from './routes/clubInvitations.js';
 import { coachTournamentRoutes } from './routes/coachTournaments.js';
 import { bookingMessageRoutes } from './routes/bookingMessages.js';
+import { reviewRoutes } from './routes/reviews.js';
 
 export function buildApp() {
   const app = Fastify({ logger: true });
@@ -27,6 +28,7 @@ export function buildApp() {
   app.register(clubInvitationRoutes);
   app.register(coachTournamentRoutes);
   app.register(bookingMessageRoutes);
+  app.register(reviewRoutes);
 
   return app;
 }

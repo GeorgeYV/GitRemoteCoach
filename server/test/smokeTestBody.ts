@@ -209,6 +209,48 @@ console.log('\n=== Escenario 8: liquidación batch a clubes ===');
   assertTrue(!readyAfter.includes(fixtures.tournamentId), 'torneo ya no aparece pendiente tras liquidar');
 }
 
+console.log('\n=== Escenario 9: reseña del padre tras un partido completado ===');
+{
+  const reviewRes = await app.inject({
+    method: 'POST',
+    url: `/bookings/${(globalThis as any).__booking1Id}/review`,
+    payload: { parentId: fixtures.parentUserId, rating: 5, comment: 'Excelente entrenador, muy puntual.' },
+  });
+  assertEqual(reviewRes.statusCode, 201, 'POST review devuelve 201');
+  const review = reviewRes.json();
+  assertEqual(review.coachId, fixtures.coachAUserId, 'la reseña queda ligada al coach de la reserva (no al del payload)');
+  assertEqual(review.rating, 5, 'rating = 5');
+
+  const coachAfter = await (await app.inject({ method: 'GET', url: `/coaches/${fixtures.coachAUserId}` })).json();
+  assertEqual(Number(coachAfter.profile.ratingAvg), 5, 'rating_avg del coach se recalcula a 5');
+  assertEqual(coachAfter.profile.ratingCount, 1, 'rating_count del coach pasa a 1');
+
+  const listRes = await (await app.inject({ method: 'GET', url: `/coaches/${fixtures.coachAUserId}/reviews` })).json();
+  assertTrue(
+    Array.isArray(listRes) && listRes.length === 1 && listRes[0].bookingId === (globalThis as any).__booking1Id,
+    'GET /coaches/:id/reviews devuelve la reseña recién creada',
+  );
+
+  const dupRes = await app.inject({
+    method: 'POST',
+    url: `/bookings/${(globalThis as any).__booking1Id}/review`,
+    payload: { parentId: fixtures.parentUserId, rating: 4 },
+  });
+  assertEqual(dupRes.statusCode, 409, 'segunda reseña sobre la misma reserva devuelve 409');
+  assertEqual(dupRes.json().error, 'review_already_exists', 'código de error = review_already_exists');
+
+  const reqRes = await requestBooking(fixtures.coachBUserId, inFuture(96));
+  const bookingNotCompleted = reqRes.json();
+  await app.inject({ method: 'POST', url: `/bookings/${bookingNotCompleted.id}/accept` });
+  const tooEarlyRes = await app.inject({
+    method: 'POST',
+    url: `/bookings/${bookingNotCompleted.id}/review`,
+    payload: { parentId: fixtures.parentUserId, rating: 3 },
+  });
+  assertEqual(tooEarlyRes.statusCode, 409, 'reseñar una reserva no completada devuelve 409');
+  assertEqual(tooEarlyRes.json().error, 'booking_not_completed', 'código de error = booking_not_completed');
+}
+
 console.log(`\n=== Resultado: ${passed} pasaron, ${failed} fallaron ===`);
 await app.close();
 process.exit(failed > 0 ? 1 : 0);
