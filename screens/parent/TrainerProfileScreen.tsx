@@ -2,10 +2,10 @@ import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AvailabilitySlotPill from '../../components/parent/AvailabilitySlotPill';
-import InitialAvatar from '../../components/parent/InitialAvatar';
-import StatTile from '../../components/parent/StatTile';
-import TrainerAvatarPlaceholder from '../../components/parent/TrainerAvatarPlaceholder';
-import VerificationRow from '../../components/parent/VerificationRow';
+import InitialAvatar from '../../components/shared/InitialAvatar';
+import StatTile from '../../components/shared/StatTile';
+import TrainerAvatarPlaceholder from '../../components/shared/TrainerAvatarPlaceholder';
+import VerificationRow from '../../components/shared/VerificationRow';
 import { colors, radius } from '../../lib/theme';
 import { mockCarlosMedinaProfile } from '../../mock/parentFlow';
 

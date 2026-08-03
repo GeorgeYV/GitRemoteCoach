@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import TrainerAvatarPlaceholder from '../../components/parent/TrainerAvatarPlaceholder';
+import TrainerAvatarPlaceholder from '../../components/shared/TrainerAvatarPlaceholder';
 import VerificationBadgePill from '../../components/parent/VerificationBadgePill';
 import { colors, radius } from '../../lib/theme';
 import { FILTER_CHIPS, mockFeaturedTournament, mockTrainers, Trainer } from '../../mock/parentFlow';

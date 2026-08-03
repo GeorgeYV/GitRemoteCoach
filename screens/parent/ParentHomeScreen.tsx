@@ -1,7 +1,7 @@
 import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import InitialAvatar from '../../components/parent/InitialAvatar';
+import InitialAvatar from '../../components/shared/InitialAvatar';
 import { colors, radius } from '../../lib/theme';
 import { mockActiveTournaments, mockFeaturedTournament, mockParentUser, Tournament } from '../../mock/parentFlow';
 
