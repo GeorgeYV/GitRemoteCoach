@@ -12,7 +12,17 @@ const requestBookingSchema = z.object({
   tournamentId: z.string().uuid(),
   matchDatetime: z.string().datetime(),
   agreedRate: z.number().positive(),
+  note: z.string().max(500).optional(),
 });
+
+const setMeetingDetailsSchema = z
+  .object({
+    courtLabel: z.string().max(100).optional(),
+    meetingPointDetail: z.string().max(500).optional(),
+  })
+  .refine((v) => v.courtLabel !== undefined || v.meetingPointDetail !== undefined, {
+    message: 'Debe incluir courtLabel y/o meetingPointDetail',
+  });
 
 const payBookingSchema = z.object({
   paymentMethodId: z.string().min(1),
@@ -69,5 +79,13 @@ export async function bookingRoutes(app: FastifyInstance): Promise<void> {
     const parsed = cancelBookingSchema.safeParse(req.body);
     if (!parsed.success) throw new ValidationError(parsed.error.message);
     return cancellationService.cancelBooking({ bookingId: id, ...parsed.data });
+  });
+
+  // Logística de encuentro mostrada en CoachPreMatchReminderScreen (cancha, punto de encuentro).
+  app.patch('/bookings/:id/meeting-details', async (req) => {
+    const { id } = req.params as { id: string };
+    const parsed = setMeetingDetailsSchema.safeParse(req.body);
+    if (!parsed.success) throw new ValidationError(parsed.error.message);
+    return bookingRepository.setMeetingDetails(id, parsed.data);
   });
 }

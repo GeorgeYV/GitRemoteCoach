@@ -13,6 +13,13 @@ export type ClubCommissionStatus = 'generated' | 'settled';
 export type PaymentTransactionType = 'charge' | 'refund' | 'transfer' | 'charge_failed';
 export type PaymentTransactionStatus = 'succeeded' | 'failed' | 'pending';
 
+export type AgeCategory = 'U10' | 'U12' | 'U14' | 'U16' | 'U18';
+export type PlayingLevel = 'recreativo' | 'competitivo' | 'alto_rendimiento';
+export type RateMode = 'per_match' | 'per_day' | 'per_tournament';
+export type ClubInvitationStatus = 'pending' | 'accepted' | 'declined';
+export type MessageSenderType = 'coach' | 'parent' | 'system';
+export type VerificationStatus = 'pending' | 'approved' | 'rejected';
+
 export interface Booking {
   id: string;
   playerId: string;
@@ -21,6 +28,11 @@ export interface Booking {
   matchDatetime: string;
   agreedRate: string;
   status: BookingStatus;
+  // Capturados al solicitar / confirmar la reserva (CoachRequestInboxScreen,
+  // CoachPreMatchReminderScreen). Ver db/schema.sql.
+  parentNote: string | null;
+  courtLabel: string | null;
+  meetingPointDetail: string | null;
   responseDeadline: string;
   paymentDeadline: string | null;
   totalAmountPaid: string | null;
@@ -66,3 +78,78 @@ export interface ClubSettlement {
 }
 
 export type CancelActor = 'parent' | 'coach';
+
+export interface CoachProfile {
+  userId: string;
+  city: string;
+  region: string | null;
+  photoUrl: string | null;
+  yearsExperience: number;
+  specialty: string | null;
+  hourlyRate: string;
+  verificationStatus: VerificationStatus;
+  ratingAvg: string;
+  ratingCount: number;
+  bio: string | null;
+  stripeConnectedAccountId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CoachAgeCategory {
+  coachId: string;
+  ageCategory: AgeCategory;
+}
+
+export interface CoachLevel {
+  coachId: string;
+  level: PlayingLevel;
+}
+
+export interface TournamentCoachTag {
+  tournamentId: string;
+  coachId: string;
+  taggedBy: string;
+  taggedAt: string;
+}
+
+export interface ClubCoachInvitation {
+  id: string;
+  clubId: string;
+  tournamentId: string;
+  coachId: string;
+  invitedBy: string;
+  message: string | null;
+  status: ClubInvitationStatus;
+  invitedAt: string;
+  respondedAt: string | null;
+}
+
+export interface CoachTournamentAvailability {
+  id: string;
+  coachId: string;
+  tournamentId: string;
+  /** Fecha del día del torneo al que aplica esta disponibilidad (YYYY-MM-DD). */
+  slotDate: string;
+  morning: boolean;
+  afternoon: boolean;
+  updatedAt: string;
+}
+
+export interface CoachTournamentRate {
+  coachId: string;
+  tournamentId: string;
+  rateMode: RateMode;
+  amount: string;
+  updatedAt: string;
+}
+
+export interface BookingMessage {
+  id: string;
+  bookingId: string;
+  senderType: MessageSenderType;
+  /** Nulo cuando senderType = 'system'. */
+  senderId: string | null;
+  body: string;
+  createdAt: string;
+}

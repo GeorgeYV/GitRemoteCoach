@@ -3,6 +3,10 @@ import { AppError } from './lib/errors.js';
 import { bookingRoutes } from './routes/bookings.js';
 import { webhookRoutes } from './routes/webhooks.js';
 import { settlementRoutes } from './routes/settlements.js';
+import { coachRoutes } from './routes/coaches.js';
+import { clubInvitationRoutes } from './routes/clubInvitations.js';
+import { coachTournamentRoutes } from './routes/coachTournaments.js';
+import { bookingMessageRoutes } from './routes/bookingMessages.js';
 
 export function buildApp() {
   const app = Fastify({ logger: true });
@@ -19,6 +23,10 @@ export function buildApp() {
   app.register(webhookRoutes);
   app.register(bookingRoutes);
   app.register(settlementRoutes);
+  app.register(coachRoutes);
+  app.register(clubInvitationRoutes);
+  app.register(coachTournamentRoutes);
+  app.register(bookingMessageRoutes);
 
   return app;
 }

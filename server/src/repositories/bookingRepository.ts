@@ -16,6 +16,9 @@ function mapRow(row: any): Booking {
     matchDatetime: row.match_datetime,
     agreedRate: row.agreed_rate,
     status: row.status,
+    parentNote: row.parent_note,
+    courtLabel: row.court_label,
+    meetingPointDetail: row.meeting_point_detail,
     responseDeadline: row.response_deadline,
     paymentDeadline: row.payment_deadline,
     totalAmountPaid: row.total_amount_paid,
@@ -45,15 +48,24 @@ export async function createBookingRequest(
     matchDatetime: string;
     agreedRate: number;
     responseDeadline: Date;
+    parentNote?: string;
   },
   db: Queryable = pool,
 ): Promise<Booking> {
   try {
     const { rows } = await db.query(
-      `INSERT INTO bookings (player_id, coach_id, tournament_id, match_datetime, agreed_rate, response_deadline)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO bookings (player_id, coach_id, tournament_id, match_datetime, agreed_rate, response_deadline, parent_note)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING *`,
-      [params.playerId, params.coachId, params.tournamentId, params.matchDatetime, params.agreedRate, params.responseDeadline],
+      [
+        params.playerId,
+        params.coachId,
+        params.tournamentId,
+        params.matchDatetime,
+        params.agreedRate,
+        params.responseDeadline,
+        params.parentNote ?? null,
+      ],
     );
     return mapRow(rows[0]);
   } catch (err: any) {
@@ -79,6 +91,24 @@ export async function getBookingById(id: string, db: Queryable = pool): Promise<
 /** Bloquea la fila dentro de una transacción — necesario para transiciones de estado seguras ante condiciones de carrera. */
 export async function getBookingByIdForUpdate(id: string, client: PoolClient): Promise<Booking> {
   const { rows } = await client.query('SELECT * FROM bookings WHERE id = $1 FOR UPDATE', [id]);
+  if (rows.length === 0) throw new NotFoundError('Booking', id);
+  return mapRow(rows[0]);
+}
+
+/** Fija la logística de encuentro (cancha, punto de encuentro) mostrada en CoachPreMatchReminderScreen. */
+export async function setMeetingDetails(
+  id: string,
+  details: { courtLabel?: string; meetingPointDetail?: string },
+  db: Queryable = pool,
+): Promise<Booking> {
+  const { rows } = await db.query(
+    `UPDATE bookings
+     SET court_label = COALESCE($2, court_label),
+         meeting_point_detail = COALESCE($3, meeting_point_detail)
+     WHERE id = $1
+     RETURNING *`,
+    [id, details.courtLabel ?? null, details.meetingPointDetail ?? null],
+  );
   if (rows.length === 0) throw new NotFoundError('Booking', id);
   return mapRow(rows[0]);
 }

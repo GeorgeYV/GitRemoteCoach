@@ -1,8 +1,11 @@
-import { pool } from '../lib/db.js';
+import { pool, withTransaction } from '../lib/db.js';
 import { businessRules } from '../config.js';
 import { ConflictError, ValidationError } from '../lib/errors.js';
 import * as bookingRepository from '../repositories/bookingRepository.js';
+import * as bookingMessageRepository from '../repositories/bookingMessageRepository.js';
 import type { Booking } from '../types.js';
+
+const BOOKING_CONFIRMED_SYSTEM_MESSAGE = 'Reserva confirmada · usa este chat para coordinar el punto de encuentro';
 
 export interface RequestBookingParams {
   playerId: string;
@@ -10,6 +13,8 @@ export interface RequestBookingParams {
   tournamentId: string;
   matchDatetime: string;
   agreedRate: number;
+  /** Nota libre del padre para el entrenador (CoachRequestInboxScreen, CoachPreMatchReminderScreen). */
+  note?: string;
 }
 
 export async function requestBooking(params: RequestBookingParams): Promise<Booking> {
@@ -17,27 +22,40 @@ export async function requestBooking(params: RequestBookingParams): Promise<Book
     throw new ValidationError('match_datetime debe ser en el futuro');
   }
   const responseDeadline = new Date(Date.now() + businessRules.coachResponseWindowHours * 3600_000);
+  const { note, ...rest } = params;
   return bookingRepository.createBookingRequest(
-    { ...params, responseDeadline },
+    { ...rest, responseDeadline, parentNote: note },
     pool,
   );
 }
 
+/**
+ * Al aceptar se abre el hilo de chat con un mensaje de sistema (mismo texto
+ * que ya se mostraba en el mock de CoachChatScreen) — ambas cosas atómicas
+ * para no dejar una reserva "accepted" sin su mensaje de apertura.
+ */
 export async function acceptBooking(bookingId: string): Promise<Booking> {
   const paymentDeadline = new Date(Date.now() + businessRules.paymentWindowHours * 3600_000);
-  const updated = await bookingRepository.updateStatus(
-    bookingId,
-    ['requested'],
-    'accepted',
-    { decided_at: new Date(), payment_deadline: paymentDeadline },
-  );
-  if (!updated) {
-    throw new ConflictError(
-      'La reserva ya no está en estado "requested" (puede haber expirado o ya fue decidida)',
-      'invalid_transition',
+  return withTransaction(async (client) => {
+    const updated = await bookingRepository.updateStatus(
+      bookingId,
+      ['requested'],
+      'accepted',
+      { decided_at: new Date(), payment_deadline: paymentDeadline },
+      client,
     );
-  }
-  return updated;
+    if (!updated) {
+      throw new ConflictError(
+        'La reserva ya no está en estado "requested" (puede haber expirado o ya fue decidida)',
+        'invalid_transition',
+      );
+    }
+    await bookingMessageRepository.createMessage(
+      { bookingId, senderType: 'system', body: BOOKING_CONFIRMED_SYSTEM_MESSAGE },
+      client,
+    );
+    return updated;
+  });
 }
 
 export async function rejectBooking(bookingId: string): Promise<Booking> {
