@@ -74,14 +74,21 @@ export type BookingStatus =
   | 'completed'
   | 'cancelled';
 
-/** Subconjunto de server/src/types.ts#Booking — lo que BookingCancelScreen necesita mostrar tras cancelar. */
+/** Subconjunto de server/src/types.ts#Booking — lo que las pantallas de reserva necesitan mostrar. */
 export interface Booking {
   id: string;
   status: BookingStatus;
+  matchDatetime: string;
+  totalAmountPaid: string | null;
   refundAmount: string | null;
   coachCompensationAmount: string | null;
   cancelledAt: string | null;
   cancellationReason: string | null;
+}
+
+/** GET /bookings/:id — BookingStatusScreen (poll hasta que el coach acepte). */
+export function getBooking(bookingId: string): Promise<Booking> {
+  return request(`/bookings/${bookingId}`);
 }
 
 /** POST /bookings/:id/cancel — BookingCancelScreen. */

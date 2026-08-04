@@ -90,9 +90,13 @@ function CoachAvailabilityFlow() {
   return <CoachAvailabilityScreen tournament={tournament} onBack={() => setTournament(null)} />;
 }
 
-/** Local four-step flow: trainer profile → pick day/slot → pay → booking status. */
+/**
+ * Local four-step flow: trainer profile → pick day/slot → wait for the coach's real acceptance → pay.
+ * Payment requires the booking to already be 'accepted' server-side, so 'status' sits between 'confirm'
+ * and 'payment' and polls the real booking until it is — it isn't just a post-payment receipt.
+ */
 function ParentBookingFlow() {
-  const [step, setStep] = useState<'profile' | 'confirm' | 'payment' | 'status'>('profile');
+  const [step, setStep] = useState<'profile' | 'confirm' | 'status' | 'payment'>('profile');
   const [selection, setSelection] = useState<BookingSlotSelection | null>(null);
   const [note, setNote] = useState('');
   const [bookingId, setBookingId] = useState<string | null>(null);
@@ -109,28 +113,35 @@ function ParentBookingFlow() {
           setSelection(nextSelection);
           setNote(nextNote);
           setBookingId(nextBookingId);
-          setStep('payment');
+          setStep('status');
         }}
       />
     );
   }
 
-  if (step === 'payment') {
+  if (step === 'status') {
     if (!selection || !bookingId) return null;
     return (
-      <BookingPaymentScreen
+      <BookingStatusScreen
         bookingId={bookingId}
         selection={selection}
-        note={note}
-        onBack={() => setStep('confirm')}
-        onConfirm={() => setStep('status')}
+        onAccepted={() => setStep('payment')}
+        onDone={() => setStep('profile')}
       />
     );
   }
 
-  if (!selection) return null;
+  if (!selection || !bookingId) return null;
 
-  return <BookingStatusScreen selection={selection} onDone={() => setStep('profile')} />;
+  return (
+    <BookingPaymentScreen
+      bookingId={bookingId}
+      selection={selection}
+      note={note}
+      onBack={() => setStep('status')}
+      onConfirm={() => setStep('status')}
+    />
+  );
 }
 
 /** Local three-step flow: home dashboard → booking detail → cancel, all sharing one local booking list. */

@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import TrainerAvatarPlaceholder from '../../components/shared/TrainerAvatarPlaceholder';
+import { ApiError, Booking, getBooking } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
 import {
   BOOKING_PERIOD_LABELS,
@@ -10,41 +11,74 @@ import {
   mockFeaturedTournament,
 } from '../../mock/parentFlow';
 
-type BookingStatus = 'pending' | 'confirmed';
-
-/** Simulates the coach's response — in the real app this flips when the coach accepts the request. */
-const AUTO_CONFIRM_DELAY_MS = 4000;
+/** El coach normalmente responde en minutos, pero la ventana real es de horas — pollear cada 4s alcanza para la demo. */
+const POLL_INTERVAL_MS = 4000;
+const WAITING_STATUSES: Booking['status'][] = ['requested'];
+const TERMINAL_NEGATIVE_STATUSES: Booking['status'][] = ['rejected', 'expired', 'cancelled', 'payment_failed'];
 
 export default function BookingStatusScreen({
+  bookingId,
   selection,
+  onAccepted,
   onDone,
 }: {
+  bookingId: string;
   selection: BookingSlotSelection;
+  /** Se llama una sola vez, la primera vez que el estado real pasa a 'accepted', para continuar a pago. */
+  onAccepted: () => void;
   onDone: () => void;
 }) {
   const profile = mockCarlosMedinaProfile;
   const { trainer } = profile;
-  const [status, setStatus] = useState<BookingStatus>('pending');
+  const [booking, setBooking] = useState<Booking | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const timer = setTimeout(() => setStatus('confirmed'), AUTO_CONFIRM_DELAY_MS);
-    return () => clearTimeout(timer);
-  }, []);
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
 
-  const confirmed = status === 'confirmed';
+    async function poll() {
+      try {
+        const result = await getBooking(bookingId);
+        if (cancelled) return;
+        setBooking(result);
+        setError(null);
+        if (WAITING_STATUSES.includes(result.status)) {
+          timer = setTimeout(poll, POLL_INTERVAL_MS);
+        }
+      } catch (err) {
+        if (cancelled) return;
+        setError(err instanceof ApiError ? err.message : 'No se pudo consultar el estado de la reserva.');
+        timer = setTimeout(poll, POLL_INTERVAL_MS);
+      }
+    }
+
+    poll();
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bookingId]);
+
+  const negative = booking && TERMINAL_NEGATIVE_STATUSES.includes(booking.status);
+  const confirmed = booking?.status === 'paid' || booking?.status === 'completed';
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <ScrollView contentContainerStyle={styles.content}>
-        <View style={[styles.statusCard, confirmed && styles.statusCardConfirmed]}>
-          <Text style={[styles.statusEyebrow, confirmed && styles.statusEyebrowConfirmed]}>
-            {confirmed ? '¡Reserva confirmada!' : 'Solicitud enviada'}
+        <View style={[styles.statusCard, confirmed && styles.statusCardConfirmed, negative && styles.statusCardNegative]}>
+          {!booking && !error && <ActivityIndicator color={colors.ballLime} style={styles.statusSpinner} />}
+          <Text
+            style={[
+              styles.statusEyebrow,
+              confirmed && styles.statusEyebrowConfirmed,
+              negative && styles.statusEyebrowNegative,
+            ]}
+          >
+            {statusTitle(booking, error)}
           </Text>
-          <Text style={styles.statusBody}>
-            {confirmed
-              ? `${trainer.name.split(' ')[0]} confirmó tu solicitud. Te avisaremos cuando comparta el punto de encuentro exacto.`
-              : `Esperando que ${trainer.name.split(' ')[0]} acepte tu solicitud. Normalmente responde en menos de 30 minutos.`}
-          </Text>
+          <Text style={styles.statusBody}>{statusBody(booking, error, trainer.name.split(' ')[0])}</Text>
         </View>
 
         <Section label="Detalle de la reserva">
@@ -59,18 +93,75 @@ export default function BookingStatusScreen({
             <View style={styles.detailDivider} />
             <DetailLine label="Día y horario" value={`${selection.dayLabel} · ${BOOKING_PERIOD_LABELS[selection.period]}`} />
             <DetailLine label="Sede" value={mockFeaturedTournament.venue} />
-            <DetailLine label="Total pagado" value={`$${trainer.price}`} />
+            <DetailLine
+              label={booking?.totalAmountPaid ? 'Total pagado' : 'Tarifa acordada'}
+              value={`$${booking?.totalAmountPaid ?? trainer.price}`}
+            />
           </View>
         </Section>
       </ScrollView>
 
       <View style={styles.footer}>
-        <Pressable style={styles.doneButton} onPress={onDone}>
-          <Text style={styles.doneLabel}>Volver al inicio</Text>
-        </Pressable>
+        {booking?.status === 'accepted' ? (
+          <Pressable style={styles.doneButton} onPress={onAccepted}>
+            <Text style={styles.doneLabel}>Continuar a pago</Text>
+          </Pressable>
+        ) : (
+          <Pressable style={styles.doneButton} onPress={onDone}>
+            <Text style={styles.doneLabel}>Volver al inicio</Text>
+          </Pressable>
+        )}
       </View>
     </SafeAreaView>
   );
+}
+
+function statusTitle(booking: Booking | null, error: string | null): string {
+  if (error && !booking) return 'No se pudo cargar';
+  if (!booking) return 'Consultando tu solicitud…';
+  switch (booking.status) {
+    case 'requested':
+      return 'Solicitud enviada';
+    case 'accepted':
+      return '¡Buenas noticias!';
+    case 'paid':
+    case 'completed':
+      return '¡Reserva confirmada!';
+    case 'rejected':
+      return 'Solicitud rechazada';
+    case 'expired':
+      return 'La solicitud expiró';
+    case 'cancelled':
+      return 'Reserva cancelada';
+    case 'payment_failed':
+      return 'El pago no se completó';
+    default:
+      return 'Estado de la reserva';
+  }
+}
+
+function statusBody(booking: Booking | null, error: string | null, coachFirstName: string): string {
+  if (error && !booking) return error;
+  if (!booking) return 'Un momento…';
+  switch (booking.status) {
+    case 'requested':
+      return `Esperando que ${coachFirstName} acepte tu solicitud. Normalmente responde en menos de 30 minutos.`;
+    case 'accepted':
+      return `${coachFirstName} aceptó tu solicitud. Continúa para completar el pago.`;
+    case 'paid':
+    case 'completed':
+      return `${coachFirstName} confirmó tu solicitud. Te avisaremos cuando comparta el punto de encuentro exacto.`;
+    case 'rejected':
+      return `${coachFirstName} no pudo aceptar esta solicitud. Busca otro entrenador disponible.`;
+    case 'expired':
+      return `${coachFirstName} no respondió a tiempo. Intenta reservar con otro entrenador.`;
+    case 'cancelled':
+      return 'Esta reserva fue cancelada.';
+    case 'payment_failed':
+      return 'La pasarela de pago rechazó el cargo. Intenta con otro método de pago.';
+    default:
+      return '';
+  }
 }
 
 function Section({ label, children }: { label: string; children: React.ReactNode }) {
@@ -116,6 +207,13 @@ const styles = StyleSheet.create({
     backgroundColor: withOpacity(colors.ballLime, 0.1),
     borderColor: colors.ballLime,
   },
+  statusCardNegative: {
+    backgroundColor: withOpacity(colors.errorCoral, 0.1),
+    borderColor: colors.errorCoral,
+  },
+  statusSpinner: {
+    marginBottom: 10,
+  },
   statusEyebrow: {
     color: colors.textSoft,
     fontSize: 16,
@@ -125,6 +223,9 @@ const styles = StyleSheet.create({
   },
   statusEyebrowConfirmed: {
     color: colors.ballLime,
+  },
+  statusEyebrowNegative: {
+    color: colors.errorCoral,
   },
   statusBody: {
     color: colors.textDim,
