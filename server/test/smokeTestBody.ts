@@ -252,6 +252,66 @@ console.log('\n=== Escenario 9: reseña del padre tras un partido completado ===
   assertEqual(tooEarlyRes.json().error, 'booking_not_completed', 'código de error = booking_not_completed');
 }
 
+console.log('\n=== Escenario 10: listado de reservas de un coach (CoachHomeScreen, etc.) ===');
+{
+  const listRes = await app.inject({ method: 'GET', url: `/coaches/${fixtures.coachAUserId}/bookings` });
+  assertEqual(listRes.statusCode, 200, 'GET /coaches/:id/bookings devuelve 200');
+  const bookings = listRes.json();
+  assertTrue(Array.isArray(bookings) && bookings.length > 0, 'devuelve al menos una reserva del coach A');
+  assertTrue(
+    bookings.every((b: any) => b.coachId === fixtures.coachAUserId),
+    'todas las reservas devueltas son del coach solicitado',
+  );
+  const booking1Row = bookings.find((b: any) => b.id === (globalThis as any).__booking1Id);
+  assertTrue(!!booking1Row, 'incluye la reserva completada del escenario 1');
+  assertEqual(booking1Row.playerName, 'Valentina Guardián', 'trae el nombre del jugador (JOIN con players)');
+  assertEqual(booking1Row.parentName, 'María Guardián', 'trae el nombre del padre (JOIN con players → users)');
+  assertEqual(booking1Row.tournamentName, 'Copa Nacional Juvenil', 'trae el nombre del torneo (JOIN con tournaments)');
+
+  const emptyRes = await app.inject({ method: 'GET', url: `/coaches/${fixtures.coachAUserId.slice(0, -1)}9/bookings` });
+  assertTrue(Array.isArray(emptyRes.json()), 'un coach sin reservas devuelve un arreglo (vacío), no un error');
+}
+
+console.log('\n=== Escenario 11: invitación de club (CoachClubInvitationScreen) ===');
+{
+  const inviteRes = await app.inject({
+    method: 'POST',
+    url: '/club-invitations',
+    payload: {
+      clubId: fixtures.clubId,
+      tournamentId: fixtures.tournamentId,
+      coachId: fixtures.coachBUserId,
+      invitedBy: fixtures.parentUserId,
+      message: 'Nos gustaría que fueras entrenador oficial.',
+    },
+  });
+  assertEqual(inviteRes.statusCode, 201, 'POST /club-invitations devuelve 201');
+  const invitation = inviteRes.json();
+
+  const listRes = await (await app.inject({ method: 'GET', url: `/coaches/${fixtures.coachBUserId}/club-invitations` })).json();
+  assertTrue(
+    Array.isArray(listRes) && listRes.some((i: any) => i.id === invitation.id),
+    'GET /coaches/:id/club-invitations devuelve la invitación recién creada',
+  );
+  const listed = listRes.find((i: any) => i.id === invitation.id);
+  assertEqual(listed.clubName, 'Club Deportivo Bosques', 'trae el nombre del club (JOIN con clubs)');
+  assertEqual(listed.tournamentName, 'Copa Nacional Juvenil', 'trae el nombre del torneo (JOIN con tournaments)');
+
+  const respondRes = await app.inject({
+    method: 'POST',
+    url: `/club-invitations/${invitation.id}/respond`,
+    payload: { decision: 'accepted' },
+  });
+  assertEqual(respondRes.statusCode, 200, 'respond devuelve 200');
+  assertEqual(respondRes.json().status, 'accepted', 'la invitación queda accepted');
+
+  const listAfter = await (await app.inject({ method: 'GET', url: `/coaches/${fixtures.coachBUserId}/club-invitations` })).json();
+  assertTrue(
+    !listAfter.some((i: any) => i.id === invitation.id),
+    'la invitación ya respondida deja de aparecer en el listado de pendientes',
+  );
+}
+
 console.log(`\n=== Resultado: ${passed} pasaron, ${failed} fallaron ===`);
 await app.close();
 process.exit(failed > 0 ? 1 : 0);

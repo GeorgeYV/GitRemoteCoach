@@ -1,28 +1,84 @@
-import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ClubTagBadge from '../../components/coach/ClubTagBadge';
+import { ApiError, ClubCoachInvitationWithNames, listClubInvitations, respondClubInvitation } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
-import { mockPendingClubInvitation } from '../../mock/coachFlow';
+import { mockCarlosMedinaProfile } from '../../mock/parentFlow';
 
 type Decision = 'pending' | 'accepted' | 'declined';
 
 export default function CoachClubInvitationScreen() {
-  const invitation = mockPendingClubInvitation;
+  const [invitation, setInvitation] = useState<ClubCoachInvitationWithNames | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [decision, setDecision] = useState<Decision>('pending');
+  const [submitting, setSubmitting] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoadError(null);
+    listClubInvitations(mockCarlosMedinaProfile.trainer.id)
+      .then((result) => {
+        if (!cancelled) setInvitation(result[0] ?? null);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setLoadError(err instanceof ApiError ? err.message : 'No se pudo cargar tu invitación.');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function respond(decisionValue: Extract<Decision, 'accepted' | 'declined'>) {
+    if (!invitation) return;
+    setSubmitting(true);
+    setActionError(null);
+    try {
+      await respondClubInvitation(invitation.id, decisionValue);
+      setDecision(decisionValue);
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : 'No se pudo enviar tu respuesta. Intenta de nuevo.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (loadError) {
+    return (
+      <SafeAreaView style={[styles.container, styles.centerState]} edges={['top', 'bottom']}>
+        <Text style={styles.headerSubtitle}>{loadError}</Text>
+      </SafeAreaView>
+    );
+  }
+
+  if (invitation === null) {
+    return (
+      <SafeAreaView style={[styles.container, styles.centerState]} edges={['top', 'bottom']}>
+        <ActivityIndicator color={colors.ballLime} />
+      </SafeAreaView>
+    );
+  }
+
+  const invitedAtLabel = new Date(invitation.invitedAt).toLocaleDateString('es-MX', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Invitación de club</Text>
-        <Text style={styles.headerSubtitle}>{invitation.invitedAt}</Text>
+        <Text style={styles.headerSubtitle}>{invitedAtLabel}</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.card}>
           <Text style={styles.clubName}>{invitation.clubName}</Text>
           <Text style={styles.tournamentName}>{invitation.tournamentName}</Text>
-          <Text style={styles.message}>“{invitation.message}”</Text>
+          {invitation.message && <Text style={styles.message}>“{invitation.message}”</Text>}
         </View>
 
         <View style={styles.explainerBox}>
@@ -54,13 +110,20 @@ export default function CoachClubInvitationScreen() {
       </ScrollView>
 
       {decision === 'pending' && (
-        <View style={styles.footer}>
-          <Pressable style={styles.declineButton} onPress={() => setDecision('declined')}>
-            <Text style={styles.declineLabel}>Rechazar</Text>
-          </Pressable>
-          <Pressable style={styles.acceptButton} onPress={() => setDecision('accepted')}>
-            <Text style={styles.acceptLabel}>Aceptar invitación</Text>
-          </Pressable>
+        <View style={styles.footerWrap}>
+          {actionError && <Text style={styles.actionErrorText}>{actionError}</Text>}
+          <View style={styles.footer}>
+            <Pressable style={styles.declineButton} onPress={() => respond('declined')} disabled={submitting}>
+              <Text style={styles.declineLabel}>Rechazar</Text>
+            </Pressable>
+            <Pressable style={styles.acceptButton} onPress={() => respond('accepted')} disabled={submitting}>
+              {submitting ? (
+                <ActivityIndicator color={colors.courtBlueDeep} />
+              ) : (
+                <Text style={styles.acceptLabel}>Aceptar invitación</Text>
+              )}
+            </Pressable>
+          </View>
         </View>
       )}
     </SafeAreaView>
@@ -71,6 +134,16 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.bg,
+  },
+  centerState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionErrorText: {
+    color: colors.errorCoral,
+    fontSize: 12,
+    textAlign: 'center',
+    marginBottom: 2,
   },
   header: {
     paddingHorizontal: 20,
@@ -162,13 +235,15 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
   },
-  footer: {
-    flexDirection: 'row',
-    gap: 10,
+  footerWrap: {
     borderTopWidth: 1,
     borderTopColor: colors.borderSoft,
     backgroundColor: colors.courtBlueDeep,
     padding: 16,
+  },
+  footer: {
+    flexDirection: 'row',
+    gap: 10,
   },
   declineButton: {
     flex: 1,

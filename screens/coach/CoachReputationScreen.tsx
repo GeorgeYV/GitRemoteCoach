@@ -1,17 +1,89 @@
-import React from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ReviewCard from '../../components/coach/ReviewCard';
 import StatTile from '../../components/shared/StatTile';
 import TrainerAvatarPlaceholder from '../../components/shared/TrainerAvatarPlaceholder';
+import { ApiError, CoachProfile, getCoachProfile, listCoachBookings, listCoachReviews, ReviewWithParent } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
-import { mockCoachActivityStats, mockCoachReviews, mockOfficialClubTaggings } from '../../mock/coachFlow';
+import { CoachReview, mockOfficialClubTaggings } from '../../mock/coachFlow';
 import { mockCarlosMedinaProfile } from '../../mock/parentFlow';
+
+interface ActivityStats {
+  matchesPlayed: number;
+  acceptanceRate: number;
+  averageResponseMinutes: number;
+  tournamentsCount: number;
+}
+
+function toCoachReview(review: ReviewWithParent): CoachReview {
+  return {
+    id: review.id,
+    parentInitial: review.parentName[0] ?? '?',
+    parentName: review.parentName,
+    stars: review.rating,
+    quote: review.comment ?? '',
+    date: new Date(review.createdAt).toLocaleDateString('es-MX', { month: 'short', year: 'numeric' }),
+  };
+}
 
 export default function CoachReputationScreen() {
   const { trainer } = mockCarlosMedinaProfile;
-  const stats = mockCoachActivityStats;
+  const coachId = trainer.id;
   const taggings = mockOfficialClubTaggings;
+
+  const [profile, setProfile] = useState<CoachProfile | null>(null);
+  const [reviews, setReviews] = useState<CoachReview[] | null>(null);
+  const [stats, setStats] = useState<ActivityStats | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setError(null);
+    Promise.all([getCoachProfile(coachId), listCoachReviews(coachId), listCoachBookings(coachId)])
+      .then(([profileResult, reviewsResult, bookings]) => {
+        if (cancelled) return;
+        setProfile(profileResult.profile);
+        setReviews(reviewsResult.map(toCoachReview));
+
+        const responded = bookings.filter((b) => b.decidedAt !== null);
+        const accepted = responded.filter((b) => b.status !== 'rejected');
+        const avgResponseMs =
+          responded.length > 0
+            ? responded.reduce((sum, b) => sum + (new Date(b.decidedAt!).getTime() - new Date(b.requestedAt).getTime()), 0) /
+              responded.length
+            : 0;
+        setStats({
+          matchesPlayed: bookings.filter((b) => b.status === 'completed').length,
+          acceptanceRate: responded.length > 0 ? accepted.length / responded.length : 0,
+          averageResponseMinutes: Math.round(avgResponseMs / 60_000),
+          tournamentsCount: new Set(bookings.map((b) => b.tournamentId)).size,
+        });
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setError(err instanceof ApiError ? err.message : 'No se pudo cargar tu reputación.');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [coachId]);
+
+  if (error) {
+    return (
+      <SafeAreaView style={[styles.container, styles.centerState]} edges={['top', 'bottom']}>
+        <Text style={styles.reviewsCount}>{error}</Text>
+      </SafeAreaView>
+    );
+  }
+
+  if (!profile || !reviews || !stats) {
+    return (
+      <SafeAreaView style={[styles.container, styles.centerState]} edges={['top', 'bottom']}>
+        <ActivityIndicator color={colors.ballLime} />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -20,8 +92,8 @@ export default function CoachReputationScreen() {
           <TrainerAvatarPlaceholder size={72} />
           <Text style={styles.name}>{trainer.name}</Text>
           <View style={styles.ratingRow}>
-            <Text style={styles.ratingValue}>★ {trainer.rating}</Text>
-            <Text style={styles.reviewsCount}>({trainer.reviews} reseñas)</Text>
+            <Text style={styles.ratingValue}>★ {profile.ratingAvg}</Text>
+            <Text style={styles.reviewsCount}>({profile.ratingCount} reseñas)</Text>
           </View>
         </View>
 
@@ -51,11 +123,15 @@ export default function CoachReputationScreen() {
         </Section>
 
         <Section label="Comentarios de padres">
-          <View style={styles.reviewsList}>
-            {mockCoachReviews.map((review) => (
-              <ReviewCard key={review.id} review={review} />
-            ))}
-          </View>
+          {reviews.length === 0 ? (
+            <Text style={styles.reviewsCount}>Todavía no tienes reseñas.</Text>
+          ) : (
+            <View style={styles.reviewsList}>
+              {reviews.map((review) => (
+                <ReviewCard key={review.id} review={review} />
+              ))}
+            </View>
+          )}
         </Section>
       </ScrollView>
     </SafeAreaView>
@@ -75,6 +151,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.bg,
+  },
+  centerState: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   content: {
     padding: 20,

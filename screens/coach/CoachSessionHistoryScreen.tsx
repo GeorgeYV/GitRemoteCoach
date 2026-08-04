@@ -1,20 +1,50 @@
-import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import CoachBookingStatusPill from '../../components/coach/CoachBookingStatusPill';
 import InitialAvatar from '../../components/shared/InitialAvatar';
+import { ApiError, BookingWithParticipants, listCoachBookings } from '../../lib/api';
+import { toCoachBooking } from '../../lib/coachBookingDisplay';
 import { colors, radius } from '../../lib/theme';
-import { CoachBooking, mockCoachBookings } from '../../mock/coachFlow';
+import { CoachBooking } from '../../mock/coachFlow';
+import { mockCarlosMedinaProfile } from '../../mock/parentFlow';
 import CoachBookingCancelScreen from './CoachBookingCancelScreen';
 
+/** 'requested' vive en el inbox de solicitudes, no en el historial de sesiones ya decididas. */
+const DECIDED_STATUSES: BookingWithParticipants['status'][] = [
+  'accepted',
+  'paid',
+  'completed',
+  'cancelled',
+  'rejected',
+  'expired',
+];
+
 export default function CoachSessionHistoryScreen() {
-  const [bookings, setBookings] = useState<CoachBooking[]>(mockCoachBookings);
+  const [bookings, setBookings] = useState<CoachBooking[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [cancelTarget, setCancelTarget] = useState<CoachBooking | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setError(null);
+    listCoachBookings(mockCarlosMedinaProfile.trainer.id)
+      .then((result) => {
+        if (!cancelled) setBookings(result.filter((b) => DECIDED_STATUSES.includes(b.status)).map(toCoachBooking));
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setError(err instanceof ApiError ? err.message : 'No se pudieron cargar tus sesiones.');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function confirmCancel(_reason: string) {
     if (!cancelTarget) return;
     const targetId = cancelTarget.id;
-    setBookings((prev) => prev.map((b) => (b.id === targetId ? { ...b, status: 'cancelled' } : b)));
+    setBookings((prev) => prev?.map((b) => (b.id === targetId ? { ...b, status: 'cancelled' } : b)) ?? null);
     setCancelTarget(null);
   }
 
@@ -25,6 +55,22 @@ export default function CoachSessionHistoryScreen() {
         onBack={() => setCancelTarget(null)}
         onConfirm={confirmCancel}
       />
+    );
+  }
+
+  if (error) {
+    return (
+      <SafeAreaView style={[styles.container, styles.centerState]} edges={['top', 'bottom']}>
+        <Text style={styles.emptyText}>{error}</Text>
+      </SafeAreaView>
+    );
+  }
+
+  if (!bookings) {
+    return (
+      <SafeAreaView style={[styles.container, styles.centerState]} edges={['top', 'bottom']}>
+        <ActivityIndicator color={colors.ballLime} />
+      </SafeAreaView>
     );
   }
 
@@ -209,5 +255,9 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 20,
     textAlign: 'center',
+  },
+  centerState: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

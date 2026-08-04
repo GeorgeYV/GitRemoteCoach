@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ClubTagBadge from '../../components/coach/ClubTagBadge';
 import TogglePill from '../../components/coach/TogglePill';
+import { ApiError, RateMode as ApiRateMode, setCoachTournamentAvailability, setCoachTournamentRate } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
 import {
   buildInitialDaySlots,
@@ -12,14 +13,29 @@ import {
   RATE_MODE_LABELS,
   RateMode,
 } from '../../mock/coachFlow';
-import { Tournament } from '../../mock/parentFlow';
+import { BOOKING_DAY_LABEL_TO_DATE, mockCarlosMedinaProfile, REAL_TOURNAMENT_ID, Tournament } from '../../mock/parentFlow';
+
+/** Solo 'copa-nacional-juvenil' tiene un torneo real sembrado (server/test/seed.ts) — los otros dos
+ * torneos del buscador siguen siendo mock puro y "Guardar" se queda local, como antes de esta wiring. */
+const TOURNAMENT_SLUG_TO_REAL_ID: Record<string, string> = {
+  'copa-nacional-juvenil': REAL_TOURNAMENT_ID,
+};
+
+const RATE_MODE_TO_API: Record<RateMode, ApiRateMode> = {
+  partido: 'per_match',
+  dia: 'per_day',
+  torneo: 'per_tournament',
+};
 
 export default function CoachAvailabilityScreen({ tournament, onBack }: { tournament: Tournament; onBack: () => void }) {
   const tagging = mockOfficialClubTaggings.find((t) => t.tournamentId === tournament.id);
+  const realTournamentId = TOURNAMENT_SLUG_TO_REAL_ID[tournament.id];
   const [days, setDays] = useState<DaySlot[]>(() => buildInitialDaySlots(tournament.id));
   const [rateMode, setRateMode] = useState<RateMode>('partido');
   const [rateAmount, setRateAmount] = useState(String(DEFAULT_RATE_AMOUNT[tournament.id] ?? ''));
   const [saved, setSaved] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   function toggleSlot(dayIndex: number, period: 'morning' | 'afternoon') {
     setSaved(false);
@@ -36,8 +52,36 @@ export default function CoachAvailabilityScreen({ tournament, onBack }: { tourna
     setRateAmount(value);
   }
 
+  async function handleSave() {
+    if (!realTournamentId) {
+      // Torneo sin contraparte real en el backend — se queda como maqueta local, igual que antes.
+      setSaved(true);
+      return;
+    }
+    setSubmitting(true);
+    setError(null);
+    try {
+      await setCoachTournamentAvailability(
+        mockCarlosMedinaProfile.trainer.id,
+        realTournamentId,
+        days
+          .filter((d) => BOOKING_DAY_LABEL_TO_DATE[d.dayLabel])
+          .map((d) => ({ slotDate: BOOKING_DAY_LABEL_TO_DATE[d.dayLabel], morning: d.morning, afternoon: d.afternoon })),
+      );
+      await setCoachTournamentRate(mockCarlosMedinaProfile.trainer.id, realTournamentId, {
+        rateMode: RATE_MODE_TO_API[rateMode],
+        amount: Number(rateAmount),
+      });
+      setSaved(true);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'No se pudo guardar tu disponibilidad. Intenta de nuevo.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   const selectedDaysCount = days.filter((d) => d.morning || d.afternoon).length;
-  const canSave = selectedDaysCount > 0 && rateAmount.trim().length > 0;
+  const canSave = selectedDaysCount > 0 && rateAmount.trim().length > 0 && !submitting;
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -113,13 +157,14 @@ export default function CoachAvailabilityScreen({ tournament, onBack }: { tourna
       </ScrollView>
 
       <View style={styles.footer}>
-        {saved && <Text style={styles.savedHint}>✓ Disponibilidad guardada</Text>}
-        <Pressable
-          style={[styles.saveButton, !canSave && styles.saveButtonDisabled]}
-          disabled={!canSave}
-          onPress={() => setSaved(true)}
-        >
-          <Text style={styles.saveLabel}>Guardar disponibilidad</Text>
+        {error && <Text style={styles.errorText}>{error}</Text>}
+        {saved && !error && <Text style={styles.savedHint}>✓ Disponibilidad guardada</Text>}
+        <Pressable style={[styles.saveButton, !canSave && styles.saveButtonDisabled]} disabled={!canSave} onPress={handleSave}>
+          {submitting ? (
+            <ActivityIndicator color={colors.courtBlueDeep} />
+          ) : (
+            <Text style={styles.saveLabel}>Guardar disponibilidad</Text>
+          )}
         </Pressable>
       </View>
     </SafeAreaView>
@@ -286,6 +331,12 @@ const styles = StyleSheet.create({
     color: colors.ballLime,
     fontSize: 12,
     fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  errorText: {
+    color: colors.errorCoral,
+    fontSize: 12,
     textAlign: 'center',
     marginBottom: 10,
   },

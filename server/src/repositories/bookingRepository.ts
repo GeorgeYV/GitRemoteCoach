@@ -1,7 +1,7 @@
 import type { Pool, PoolClient } from 'pg';
 import { pool } from '../lib/db.js';
 import { ConflictError, NotFoundError } from '../lib/errors.js';
-import type { Booking, BookingStatus } from '../types.js';
+import type { Booking, BookingStatus, BookingWithParticipants } from '../types.js';
 
 type Queryable = Pool | PoolClient;
 
@@ -37,6 +37,17 @@ function mapRow(row: any): Booking {
     decidedAt: row.decided_at,
     completedAt: row.completed_at,
     cancelledAt: row.cancelled_at,
+  };
+}
+
+function mapRowWithParticipants(row: any): BookingWithParticipants {
+  return {
+    ...mapRow(row),
+    playerName: row.player_name,
+    ageCategory: row.age_category,
+    parentName: row.parent_name,
+    tournamentName: row.tournament_name,
+    tournamentVenue: row.tournament_venue,
   };
 }
 
@@ -172,6 +183,26 @@ export async function findPendingCommissionsForTournament(
     [tournamentId],
   );
   return rows.map(mapRow);
+}
+
+/** CoachHomeScreen, CoachRequestInboxScreen, CoachSessionHistoryScreen, CoachEarningsScreen: todas las
+ * reservas de un coach, con nombre de jugador/padre y datos del torneo, más recientes primero. */
+export async function listBookingsForCoach(
+  coachId: string,
+  db: Queryable = pool,
+): Promise<BookingWithParticipants[]> {
+  const { rows } = await db.query(
+    `SELECT b.*, p.full_name AS player_name, p.age_category, u.full_name AS parent_name,
+            t.name AS tournament_name, t.venue AS tournament_venue
+     FROM bookings b
+     JOIN players p ON p.id = b.player_id
+     JOIN users u ON u.id = p.guardian_user_id
+     JOIN tournaments t ON t.id = b.tournament_id
+     WHERE b.coach_id = $1
+     ORDER BY b.match_datetime DESC`,
+    [coachId],
+  );
+  return rows.map(mapRowWithParticipants);
 }
 
 export async function markBookingsSettled(

@@ -20,12 +20,15 @@ export default function CoachBookingDetailScreen({
   booking,
   onBack,
   onCancel,
+  onChat,
 }: {
   booking: CoachBooking;
   onBack: () => void;
   onCancel: () => void;
+  onChat?: () => void;
 }) {
-  const net = booking.agreedRate * (1 - PLATFORM_COMMISSION_RATE);
+  const net = booking.coachNetAmount ?? booking.agreedRate * (1 - PLATFORM_COMMISSION_RATE);
+  const commission = booking.agreedRate - net;
   const confirmed = booking.status === 'confirmed';
 
   return (
@@ -67,7 +70,10 @@ export default function CoachBookingDetailScreen({
         <Section label="Pago">
           <View style={styles.detailCard}>
             <DetailLine label="Tarifa acordada" value={money(booking.agreedRate)} />
-            <DetailLine label="Comisión de la plataforma" value={`${Math.round(PLATFORM_COMMISSION_RATE * 100)}%`} />
+            <DetailLine
+              label={booking.coachNetAmount !== undefined ? 'Comisiones (plataforma y club)' : 'Comisión de la plataforma (estimada)'}
+              value={money(commission)}
+            />
             <DetailLine label="Tu pago neto" value={money(net)} emphasize />
           </View>
         </Section>
@@ -75,6 +81,11 @@ export default function CoachBookingDetailScreen({
 
       {confirmed && (
         <View style={styles.footer}>
+          {onChat && (
+            <Pressable style={styles.chatButton} onPress={onChat}>
+              <Text style={styles.chatButtonLabel}>Abrir chat</Text>
+            </Pressable>
+          )}
           <Pressable style={styles.cancelButton} onPress={onCancel}>
             <Text style={styles.cancelLabel}>Cancelar sesión</Text>
           </Pressable>
@@ -218,6 +229,19 @@ const styles = StyleSheet.create({
     borderTopColor: colors.borderSoft,
     backgroundColor: colors.courtBlueDeep,
     padding: 16,
+    gap: 10,
+  },
+  chatButton: {
+    borderRadius: radius,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: 15,
+    alignItems: 'center',
+  },
+  chatButtonLabel: {
+    color: colors.lineWhite,
+    fontSize: 14,
+    fontWeight: '700',
   },
   cancelButton: {
     backgroundColor: colors.errorCoral,

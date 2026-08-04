@@ -1,24 +1,78 @@
-import React from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import EarningsRow from '../../components/coach/EarningsRow';
+import { ApiError, BookingWithParticipants, listCoachBookings } from '../../lib/api';
 import { colors, radius } from '../../lib/theme';
-import { mockEarningsHistory, PLATFORM_COMMISSION_RATE } from '../../mock/coachFlow';
+import { EarningsEntry, PLATFORM_COMMISSION_RATE } from '../../mock/coachFlow';
+import { mockCarlosMedinaProfile } from '../../mock/parentFlow';
 
 function money(amount: number): string {
   return `$${amount.toFixed(2)}`;
 }
 
-export default function CoachEarningsScreen() {
-  const entries = mockEarningsHistory;
+/** 'paid' = cobrado pero retenido hasta el partido; 'completed' = ya liberado al coach (paymentService.completeBooking). */
+function toEarningsEntry(booking: BookingWithParticipants): EarningsEntry {
+  const matchDate = new Date(booking.matchDatetime);
+  return {
+    id: booking.id,
+    playerName: booking.playerName,
+    category: booking.ageCategory,
+    tournamentName: booking.tournamentName,
+    date: matchDate.toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' }),
+    agreedRate: Number(booking.agreedRate),
+    coachNetAmount: booking.coachNetAmount !== null ? Number(booking.coachNetAmount) : undefined,
+    payoutStatus: booking.status === 'completed' ? 'liberado' : 'pendiente',
+  };
+}
 
-  const netFor = (rate: number) => rate * (1 - PLATFORM_COMMISSION_RATE);
+export default function CoachEarningsScreen() {
+  const [entries, setEntries] = useState<EarningsEntry[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setError(null);
+    listCoachBookings(mockCarlosMedinaProfile.trainer.id)
+      .then((result) => {
+        if (!cancelled) {
+          setEntries(
+            result.filter((b) => b.status === 'paid' || b.status === 'completed').map(toEarningsEntry),
+          );
+        }
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setError(err instanceof ApiError ? err.message : 'No se pudieron cargar tus ingresos.');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (error) {
+    return (
+      <SafeAreaView style={[styles.container, styles.centerState]} edges={['top', 'bottom']}>
+        <Text style={styles.headerSubtitle}>{error}</Text>
+      </SafeAreaView>
+    );
+  }
+
+  if (!entries) {
+    return (
+      <SafeAreaView style={[styles.container, styles.centerState]} edges={['top', 'bottom']}>
+        <ActivityIndicator color={colors.ballLime} />
+      </SafeAreaView>
+    );
+  }
+
+  const netFor = (entry: EarningsEntry) => entry.coachNetAmount ?? entry.agreedRate * (1 - PLATFORM_COMMISSION_RATE);
 
   const released = entries.filter((e) => e.payoutStatus === 'liberado');
   const pending = entries.filter((e) => e.payoutStatus === 'pendiente');
 
-  const releasedTotal = released.reduce((sum, e) => sum + netFor(e.agreedRate), 0);
-  const pendingTotal = pending.reduce((sum, e) => sum + netFor(e.agreedRate), 0);
+  const releasedTotal = released.reduce((sum, e) => sum + netFor(e), 0);
+  const pendingTotal = pending.reduce((sum, e) => sum + netFor(e), 0);
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -68,6 +122,10 @@ const styles = StyleSheet.create({
   headerSubtitle: {
     color: colors.textDim,
     fontSize: 13,
+  },
+  centerState: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   summaryRow: {
     flexDirection: 'row',

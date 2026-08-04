@@ -1,10 +1,18 @@
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DocumentRow from '../../components/coach/DocumentRow';
 import TrainerAvatarPlaceholder from '../../components/shared/TrainerAvatarPlaceholder';
+import { AgeCategory, ApiError, PlayingLevel, updateCoachTraining } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
 import { AGE_CATEGORY_OPTIONS, DocumentItem, LEVEL_OPTIONS, mockDocumentChecklist } from '../../mock/coachFlow';
+import { mockCarlosMedinaProfile } from '../../mock/parentFlow';
+
+const LEVEL_LABEL_TO_VALUE: Record<string, PlayingLevel> = {
+  Recreativo: 'recreativo',
+  Competitivo: 'competitivo',
+  'Alto rendimiento': 'alto_rendimiento',
+};
 
 export default function CoachRegistrationScreen({ onSubmit }: { onSubmit?: () => void }) {
   const [name, setName] = useState('');
@@ -14,6 +22,8 @@ export default function CoachRegistrationScreen({ onSubmit }: { onSubmit?: () =>
   const [categories, setCategories] = useState<string[]>([]);
   const [levels, setLevels] = useState<string[]>([]);
   const [documents, setDocuments] = useState<DocumentItem[]>(mockDocumentChecklist);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   function toggle(list: string[], value: string, setList: (v: string[]) => void) {
     setList(list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
@@ -21,6 +31,22 @@ export default function CoachRegistrationScreen({ onSubmit }: { onSubmit?: () =>
 
   function markUploaded(id: string) {
     setDocuments((prev) => prev.map((d) => (d.id === id ? { ...d, status: 'uploaded' } : d)));
+  }
+
+  async function handleSubmit() {
+    setSubmitting(true);
+    setError(null);
+    try {
+      await updateCoachTraining(mockCarlosMedinaProfile.trainer.id, {
+        ageCategories: categories as AgeCategory[],
+        levels: levels.map((label) => LEVEL_LABEL_TO_VALUE[label]),
+      });
+      onSubmit?.();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'No se pudo enviar tu registro. Intenta de nuevo.');
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   const requiredDocsReady = documents.filter((d) => !d.optional).every((d) => d.status === 'uploaded');
@@ -100,15 +126,20 @@ export default function CoachRegistrationScreen({ onSubmit }: { onSubmit?: () =>
       </ScrollView>
 
       <View style={styles.footer}>
+        {error && <Text style={styles.errorText}>{error}</Text>}
         {!requiredDocsReady && (
           <Text style={styles.footerHint}>Sube los documentos obligatorios para continuar</Text>
         )}
         <Pressable
-          style={[styles.submitButton, !requiredDocsReady && styles.submitButtonDisabled]}
-          disabled={!requiredDocsReady}
-          onPress={onSubmit}
+          style={[styles.submitButton, (!requiredDocsReady || submitting) && styles.submitButtonDisabled]}
+          disabled={!requiredDocsReady || submitting}
+          onPress={handleSubmit}
         >
-          <Text style={styles.submitLabel}>Enviar para verificación</Text>
+          {submitting ? (
+            <ActivityIndicator color={colors.courtBlueDeep} />
+          ) : (
+            <Text style={styles.submitLabel}>Enviar para verificación</Text>
+          )}
         </Pressable>
       </View>
     </SafeAreaView>
@@ -274,6 +305,12 @@ const styles = StyleSheet.create({
   footerHint: {
     color: colors.textDim,
     fontSize: 11,
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  errorText: {
+    color: colors.errorCoral,
+    fontSize: 12,
     textAlign: 'center',
     marginBottom: 10,
   },

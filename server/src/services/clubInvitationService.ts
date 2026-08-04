@@ -2,7 +2,7 @@ import { withTransaction } from '../lib/db.js';
 import { ConflictError } from '../lib/errors.js';
 import * as clubInvitationRepository from '../repositories/clubInvitationRepository.js';
 import * as tournamentCoachTagRepository from '../repositories/tournamentCoachTagRepository.js';
-import type { ClubCoachInvitation, ClubInvitationStatus } from '../types.js';
+import type { ClubCoachInvitation, ClubCoachInvitationWithNames, ClubInvitationStatus } from '../types.js';
 
 export interface InviteCoachParams {
   clubId: string;
@@ -16,7 +16,7 @@ export async function inviteCoach(params: InviteCoachParams): Promise<ClubCoachI
   return clubInvitationRepository.createInvitation(params);
 }
 
-export async function listPendingInvitationsForCoach(coachId: string): Promise<ClubCoachInvitation[]> {
+export async function listPendingInvitationsForCoach(coachId: string): Promise<ClubCoachInvitationWithNames[]> {
   return clubInvitationRepository.listPendingInvitationsForCoach(coachId);
 }
 

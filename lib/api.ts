@@ -19,7 +19,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   try {
     res = await fetch(`${API_BASE_URL}${path}`, {
       ...init,
-      headers: { 'Content-Type': 'application/json', ...init?.headers },
+      // Solo se manda Content-Type cuando de verdad hay body — Fastify rechaza con
+      // 400 (que este error handler no distingue de un 500) un body vacío con
+      // Content-Type: application/json, y varios POST (accept/reject/pay sin
+      // requiresAction) no llevan body.
+      headers: init?.body ? { 'Content-Type': 'application/json', ...init?.headers } : init?.headers,
     });
   } catch {
     throw new ApiError(0, 'network_error', 'No se pudo conectar con el servidor');
@@ -74,16 +78,40 @@ export type BookingStatus =
   | 'completed'
   | 'cancelled';
 
-/** Subconjunto de server/src/types.ts#Booking — lo que las pantallas de reserva necesitan mostrar. */
+/** Espeja server/src/types.ts#Booking. */
 export interface Booking {
   id: string;
-  status: BookingStatus;
+  playerId: string;
+  coachId: string;
+  tournamentId: string;
   matchDatetime: string;
+  agreedRate: string;
+  status: BookingStatus;
+  parentNote: string | null;
+  courtLabel: string | null;
+  meetingPointDetail: string | null;
+  responseDeadline: string;
+  paymentDeadline: string | null;
   totalAmountPaid: string | null;
+  coachNetAmount: string | null;
+  platformCommissionAmount: string | null;
+  clubCommissionAmount: string | null;
   refundAmount: string | null;
   coachCompensationAmount: string | null;
   cancelledAt: string | null;
   cancellationReason: string | null;
+  requestedAt: string;
+  decidedAt: string | null;
+  completedAt: string | null;
+}
+
+/** Espeja server/src/types.ts#BookingWithParticipants — lo que devuelve el listado por coach. */
+export interface BookingWithParticipants extends Booking {
+  playerName: string;
+  ageCategory: string;
+  parentName: string;
+  tournamentName: string;
+  tournamentVenue: string;
 }
 
 /** GET /bookings/:id — BookingStatusScreen (poll hasta que el coach acepte). */
@@ -91,10 +119,25 @@ export function getBooking(bookingId: string): Promise<Booking> {
   return request(`/bookings/${bookingId}`);
 }
 
-/** POST /bookings/:id/cancel — BookingCancelScreen. */
+/** GET /coaches/:id/bookings — CoachHomeScreen, CoachRequestInboxScreen, CoachSessionHistoryScreen, CoachEarningsScreen. */
+export function listCoachBookings(coachId: string): Promise<BookingWithParticipants[]> {
+  return request(`/coaches/${coachId}/bookings`);
+}
+
+/** POST /bookings/:id/accept — CoachRequestInboxScreen. */
+export function acceptBookingRequest(bookingId: string): Promise<Booking> {
+  return request(`/bookings/${bookingId}/accept`, { method: 'POST' });
+}
+
+/** POST /bookings/:id/reject — CoachRequestInboxScreen. */
+export function rejectBookingRequest(bookingId: string): Promise<Booking> {
+  return request(`/bookings/${bookingId}/reject`, { method: 'POST' });
+}
+
+/** POST /bookings/:id/cancel — BookingCancelScreen (parent) y CoachBookingCancelScreen. */
 export function cancelBooking(
   bookingId: string,
-  params: { actor: 'parent'; actorUserId: string; reason?: string },
+  params: { actor: 'parent' | 'coach'; actorUserId: string; reason?: string },
 ): Promise<Booking> {
   return request(`/bookings/${bookingId}/cancel`, {
     method: 'POST',
@@ -145,7 +188,7 @@ export function listBookingMessages(bookingId: string): Promise<BookingMessage[]
   return request(`/bookings/${bookingId}/messages`);
 }
 
-/** POST /bookings/:id/messages — ParentChatScreen. Rechazado con 409 si la reserva ya no está activa. */
+/** POST /bookings/:id/messages — ParentChatScreen, CoachChatScreen. Rechazado con 409 si la reserva ya no está activa. */
 export function sendBookingMessage(
   bookingId: string,
   params: { senderType: MessageSenderType; senderId?: string; body: string },
@@ -153,5 +196,137 @@ export function sendBookingMessage(
   return request(`/bookings/${bookingId}/messages`, {
     method: 'POST',
     body: JSON.stringify(params),
+  });
+}
+
+export type AgeCategory = 'U10' | 'U12' | 'U14' | 'U16' | 'U18';
+export type PlayingLevel = 'recreativo' | 'competitivo' | 'alto_rendimiento';
+export type VerificationStatus = 'pending' | 'approved' | 'rejected';
+
+/** Espeja server/src/types.ts#CoachProfile. */
+export interface CoachProfile {
+  userId: string;
+  city: string;
+  region: string | null;
+  photoUrl: string | null;
+  yearsExperience: number;
+  specialty: string | null;
+  hourlyRate: string;
+  verificationStatus: VerificationStatus;
+  ratingAvg: string;
+  ratingCount: number;
+  bio: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CoachProfileWithTraining {
+  profile: CoachProfile;
+  ageCategories: AgeCategory[];
+  levels: PlayingLevel[];
+}
+
+/** GET /coaches/:id — CoachHomeScreen, CoachVerificationPendingScreen, CoachReputationScreen. */
+export function getCoachProfile(coachId: string): Promise<CoachProfileWithTraining> {
+  return request(`/coaches/${coachId}`);
+}
+
+/** PUT /coaches/:id/training — CoachRegistrationScreen. */
+export function updateCoachTraining(
+  coachId: string,
+  params: { ageCategories: AgeCategory[]; levels: PlayingLevel[] },
+): Promise<CoachProfileWithTraining> {
+  return request(`/coaches/${coachId}/training`, {
+    method: 'PUT',
+    body: JSON.stringify(params),
+  });
+}
+
+export type RateMode = 'per_match' | 'per_day' | 'per_tournament';
+
+export interface CoachTournamentAvailability {
+  id: string;
+  coachId: string;
+  tournamentId: string;
+  slotDate: string;
+  morning: boolean;
+  afternoon: boolean;
+  updatedAt: string;
+}
+
+export interface CoachTournamentRate {
+  coachId: string;
+  tournamentId: string;
+  rateMode: RateMode;
+  amount: string;
+  updatedAt: string;
+}
+
+/** GET /coaches/:coachId/tournaments/:tournamentId/availability — CoachAvailabilityScreen. */
+export function getCoachTournamentAvailability(
+  coachId: string,
+  tournamentId: string,
+): Promise<{ availability: CoachTournamentAvailability[]; rate: CoachTournamentRate | null }> {
+  return request(`/coaches/${coachId}/tournaments/${tournamentId}/availability`);
+}
+
+/** PUT /coaches/:coachId/tournaments/:tournamentId/availability — CoachAvailabilityScreen "Guardar disponibilidad". */
+export function setCoachTournamentAvailability(
+  coachId: string,
+  tournamentId: string,
+  days: Array<{ slotDate: string; morning: boolean; afternoon: boolean }>,
+): Promise<CoachTournamentAvailability[]> {
+  return request(`/coaches/${coachId}/tournaments/${tournamentId}/availability`, {
+    method: 'PUT',
+    body: JSON.stringify({ days }),
+  });
+}
+
+/** PUT /coaches/:coachId/tournaments/:tournamentId/rate — CoachAvailabilityScreen. */
+export function setCoachTournamentRate(
+  coachId: string,
+  tournamentId: string,
+  params: { rateMode: RateMode; amount: number },
+): Promise<CoachTournamentRate> {
+  return request(`/coaches/${coachId}/tournaments/${tournamentId}/rate`, {
+    method: 'PUT',
+    body: JSON.stringify(params),
+  });
+}
+
+export type ClubInvitationStatus = 'pending' | 'accepted' | 'declined';
+
+/** Espeja server/src/types.ts#ClubCoachInvitation. */
+export interface ClubCoachInvitation {
+  id: string;
+  clubId: string;
+  tournamentId: string;
+  coachId: string;
+  invitedBy: string;
+  message: string | null;
+  status: ClubInvitationStatus;
+  invitedAt: string;
+  respondedAt: string | null;
+}
+
+/** Espeja server/src/types.ts#ClubCoachInvitationWithNames — lo que devuelve el listado por coach. */
+export interface ClubCoachInvitationWithNames extends ClubCoachInvitation {
+  clubName: string;
+  tournamentName: string;
+}
+
+/** GET /coaches/:id/club-invitations — CoachClubInvitationScreen. */
+export function listClubInvitations(coachId: string): Promise<ClubCoachInvitationWithNames[]> {
+  return request(`/coaches/${coachId}/club-invitations`);
+}
+
+/** POST /club-invitations/:id/respond — CoachClubInvitationScreen. */
+export function respondClubInvitation(
+  invitationId: string,
+  decision: 'accepted' | 'declined',
+): Promise<ClubCoachInvitation> {
+  return request(`/club-invitations/${invitationId}/respond`, {
+    method: 'POST',
+    body: JSON.stringify({ decision }),
   });
 }

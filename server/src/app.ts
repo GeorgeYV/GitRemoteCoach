@@ -15,7 +15,10 @@ export function buildApp() {
 
   // El target web de Expo (lib/api.ts) llama a esta API desde otro origen —
   // sin CORS el navegador bloquea el preflight antes de que llegue cualquier ruta.
-  app.register(cors, { origin: true });
+  // methods explícito: el default de @fastify/cors es 'GET,HEAD,POST' — sin esto,
+  // el navegador bloquea en el preflight cualquier PUT/PATCH (ej. CoachAvailabilityScreen)
+  // antes de que la petición real llegue siquiera al servidor.
+  app.register(cors, { origin: true, methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'] });
 
   app.setErrorHandler((err, _req, reply) => {
     if (err instanceof AppError) {

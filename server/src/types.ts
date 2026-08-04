@@ -53,6 +53,16 @@ export interface Booking {
   cancelledAt: string | null;
 }
 
+/** Lo que devuelve el listado por coach (CoachHomeScreen, CoachRequestInboxScreen, CoachSessionHistoryScreen,
+ * CoachEarningsScreen) — nombre de jugador/padre y datos del torneo vienen de JOINs. */
+export interface BookingWithParticipants extends Booking {
+  playerName: string;
+  ageCategory: AgeCategory;
+  parentName: string;
+  tournamentName: string;
+  tournamentVenue: string;
+}
+
 export interface PaymentTransaction {
   id: string;
   bookingId: string;
@@ -123,6 +133,12 @@ export interface ClubCoachInvitation {
   status: ClubInvitationStatus;
   invitedAt: string;
   respondedAt: string | null;
+}
+
+/** Lo que devuelve el listado por coach (CoachClubInvitationScreen) — nombre de club y torneo vienen de JOINs. */
+export interface ClubCoachInvitationWithNames extends ClubCoachInvitation {
+  clubName: string;
+  tournamentName: string;
 }
 
 export interface CoachTournamentAvailability {

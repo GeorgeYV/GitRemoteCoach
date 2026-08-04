@@ -9,8 +9,8 @@ function money(amount: number): string {
 }
 
 export default function EarningsRow({ entry }: { entry: EarningsEntry }) {
-  const commission = entry.agreedRate * PLATFORM_COMMISSION_RATE;
-  const net = entry.agreedRate - commission;
+  const net = entry.coachNetAmount ?? entry.agreedRate * (1 - PLATFORM_COMMISSION_RATE);
+  const commission = entry.agreedRate - net;
 
   return (
     <View style={styles.card}>
@@ -31,7 +31,9 @@ export default function EarningsRow({ entry }: { entry: EarningsEntry }) {
           <Text style={styles.breakdownValue}>{money(entry.agreedRate)}</Text>
         </View>
         <View style={styles.breakdownRow}>
-          <Text style={styles.breakdownLabel}>Comisión de la plataforma (15%)</Text>
+          <Text style={styles.breakdownLabel}>
+            {entry.coachNetAmount !== undefined ? 'Comisiones (plataforma y club)' : 'Comisión de la plataforma (15%)'}
+          </Text>
           <Text style={styles.breakdownValueNegative}>−{money(commission)}</Text>
         </View>
         <View style={[styles.breakdownRow, styles.breakdownRowTotal]}>

@@ -3,7 +3,7 @@ import { businessRules } from '../config.js';
 import { ConflictError, ValidationError } from '../lib/errors.js';
 import * as bookingRepository from '../repositories/bookingRepository.js';
 import * as bookingMessageRepository from '../repositories/bookingMessageRepository.js';
-import type { Booking } from '../types.js';
+import type { Booking, BookingWithParticipants } from '../types.js';
 
 const BOOKING_CONFIRMED_SYSTEM_MESSAGE = 'Reserva confirmada · usa este chat para coordinar el punto de encuentro';
 
@@ -56,6 +56,10 @@ export async function acceptBooking(bookingId: string): Promise<Booking> {
     );
     return updated;
   });
+}
+
+export async function listBookingsForCoach(coachId: string): Promise<BookingWithParticipants[]> {
+  return bookingRepository.listBookingsForCoach(coachId);
 }
 
 export async function rejectBooking(bookingId: string): Promise<Booking> {

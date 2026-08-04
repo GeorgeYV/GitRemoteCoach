@@ -1,6 +1,6 @@
 import { StatusBar } from 'expo-status-bar';
-import React, { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { MatchProvider, useMatch } from './context/MatchContext';
 import { colors } from './lib/theme';
@@ -22,7 +22,6 @@ import CoachRequestInboxScreen from './screens/coach/CoachRequestInboxScreen';
 import CoachSessionHistoryScreen from './screens/coach/CoachSessionHistoryScreen';
 import CoachTournamentSearchScreen from './screens/coach/CoachTournamentSearchScreen';
 import CoachVerificationPendingScreen from './screens/coach/CoachVerificationPendingScreen';
-import { CoachBooking, mockCoachBookings } from './mock/coachFlow';
 import ParentHomeScreen from './screens/parent/ParentHomeScreen';
 import TrainerListScreen from './screens/parent/TrainerListScreen';
 import TrainerProfileScreen from './screens/parent/TrainerProfileScreen';
@@ -31,8 +30,10 @@ import BookingPaymentScreen from './screens/parent/BookingPaymentScreen';
 import BookingStatusScreen from './screens/parent/BookingStatusScreen';
 import ParentChatScreen from './screens/parent/ParentChatScreen';
 import BookingHistoryScreen from './screens/parent/BookingHistoryScreen';
-import { BookingSlotSelection, REAL_COMPLETED_BOOKING_ID, Tournament } from './mock/parentFlow';
+import { BookingSlotSelection, mockCarlosMedinaProfile, REAL_COMPLETED_BOOKING_ID, Tournament } from './mock/parentFlow';
 import { MatchConfig } from './lib/types';
+import { ApiError, BookingWithParticipants, cancelBooking, getCoachProfile, listCoachBookings } from './lib/api';
+import { isUpcoming, toCoachBooking } from './lib/coachBookingDisplay';
 
 type PreviewScreen =
   | 'coachCapture'
@@ -72,6 +73,10 @@ const PREVIEW_OPTIONS: { key: PreviewScreen; label: string }[] = [
   { key: 'coachReputation', label: 'Coach · Reputación' },
   { key: 'coachClubInvitation', label: 'Coach · Invitación club' },
 ];
+
+/** UUID real de Carlos Medina — coincide con coachAUserId en server/test/seed.ts. Toda la previsualización
+ * del lado coach opera como este entrenador hasta que exista una sesión/login real. */
+const COACH_ID = mockCarlosMedinaProfile.trainer.id;
 
 function CoachFlow({ roundLabel = mockRoundLabel }: { roundLabel?: string }) {
   const { matchState, reducerState } = useMatch();
@@ -146,14 +151,42 @@ function ParentBookingFlow() {
 
 /** Local three-step flow: home dashboard → booking detail → cancel, all sharing one local booking list. */
 function CoachHomeFlow() {
-  const [bookings, setBookings] = useState<CoachBooking[]>(mockCoachBookings);
-  const [step, setStep] = useState<'home' | 'detail' | 'cancel'>('home');
-  const nextBooking = bookings.find((b) => b.status === 'confirmed') ?? null;
+  const [bookings, setBookings] = useState<BookingWithParticipants[] | null>(null);
+  const [rating, setRating] = useState('—');
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [step, setStep] = useState<'home' | 'detail' | 'cancel' | 'chat'>('home');
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoadError(null);
+    Promise.all([listCoachBookings(COACH_ID), getCoachProfile(COACH_ID)])
+      .then(([bookingList, profile]) => {
+        if (cancelled) return;
+        setBookings(bookingList);
+        setRating(profile.profile.ratingAvg);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setLoadError(err instanceof ApiError ? err.message : 'No se pudo cargar tu panel.');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const nextBookingRaw =
+    bookings
+      ?.filter(isUpcoming)
+      .sort((a, b) => new Date(a.matchDatetime).getTime() - new Date(b.matchDatetime).getTime())[0] ?? null;
+  const nextBooking = nextBookingRaw ? toCoachBooking(nextBookingRaw) : undefined;
+  const pendingRequests = bookings?.filter((b) => b.status === 'requested').length ?? 0;
+  const pendingEarnings =
+    bookings?.filter((b) => b.status === 'paid').reduce((sum, b) => sum + Number(b.coachNetAmount ?? 0), 0) ?? 0;
 
   function confirmCancel(_reason: string) {
-    if (!nextBooking) return;
-    const targetId = nextBooking.id;
-    setBookings((prev) => prev.map((b) => (b.id === targetId ? { ...b, status: 'cancelled' } : b)));
+    if (!nextBookingRaw) return;
+    const targetId = nextBookingRaw.id;
+    setBookings((prev) => prev?.map((b) => (b.id === targetId ? { ...b, status: 'cancelled' } : b)) ?? null);
     setStep('home');
   }
 
@@ -163,6 +196,7 @@ function CoachHomeFlow() {
         booking={nextBooking}
         onBack={() => setStep('home')}
         onCancel={() => setStep('cancel')}
+        onChat={() => setStep('chat')}
       />
     );
   }
@@ -173,7 +207,36 @@ function CoachHomeFlow() {
     );
   }
 
-  return <CoachHomeScreen nextBooking={nextBooking ?? undefined} onOpenBooking={() => setStep('detail')} />;
+  if (step === 'chat' && nextBookingRaw) {
+    return <CoachChatScreen bookingId={nextBookingRaw.id} onBack={() => setStep('detail')} />;
+  }
+
+  if (loadError) {
+    return (
+      <View style={[styles.root, styles.centerState]}>
+        <Text style={styles.centerStateText}>{loadError}</Text>
+      </View>
+    );
+  }
+
+  if (!bookings) {
+    return (
+      <View style={[styles.root, styles.centerState]}>
+        <ActivityIndicator color={colors.ballLime} />
+      </View>
+    );
+  }
+
+  return (
+    <CoachHomeScreen
+      coachName={mockCarlosMedinaProfile.trainer.name}
+      rating={rating}
+      pendingRequests={pendingRequests}
+      pendingEarnings={pendingEarnings}
+      nextBooking={nextBooking}
+      onOpenBooking={() => setStep('detail')}
+    />
+  );
 }
 
 /**
@@ -235,7 +298,7 @@ function ScreenPreviewSwitcher() {
         ) : screen === 'coachInbox' ? (
           <CoachRequestInboxScreen />
         ) : screen === 'coachChat' ? (
-          <CoachChatScreen />
+          <CoachChatScreen bookingId={REAL_COMPLETED_BOOKING_ID} />
         ) : screen === 'coachPreMatch' ? (
           <CoachMatchDayFlow />
         ) : screen === 'coachSessions' ? (
@@ -287,6 +350,17 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: colors.bg,
+  },
+  centerState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  centerStateText: {
+    color: colors.textDim,
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 19,
   },
   content: {
     flex: 1,

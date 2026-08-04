@@ -3,14 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import InitialAvatar from '../../components/shared/InitialAvatar';
 import { colors, radius } from '../../lib/theme';
-import {
-  CoachBooking,
-  mockBookingRequests,
-  mockCoachActivityStats,
-  mockEarningsHistory,
-  PLATFORM_COMMISSION_RATE,
-} from '../../mock/coachFlow';
-import { mockCarlosMedinaProfile } from '../../mock/parentFlow';
+import { CoachBooking } from '../../mock/coachFlow';
 
 const QUICK_LINKS = [
   { label: 'Disponibilidad', hint: 'Ajusta tus días y tarifa por torneo' },
@@ -24,24 +17,27 @@ function money(amount: number): string {
 }
 
 export default function CoachHomeScreen({
+  coachName,
+  rating,
+  pendingRequests,
+  pendingEarnings,
   nextBooking,
   onOpenBooking,
 }: {
+  coachName: string;
+  rating: string;
+  pendingRequests: number;
+  pendingEarnings: number;
   nextBooking?: CoachBooking;
   onOpenBooking?: () => void;
 }) {
-  const { trainer } = mockCarlosMedinaProfile;
-  const firstName = trainer.name.split(' ')[0];
-  const pendingRequests = mockBookingRequests.length;
-  const pendingEarnings = mockEarningsHistory
-    .filter((e) => e.payoutStatus === 'pendiente')
-    .reduce((sum, e) => sum + e.agreedRate * (1 - PLATFORM_COMMISSION_RATE), 0);
+  const firstName = coachName.split(' ')[0];
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.header}>
         <Text style={styles.wordmark}>Remote Coach</Text>
-        <InitialAvatar initial={trainer.name[0]} size={36} />
+        <InitialAvatar initial={coachName[0]} size={36} />
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
@@ -51,7 +47,7 @@ export default function CoachHomeScreen({
         <View style={styles.statsRow}>
           <StatChip value={String(pendingRequests)} label="Solicitudes" />
           <StatChip value={money(pendingEarnings)} label="Por liberar" />
-          <StatChip value={`★ ${trainer.rating}`} label="Reputación" />
+          <StatChip value={`★ ${rating}`} label="Reputación" />
         </View>
 
         <Text style={styles.sectionLabel}>Próxima sesión</Text>
