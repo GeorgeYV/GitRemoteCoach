@@ -63,6 +63,10 @@ export interface BookingSlotSelection {
  * en mock/coachFlow.ts — cambiarlo rompería esos lookups). */
 export const REAL_TOURNAMENT_ID = '00000000-0000-0000-0000-000000000002';
 
+/** UUID real de una reserva completada con Carlos — usada para probar reseñas y chat
+ * (GET/POST /bookings/:id/messages, POST /bookings/:id/review) contra el backend real. */
+export const REAL_COMPLETED_BOOKING_ID = '44444444-4444-4444-8444-444444444444';
+
 const BOOKING_DAY_LABEL_TO_DATE: Record<string, string> = {
   'Vie 5': '2026-08-05',
   'Sáb 6': '2026-08-06',
@@ -163,9 +167,7 @@ export const mockBookingHistory: BookingHistoryEntry[] = [
     status: 'cancelled',
   },
   {
-    // UUID real — coincide con la reserva completada sembrada para pruebas manuales
-    // contra el backend real (ver server/test/_manualDevServer.ts).
-    id: '44444444-4444-4444-8444-444444444444',
+    id: REAL_COMPLETED_BOOKING_ID,
     trainerName: 'Carlos Medina',
     trainerInitial: 'C',
     tournamentName: 'Copa de Verano U14',

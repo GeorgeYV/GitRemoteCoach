@@ -7,6 +7,7 @@ import { colors, radius } from '../../lib/theme';
 import { BookingHistoryEntry, mockBookingHistory } from '../../mock/parentFlow';
 import BookingCancelScreen from './BookingCancelScreen';
 import BookingReviewScreen from './BookingReviewScreen';
+import ParentChatScreen from './ParentChatScreen';
 
 type TabKey = 'inicio' | 'reservas' | 'reportes' | 'perfil';
 
@@ -24,6 +25,7 @@ export default function BookingHistoryScreen() {
   const [bookings, setBookings] = useState<BookingHistoryEntry[]>(mockBookingHistory);
   const [cancelTarget, setCancelTarget] = useState<BookingHistoryEntry | null>(null);
   const [reviewTarget, setReviewTarget] = useState<BookingHistoryEntry | null>(null);
+  const [chatTarget, setChatTarget] = useState<BookingHistoryEntry | null>(null);
 
   function confirmCancel(_reason: string) {
     if (!cancelTarget) return;
@@ -51,6 +53,10 @@ export default function BookingHistoryScreen() {
     );
   }
 
+  if (chatTarget) {
+    return <ParentChatScreen bookingId={chatTarget.id} onBack={() => setChatTarget(null)} />;
+  }
+
   const upcoming = bookings.filter((b) => CANCELLABLE_STATUSES.includes(b.status));
   const past = bookings.filter((b) => !CANCELLABLE_STATUSES.includes(b.status));
 
@@ -67,7 +73,12 @@ export default function BookingHistoryScreen() {
         <Section label="Próximas" hidden={upcoming.length === 0}>
           <View style={styles.list}>
             {upcoming.map((booking) => (
-              <BookingRow key={booking.id} booking={booking} onCancel={() => setCancelTarget(booking)} />
+              <BookingRow
+                key={booking.id}
+                booking={booking}
+                onCancel={() => setCancelTarget(booking)}
+                onChat={() => setChatTarget(booking)}
+              />
             ))}
           </View>
         </Section>
@@ -119,10 +130,12 @@ function BookingRow({
   booking,
   onCancel,
   onReview,
+  onChat,
 }: {
   booking: BookingHistoryEntry;
   onCancel?: () => void;
   onReview?: () => void;
+  onChat?: () => void;
 }) {
   return (
     <View style={styles.row}>
@@ -142,19 +155,26 @@ function BookingRow({
         </Text>
         <View style={styles.statusRow}>
           <BookingStatusPill status={booking.status} />
-          {onCancel && (
-            <Pressable style={styles.cancelLink} onPress={onCancel}>
-              <Text style={styles.cancelLinkLabel}>Cancelar</Text>
-            </Pressable>
-          )}
-          {booking.status === 'completed' &&
-            (onReview ? (
-              <Pressable style={styles.reviewLink} onPress={onReview}>
-                <Text style={styles.reviewLinkLabel}>Dejar reseña</Text>
+          <View style={styles.rowActions}>
+            {onChat && (
+              <Pressable style={styles.chatLink} onPress={onChat}>
+                <Text style={styles.chatLinkLabel}>Chat</Text>
               </Pressable>
-            ) : booking.reviewed ? (
-              <Text style={styles.reviewedLabel}>✓ Reseñada</Text>
-            ) : null)}
+            )}
+            {onCancel && (
+              <Pressable style={styles.cancelLink} onPress={onCancel}>
+                <Text style={styles.cancelLinkLabel}>Cancelar</Text>
+              </Pressable>
+            )}
+            {booking.status === 'completed' &&
+              (onReview ? (
+                <Pressable style={styles.reviewLink} onPress={onReview}>
+                  <Text style={styles.reviewLinkLabel}>Dejar reseña</Text>
+                </Pressable>
+              ) : booking.reviewed ? (
+                <Text style={styles.reviewedLabel}>✓ Reseñada</Text>
+              ) : null)}
+          </View>
         </View>
       </View>
     </View>
@@ -244,6 +264,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  rowActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  chatLink: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  chatLinkLabel: {
+    color: colors.textSoft,
+    fontSize: 12,
+    fontWeight: '700',
   },
   cancelLink: {
     paddingVertical: 4,

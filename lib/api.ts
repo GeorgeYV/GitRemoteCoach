@@ -120,3 +120,31 @@ export function payBooking(
     body: JSON.stringify({ paymentMethodId }),
   });
 }
+
+export type MessageSenderType = 'coach' | 'parent' | 'system';
+
+/** Espeja server/src/types.ts#BookingMessage. */
+export interface BookingMessage {
+  id: string;
+  bookingId: string;
+  senderType: MessageSenderType;
+  senderId: string | null;
+  body: string;
+  createdAt: string;
+}
+
+/** GET /bookings/:id/messages — ParentChatScreen. */
+export function listBookingMessages(bookingId: string): Promise<BookingMessage[]> {
+  return request(`/bookings/${bookingId}/messages`);
+}
+
+/** POST /bookings/:id/messages — ParentChatScreen. Rechazado con 409 si la reserva ya no está activa. */
+export function sendBookingMessage(
+  bookingId: string,
+  params: { senderType: MessageSenderType; senderId?: string; body: string },
+): Promise<BookingMessage> {
+  return request(`/bookings/${bookingId}/messages`, {
+    method: 'POST',
+    body: JSON.stringify(params),
+  });
+}

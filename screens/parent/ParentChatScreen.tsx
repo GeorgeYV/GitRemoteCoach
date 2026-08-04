@@ -1,5 +1,6 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -12,32 +13,69 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ChatBubble from '../../components/parent/ChatBubble';
 import TrainerAvatarPlaceholder from '../../components/shared/TrainerAvatarPlaceholder';
+import { ApiError, BookingMessage, listBookingMessages, sendBookingMessage } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
 import { ChatMessage, mockChatThread } from '../../mock/coachFlow';
-import { mockCarlosMedinaProfile, PARENT_QUICK_REPLIES } from '../../mock/parentFlow';
+import { mockCarlosMedinaProfile, mockParentUser, PARENT_QUICK_REPLIES } from '../../mock/parentFlow';
 
-function nowLabel(): string {
-  return new Date().toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit' });
+function timeLabel(iso: string): string {
+  return new Date(iso).toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit' });
 }
 
-export default function ParentChatScreen() {
+function toChatMessage(message: BookingMessage): ChatMessage {
+  return { id: message.id, sender: message.senderType, text: message.body, time: timeLabel(message.createdAt) };
+}
+
+export default function ParentChatScreen({ bookingId, onBack }: { bookingId: string; onBack?: () => void }) {
   const thread = mockChatThread;
   const coachName = mockCarlosMedinaProfile.trainer.name;
-  const [messages, setMessages] = useState<ChatMessage[]>(thread.messages);
+  const [messages, setMessages] = useState<ChatMessage[] | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
   const scrollRef = useRef<ScrollView>(null);
 
-  function sendMessage(text: string) {
+  useEffect(() => {
+    let cancelled = false;
+    setLoadError(null);
+    listBookingMessages(bookingId)
+      .then((result) => {
+        if (!cancelled) setMessages(result.map(toChatMessage));
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setLoadError(err instanceof ApiError ? err.message : 'No se pudo cargar la conversación.');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [bookingId]);
+
+  async function sendMessage(text: string) {
     const trimmed = text.trim();
-    if (!trimmed) return;
-    setMessages((prev) => [...prev, { id: `m${prev.length}-${Date.now()}`, sender: 'parent', text: trimmed, time: nowLabel() }]);
-    setDraft('');
+    if (!trimmed || sending) return;
+    setSending(true);
+    setSendError(null);
+    try {
+      const message = await sendBookingMessage(bookingId, {
+        senderType: 'parent',
+        senderId: mockParentUser.id,
+        body: trimmed,
+      });
+      setMessages((prev) => [...(prev ?? []), toChatMessage(message)]);
+      setDraft('');
+    } catch (err) {
+      setSendError(err instanceof ApiError ? err.message : 'No se pudo enviar el mensaje. Intenta de nuevo.');
+    } finally {
+      setSending(false);
+    }
   }
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.header}>
-        <Pressable style={styles.backButton}>
+        <Pressable style={styles.backButton} onPress={onBack}>
           <Text style={styles.backIcon}>←</Text>
         </Pressable>
         <TrainerAvatarPlaceholder size={40} />
@@ -62,15 +100,27 @@ export default function ParentChatScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={8}
       >
-        <ScrollView
-          ref={scrollRef}
-          contentContainerStyle={styles.messageList}
-          onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
-        >
-          {messages.map((message) => (
-            <ChatBubble key={message.id} message={message} />
-          ))}
-        </ScrollView>
+        {loadError ? (
+          <View style={styles.centerState}>
+            <Text style={styles.centerStateText}>{loadError}</Text>
+          </View>
+        ) : messages === null ? (
+          <View style={styles.centerState}>
+            <ActivityIndicator color={colors.ballLime} />
+          </View>
+        ) : (
+          <ScrollView
+            ref={scrollRef}
+            contentContainerStyle={styles.messageList}
+            onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
+          >
+            {messages.length === 0 ? (
+              <Text style={styles.centerStateText}>Todavía no hay mensajes — envía el primero.</Text>
+            ) : (
+              messages.map((message) => <ChatBubble key={message.id} message={message} />)
+            )}
+          </ScrollView>
+        )}
 
         <ScrollView
           horizontal
@@ -85,6 +135,7 @@ export default function ParentChatScreen() {
           ))}
         </ScrollView>
 
+        {sendError && <Text style={styles.sendErrorText}>{sendError}</Text>}
         <View style={styles.inputBar}>
           <TextInput
             style={styles.input}
@@ -95,11 +146,11 @@ export default function ParentChatScreen() {
             multiline
           />
           <Pressable
-            style={[styles.sendButton, draft.trim().length === 0 && styles.sendButtonDisabled]}
-            disabled={draft.trim().length === 0}
+            style={[styles.sendButton, (draft.trim().length === 0 || sending) && styles.sendButtonDisabled]}
+            disabled={draft.trim().length === 0 || sending}
             onPress={() => sendMessage(draft)}
           >
-            <Text style={styles.sendIcon}>➤</Text>
+            {sending ? <ActivityIndicator color={colors.courtBlueDeep} /> : <Text style={styles.sendIcon}>➤</Text>}
           </Pressable>
         </View>
       </KeyboardAvoidingView>
@@ -159,6 +210,25 @@ const styles = StyleSheet.create({
   messageList: {
     padding: 16,
     paddingBottom: 8,
+  },
+  centerState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  centerStateText: {
+    color: colors.textDim,
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 19,
+  },
+  sendErrorText: {
+    color: colors.errorCoral,
+    fontSize: 11,
+    textAlign: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 8,
   },
   quickRepliesRow: {
     flexGrow: 0,

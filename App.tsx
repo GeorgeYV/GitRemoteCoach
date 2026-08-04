@@ -31,7 +31,7 @@ import BookingPaymentScreen from './screens/parent/BookingPaymentScreen';
 import BookingStatusScreen from './screens/parent/BookingStatusScreen';
 import ParentChatScreen from './screens/parent/ParentChatScreen';
 import BookingHistoryScreen from './screens/parent/BookingHistoryScreen';
-import { BookingSlotSelection, Tournament } from './mock/parentFlow';
+import { BookingSlotSelection, REAL_COMPLETED_BOOKING_ID, Tournament } from './mock/parentFlow';
 import { MatchConfig } from './lib/types';
 
 type PreviewScreen =
@@ -240,7 +240,7 @@ function ScreenPreviewSwitcher() {
         ) : screen === 'parentList' ? (
           <TrainerListScreen />
         ) : screen === 'parentChat' ? (
-          <ParentChatScreen />
+          <ParentChatScreen bookingId={REAL_COMPLETED_BOOKING_ID} />
         ) : screen === 'parentHistory' ? (
           <BookingHistoryScreen />
         ) : (
