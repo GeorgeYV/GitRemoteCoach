@@ -95,6 +95,7 @@ function ParentBookingFlow() {
   const [step, setStep] = useState<'profile' | 'confirm' | 'payment' | 'status'>('profile');
   const [selection, setSelection] = useState<BookingSlotSelection | null>(null);
   const [note, setNote] = useState('');
+  const [bookingId, setBookingId] = useState<string | null>(null);
 
   if (step === 'profile') {
     return <TrainerProfileScreen onReserve={() => setStep('confirm')} />;
@@ -104,9 +105,10 @@ function ParentBookingFlow() {
     return (
       <BookingConfirmScreen
         onBack={() => setStep('profile')}
-        onContinue={(nextSelection, nextNote) => {
+        onContinue={(nextSelection, nextNote, nextBookingId) => {
           setSelection(nextSelection);
           setNote(nextNote);
+          setBookingId(nextBookingId);
           setStep('payment');
         }}
       />
@@ -114,9 +116,10 @@ function ParentBookingFlow() {
   }
 
   if (step === 'payment') {
-    if (!selection) return null;
+    if (!selection || !bookingId) return null;
     return (
       <BookingPaymentScreen
+        bookingId={bookingId}
         selection={selection}
         note={note}
         onBack={() => setStep('confirm')}

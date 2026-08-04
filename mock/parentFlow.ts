@@ -1,6 +1,8 @@
 export interface ParentUser {
   /** UUID real — usado como parentId al enviar una reseña (POST /bookings/:id/review). */
   id: string;
+  /** UUID real del jugador (childName) — usado como playerId al crear una reserva (POST /bookings). */
+  playerId: string;
   name: string;
   initial: string;
   childName: string;
@@ -54,6 +56,31 @@ export const BOOKING_PERIOD_LABELS: Record<BookingPeriod, string> = {
 export interface BookingSlotSelection {
   dayLabel: string;
   period: BookingPeriod;
+}
+
+/** UUID real del torneo — coincide con tournamentId en server/test/seed.ts. Independiente de
+ * mockFeaturedTournament.id (un slug que el lado coach usa para presets de disponibilidad/tarifa
+ * en mock/coachFlow.ts — cambiarlo rompería esos lookups). */
+export const REAL_TOURNAMENT_ID = '00000000-0000-0000-0000-000000000002';
+
+const BOOKING_DAY_LABEL_TO_DATE: Record<string, string> = {
+  'Vie 5': '2026-08-05',
+  'Sáb 6': '2026-08-06',
+  'Dom 7': '2026-08-07',
+  'Lun 8': '2026-08-08',
+  'Mar 9': '2026-08-09',
+};
+
+const BOOKING_PERIOD_TO_TIME: Record<BookingPeriod, string> = {
+  morning: '10:00:00',
+  afternoon: '16:00:00',
+};
+
+/** Traduce la selección de día/horario del wireframe a un ISO datetime real para POST /bookings. */
+export function buildMatchDatetime(selection: BookingSlotSelection): string {
+  const date = BOOKING_DAY_LABEL_TO_DATE[selection.dayLabel] ?? BOOKING_DAY_LABEL_TO_DATE['Vie 5'];
+  const time = BOOKING_PERIOD_TO_TIME[selection.period];
+  return `${date}T${time}.000Z`;
 }
 
 export interface PaymentMethod {
@@ -177,6 +204,8 @@ export const mockParentUser: ParentUser = {
   // UUID real — coincide con el padre sembrado en server/test/seed.ts (parentUserId,
   // full_name "María Guardián") para poder probar POST /bookings/:id/review contra el backend real.
   id: '00000000-0000-0000-0000-000000000003',
+  // UUID real — coincide con playerId en server/test/seed.ts (full_name "Valentina Guardián").
+  playerId: '00000000-0000-0000-0000-000000000006',
   name: 'María',
   initial: 'M',
   childName: 'Valentina',

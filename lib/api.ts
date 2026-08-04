@@ -94,3 +94,29 @@ export function cancelBooking(
     body: JSON.stringify(params),
   });
 }
+
+/** POST /bookings — BookingConfirmScreen. Crea la reserva en estado 'requested'. */
+export function requestBooking(params: {
+  playerId: string;
+  coachId: string;
+  tournamentId: string;
+  matchDatetime: string;
+  agreedRate: number;
+  note?: string;
+}): Promise<Booking> {
+  return request('/bookings', {
+    method: 'POST',
+    body: JSON.stringify(params),
+  });
+}
+
+/** POST /bookings/:id/pay — BookingPaymentScreen. Solo funciona si el coach ya aceptó la reserva. */
+export function payBooking(
+  bookingId: string,
+  paymentMethodId: string,
+): Promise<{ booking: Booking; requiresAction?: { clientSecret: string } }> {
+  return request(`/bookings/${bookingId}/pay`, {
+    method: 'POST',
+    body: JSON.stringify({ paymentMethodId }),
+  });
+}

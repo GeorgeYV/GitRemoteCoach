@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import PaymentMethodRow from '../../components/parent/PaymentMethodRow';
 import TrainerAvatarPlaceholder from '../../components/shared/TrainerAvatarPlaceholder';
+import { ApiError, payBooking } from '../../lib/api';
 import { colors, radius } from '../../lib/theme';
 import {
   BOOKING_PERIOD_LABELS,
@@ -13,11 +14,13 @@ import {
 } from '../../mock/parentFlow';
 
 export default function BookingPaymentScreen({
+  bookingId,
   selection,
   note,
   onBack,
   onConfirm,
 }: {
+  bookingId: string;
   selection: BookingSlotSelection;
   note: string;
   onBack: () => void;
@@ -26,6 +29,25 @@ export default function BookingPaymentScreen({
   const profile = mockCarlosMedinaProfile;
   const { trainer } = profile;
   const [methodId, setMethodId] = useState(mockPaymentMethods[0].id);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleConfirm() {
+    setSubmitting(true);
+    setError(null);
+    try {
+      const result = await payBooking(bookingId, methodId);
+      if (result.requiresAction) {
+        setError('El pago requiere verificación adicional (3DS), no soportada en este demo.');
+        return;
+      }
+      onConfirm();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'No se pudo procesar el pago. Intenta de nuevo.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -68,9 +90,18 @@ export default function BookingPaymentScreen({
       </ScrollView>
 
       <View style={styles.footer}>
+        {error && <Text style={styles.errorText}>{error}</Text>}
         <Text style={styles.footerNote}>El cobro se libera al entrenador tras completar el partido</Text>
-        <Pressable style={styles.confirmButton} onPress={onConfirm}>
-          <Text style={styles.confirmLabel}>Confirmar y pagar ${trainer.price}</Text>
+        <Pressable
+          style={[styles.confirmButton, submitting && styles.confirmButtonDisabled]}
+          onPress={handleConfirm}
+          disabled={submitting}
+        >
+          {submitting ? (
+            <ActivityIndicator color={colors.courtBlueDeep} />
+          ) : (
+            <Text style={styles.confirmLabel}>Confirmar y pagar ${trainer.price}</Text>
+          )}
         </Pressable>
       </View>
     </SafeAreaView>
@@ -207,9 +238,18 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     alignItems: 'center',
   },
+  confirmButtonDisabled: {
+    opacity: 0.6,
+  },
   confirmLabel: {
     color: colors.courtBlueDeep,
     fontSize: 15,
     fontWeight: '800',
+  },
+  errorText: {
+    color: colors.errorCoral,
+    fontSize: 12,
+    textAlign: 'center',
+    marginBottom: 10,
   },
 });

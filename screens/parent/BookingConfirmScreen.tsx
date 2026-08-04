@@ -1,14 +1,18 @@
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import TrainerAvatarPlaceholder from '../../components/shared/TrainerAvatarPlaceholder';
+import { ApiError, requestBooking } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
 import {
   BOOKING_PERIOD_LABELS,
   BookingPeriod,
   BookingSlotSelection,
+  buildMatchDatetime,
   mockCarlosMedinaProfile,
   mockFeaturedTournament,
+  mockParentUser,
+  REAL_TOURNAMENT_ID,
 } from '../../mock/parentFlow';
 
 export default function BookingConfirmScreen({
@@ -16,18 +20,41 @@ export default function BookingConfirmScreen({
   onContinue,
 }: {
   onBack: () => void;
-  onContinue: (selection: BookingSlotSelection, note: string) => void;
+  onContinue: (selection: BookingSlotSelection, note: string, bookingId: string) => void;
 }) {
   const profile = mockCarlosMedinaProfile;
   const { trainer } = profile;
   const [selection, setSelection] = useState<BookingSlotSelection | null>(null);
   const [note, setNote] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   function selectSlot(dayLabel: string, period: BookingPeriod) {
     setSelection({ dayLabel, period });
   }
 
-  const canContinue = selection !== null;
+  async function handleContinue() {
+    if (!selection) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      const booking = await requestBooking({
+        playerId: mockParentUser.playerId,
+        coachId: trainer.id,
+        tournamentId: REAL_TOURNAMENT_ID,
+        matchDatetime: buildMatchDatetime(selection),
+        agreedRate: trainer.price,
+        note: note.trim() || undefined,
+      });
+      onContinue(selection, note.trim(), booking.id);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'No se pudo enviar la solicitud. Intenta de nuevo.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const canContinue = selection !== null && !submitting;
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -101,13 +128,18 @@ export default function BookingConfirmScreen({
       </ScrollView>
 
       <View style={styles.footer}>
+        {error && <Text style={styles.errorText}>{error}</Text>}
         <Text style={styles.footerNote}>${trainer.price} · sin costo de viáticos</Text>
         <Pressable
           style={[styles.continueButton, !canContinue && styles.continueButtonDisabled]}
           disabled={!canContinue}
-          onPress={() => selection && onContinue(selection, note.trim())}
+          onPress={handleContinue}
         >
-          <Text style={styles.continueLabel}>Continuar a pago</Text>
+          {submitting ? (
+            <ActivityIndicator color={colors.courtBlueDeep} />
+          ) : (
+            <Text style={styles.continueLabel}>Continuar a pago</Text>
+          )}
         </Pressable>
       </View>
     </SafeAreaView>
@@ -240,6 +272,12 @@ const styles = StyleSheet.create({
   },
   footerNote: {
     color: colors.textDim,
+    fontSize: 12,
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  errorText: {
+    color: colors.errorCoral,
     fontSize: 12,
     textAlign: 'center',
     marginBottom: 10,
