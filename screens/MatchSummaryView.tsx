@@ -5,7 +5,7 @@ import { useMatch } from '../context/MatchContext';
 import { colors, radius } from '../lib/theme';
 
 export default function MatchSummaryView() {
-  const { config, matchState, stats, reducerState, setObservations, resetMatch } = useMatch();
+  const { config, matchState, stats, reducerState, setObservations, resetMatch, reopenMatch } = useMatch();
   const p1 = stats.player1;
 
   const setScoresLine = matchState.completedSets.map((s) => `${s.gamesPlayer1}-${s.gamesPlayer2}`).join(', ');
@@ -54,6 +54,12 @@ export default function MatchSummaryView() {
           onChangeText={setObservations}
           textAlignVertical="top"
         />
+
+        <Pressable style={styles.backButton} onPress={reopenMatch}>
+          <Text style={styles.backLabel}>
+            {matchState.matchEnded ? '↺ Deshacer último punto y volver' : '← Volver a capturar'}
+          </Text>
+        </Pressable>
 
         <Pressable style={styles.finishButton} onPress={resetMatch}>
           <Text style={styles.finishLabel}>Nuevo partido</Text>
@@ -150,6 +156,16 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     minHeight: 110,
     marginBottom: 20,
+  },
+  backButton: {
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  backLabel: {
+    color: colors.textDim,
+    fontSize: 13,
+    fontWeight: '600',
   },
   finishButton: {
     backgroundColor: colors.ballLime,

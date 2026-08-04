@@ -22,6 +22,7 @@ interface MatchContextValue {
   undoLast: () => void;
   setMode: (mode: CaptureMode) => void;
   closeMatch: () => void;
+  reopenMatch: () => void;
   setObservations: (text: string) => void;
   resetMatch: () => void;
   canUndo: boolean;
@@ -75,6 +76,13 @@ export function MatchProvider({
     undoLast: () => dispatch({ type: 'UNDO_LAST' }),
     setMode: (mode) => dispatch({ type: 'SET_MODE', payload: mode }),
     closeMatch: () => dispatch({ type: 'CLOSE_MATCH' }),
+    reopenMatch: () => {
+      // if the match ended on its own, undoing its final point is what actually
+      // lets the coach get back into LiveCaptureView (matchEnded is derived from
+      // events, not a flag REOPEN_MATCH alone can clear).
+      if (matchState.matchEnded) dispatch({ type: 'UNDO_LAST' });
+      dispatch({ type: 'REOPEN_MATCH' });
+    },
     setObservations: (text) => dispatch({ type: 'SET_OBSERVATIONS', payload: text }),
     resetMatch: () => {
       dispatch({ type: 'RESET' });

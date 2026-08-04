@@ -19,9 +19,15 @@ export default function LiveCaptureView({ roundLabel }: { roundLabel: string }) 
   function handlePoint(wonBy: PlayerId) {
     if (reducerState.mode === 'rapida') {
       addPoint(wonBy, null);
-    } else {
-      setPendingWonBy(wonBy);
+      return;
     }
+    // A detail sheet may already be open for the previous point. Never make the
+    // coach wait for it: commit that one with no detail (same as a timeout) and
+    // immediately open the sheet for the new point.
+    if (pendingWonBy) {
+      addPoint(pendingWonBy, null);
+    }
+    setPendingWonBy(wonBy);
   }
 
   function handleDetailConfirm(detail: PointDetail | null) {
@@ -42,7 +48,7 @@ export default function LiveCaptureView({ roundLabel }: { roundLabel: string }) 
 
         <ModeSwitch mode={reducerState.mode} onChange={setMode} />
 
-        <PointButtons disabled={matchEnded || pendingWonBy !== null} onPoint={handlePoint} />
+        <PointButtons disabled={matchEnded} onPoint={handlePoint} />
 
         <DetailSheet pendingWonBy={pendingWonBy} onConfirm={handleDetailConfirm} />
       </View>

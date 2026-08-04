@@ -14,6 +14,7 @@ export type MatchAction =
   | { type: 'UNDO_LAST' }
   | { type: 'SET_MODE'; payload: CaptureMode }
   | { type: 'CLOSE_MATCH' }
+  | { type: 'REOPEN_MATCH' }
   | { type: 'SET_OBSERVATIONS'; payload: string }
   | { type: 'LOAD_STATE'; payload: MatchReducerState }
   | { type: 'RESET' };
@@ -35,6 +36,8 @@ export function matchReducer(state: MatchReducerState, action: MatchAction): Mat
       return { ...state, mode: action.payload };
     case 'CLOSE_MATCH':
       return { ...state, matchClosed: true };
+    case 'REOPEN_MATCH':
+      return { ...state, matchClosed: false };
     case 'SET_OBSERVATIONS':
       return { ...state, observations: action.payload };
     case 'LOAD_STATE':
