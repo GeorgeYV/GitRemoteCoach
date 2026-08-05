@@ -312,6 +312,106 @@ console.log('\n=== Escenario 11: invitación de club (CoachClubInvitationScreen)
   );
 }
 
+console.log('\n=== Escenario 12: captura en vivo de un partido (matches / match_point_events) ===');
+{
+  const reqRes = await requestBooking(fixtures.coachAUserId, inFuture(120));
+  const booking12 = reqRes.json();
+
+  const matchPayload = {
+    bookingId: booking12.id,
+    player2Label: 'Rival de práctica',
+    bestOf: '3',
+    noAd: false,
+    initialServer: 'player1',
+    captureMode: 'rapida',
+  };
+  const createRes = await app.inject({ method: 'POST', url: '/matches', payload: matchPayload });
+  assertEqual(createRes.statusCode, 201, 'POST /matches devuelve 201');
+  const match = createRes.json();
+  assertEqual(match.player1Id, fixtures.playerId, 'player1_id se deriva de la reserva, no del payload del cliente');
+  assertEqual(match.status, 'in_progress', 'estado inicial = in_progress');
+
+  const createAgainRes = await app.inject({ method: 'POST', url: '/matches', payload: matchPayload });
+  assertEqual(createAgainRes.json().id, match.id, 'POST /matches es idempotente por bookingId (booking_id es UNIQUE)');
+
+  const point1Res = await app.inject({
+    method: 'POST',
+    url: `/matches/${match.id}/points`,
+    payload: { sequenceNumber: 1, wonBy: 'player1', detail: 'ace', firstServeIn: true },
+  });
+  assertEqual(point1Res.statusCode, 201, 'POST points devuelve 201');
+  const point1 = point1Res.json();
+
+  const point2Res = await app.inject({
+    method: 'POST',
+    url: `/matches/${match.id}/points`,
+    payload: { sequenceNumber: 2, wonBy: 'player2', detail: null, firstServeIn: true },
+  });
+  const point2 = point2Res.json();
+
+  const undoRes = await app.inject({ method: 'DELETE', url: `/matches/${match.id}/points/2` });
+  assertEqual(undoRes.statusCode, 204, 'DELETE points/:sequenceNumber (undo) devuelve 204');
+
+  const bulkRes = await app.inject({
+    method: 'POST',
+    url: `/matches/${match.id}/points/bulk`,
+    payload: {
+      points: [
+        { sequenceNumber: 1, wonBy: 'player1', detail: 'ace', firstServeIn: true },
+        { sequenceNumber: 2, wonBy: 'player2', detail: null, firstServeIn: true },
+      ],
+    },
+  });
+  const bulkPoints = bulkRes.json();
+  assertEqual(bulkPoints.length, 2, 'points/bulk devuelve los 2 puntos');
+  assertEqual(bulkPoints[0].id, point1.id, 'bulk es idempotente para un punto ya sincronizado (mismo id, no lo duplica)');
+  assertTrue(bulkPoints[1].id !== point2.id, 'bulk recrea el punto 2 tras el undo (id distinto al borrado)');
+
+  const completeRes = await app.inject({
+    method: 'PATCH',
+    url: `/matches/${match.id}/status`,
+    payload: { status: 'completed' },
+  });
+  assertEqual(completeRes.json().status, 'completed', 'PATCH status = completed');
+  assertTrue(!!completeRes.json().completedAt, 'completed_at queda fijado al completar');
+
+  const obsRes = await app.inject({
+    method: 'PATCH',
+    url: `/matches/${match.id}/observations`,
+    payload: { coachObservations: 'Buen segundo saque, mejorar la volea.' },
+  });
+  assertEqual(
+    obsRes.json().coachObservations,
+    'Buen segundo saque, mejorar la volea.',
+    'PATCH observations guarda las observaciones del entrenador',
+  );
+
+  const modeRes = await app.inject({
+    method: 'PATCH',
+    url: `/matches/${match.id}/capture-mode`,
+    payload: { captureMode: 'detallada' },
+  });
+  assertEqual(modeRes.json().captureMode, 'detallada', 'PATCH capture-mode cambia el modo de captura');
+
+  const restartRes = await app.inject({ method: 'POST', url: `/matches/${match.id}/restart` });
+  assertEqual(restartRes.statusCode, 200, 'POST restart ("Nuevo partido") devuelve 200');
+  assertEqual(restartRes.json().status, 'in_progress', 'restart vuelve el estado a in_progress');
+
+  const afterRestartBulk = await (
+    await app.inject({
+      method: 'POST',
+      url: `/matches/${match.id}/points/bulk`,
+      payload: {
+        points: [{ sequenceNumber: 1, wonBy: 'player1', detail: 'ace', firstServeIn: true }],
+      },
+    })
+  ).json();
+  assertTrue(
+    afterRestartBulk[0].id !== point1.id,
+    'restart borró los puntos anteriores del mismo partido (el punto 1 se recrea con id nuevo)',
+  );
+}
+
 console.log(`\n=== Resultado: ${passed} pasaron, ${failed} fallaron ===`);
 await app.close();
 process.exit(failed > 0 ? 1 : 0);

@@ -37,7 +37,15 @@ import ClubTournamentDetailScreen from './screens/club/ClubTournamentDetailScree
 import ClubInviteCoachScreen from './screens/club/ClubInviteCoachScreen';
 import { BookingSlotSelection, mockCarlosMedinaProfile, REAL_COMPLETED_BOOKING_ID, Tournament } from './mock/parentFlow';
 import { MatchConfig } from './lib/types';
-import { ApiError, BookingWithParticipants, cancelBooking, getCoachProfile, listCoachBookings, TournamentSummary } from './lib/api';
+import {
+  ApiError,
+  BookingWithParticipants,
+  cancelBooking,
+  createOrGetMatch,
+  getCoachProfile,
+  listCoachBookings,
+  TournamentSummary,
+} from './lib/api';
 import { isUpcoming, toCoachBooking } from './lib/coachBookingDisplay';
 
 type PreviewScreen =
@@ -251,13 +259,43 @@ function CoachHomeFlow() {
 }
 
 /**
- * Local three-step flow: pre-match reminder → confirm match setup → the existing,
- * unmodified live-capture wireframe. This is the "transición" requested — it does not
- * change LiveCaptureView/MatchSummaryView at all, only how the coach arrives at them.
+ * Local four-step flow: pre-match reminder → confirm match setup → resolve/create the
+ * server-side `matches` row for this booking → the existing, unmodified live-capture
+ * wireframe. CoachPreMatchReminderScreen/CoachMatchSetupScreen keep showing mock content
+ * (mockPreMatchReminder) — only the persistence plumbing (bookingId → matchId) is real;
+ * re-wiring their displayed content to the real booking is separate follow-up work.
  */
-function CoachMatchDayFlow() {
-  const [step, setStep] = useState<'reminder' | 'setup' | 'live'>('reminder');
+function CoachMatchDayFlow({ bookingId }: { bookingId: string }) {
+  const [step, setStep] = useState<'reminder' | 'setup' | 'loadingMatch' | 'live'>('reminder');
   const [session, setSession] = useState<{ config: MatchConfig; roundLabel: string } | null>(null);
+  const [matchId, setMatchId] = useState<string | null>(null);
+  const [matchError, setMatchError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (step !== 'loadingMatch' || !session) return;
+    let cancelled = false;
+    setMatchError(null);
+    createOrGetMatch({
+      bookingId,
+      player2Label: session.config.player2Name,
+      bestOf: String(session.config.bestOf) as '1' | '3',
+      noAd: session.config.noAd,
+      initialServer: session.config.initialServer,
+      captureMode: 'rapida',
+    })
+      .then((match) => {
+        if (cancelled) return;
+        setMatchId(match.id);
+        setStep('live');
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setMatchError(err instanceof ApiError ? err.message : 'No se pudo iniciar el partido.');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [step, session, bookingId]);
 
   if (step === 'reminder') {
     return <CoachPreMatchReminderScreen onStartCapture={() => setStep('setup')} />;
@@ -268,17 +306,79 @@ function CoachMatchDayFlow() {
       <CoachMatchSetupScreen
         onStart={(config, roundLabel) => {
           setSession({ config, roundLabel });
-          setStep('live');
+          setStep('loadingMatch');
         }}
       />
     );
   }
 
-  if (!session) return null;
+  if (step === 'loadingMatch') {
+    return (
+      <View style={[styles.root, styles.centerState]}>
+        {matchError ? (
+          <Text style={styles.centerStateText}>{matchError}</Text>
+        ) : (
+          <ActivityIndicator color={colors.ballLime} />
+        )}
+      </View>
+    );
+  }
+
+  if (!session || !matchId) return null;
 
   return (
-    <MatchProvider config={session.config}>
+    <MatchProvider config={session.config} matchId={matchId}>
       <CoachFlow roundLabel={session.roundLabel} />
+    </MatchProvider>
+  );
+}
+
+/** Atajo de previsualización directo a la captura (salta reminder/setup) — misma
+ * persistencia real que CoachMatchDayFlow, contra el mismo booking fixture. */
+function CoachCapturePreview() {
+  const [matchId, setMatchId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    createOrGetMatch({
+      bookingId: REAL_COMPLETED_BOOKING_ID,
+      player2Label: mockMatchConfig.player2Name,
+      bestOf: String(mockMatchConfig.bestOf) as '1' | '3',
+      noAd: mockMatchConfig.noAd,
+      initialServer: mockMatchConfig.initialServer,
+      captureMode: 'rapida',
+    })
+      .then((match) => {
+        if (!cancelled) setMatchId(match.id);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof ApiError ? err.message : 'No se pudo iniciar el partido.');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (error) {
+    return (
+      <View style={[styles.root, styles.centerState]}>
+        <Text style={styles.centerStateText}>{error}</Text>
+      </View>
+    );
+  }
+
+  if (!matchId) {
+    return (
+      <View style={[styles.root, styles.centerState]}>
+        <ActivityIndicator color={colors.ballLime} />
+      </View>
+    );
+  }
+
+  return (
+    <MatchProvider config={mockMatchConfig} matchId={matchId}>
+      <CoachFlow />
     </MatchProvider>
   );
 }
@@ -317,9 +417,7 @@ function ScreenPreviewSwitcher() {
     <View style={styles.root}>
       <View style={styles.content}>
         {screen === 'coachCapture' ? (
-          <MatchProvider config={mockMatchConfig}>
-            <CoachFlow />
-          </MatchProvider>
+          <CoachCapturePreview />
         ) : screen === 'coachRegister' ? (
           <CoachRegistrationScreen />
         ) : screen === 'coachPending' ? (
@@ -333,7 +431,7 @@ function ScreenPreviewSwitcher() {
         ) : screen === 'coachChat' ? (
           <CoachChatScreen bookingId={REAL_COMPLETED_BOOKING_ID} />
         ) : screen === 'coachPreMatch' ? (
-          <CoachMatchDayFlow />
+          <CoachMatchDayFlow bookingId={REAL_COMPLETED_BOOKING_ID} />
         ) : screen === 'coachSessions' ? (
           <CoachSessionHistoryScreen />
         ) : screen === 'coachEarnings' ? (

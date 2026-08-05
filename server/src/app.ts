@@ -11,6 +11,7 @@ import { tournamentRoutes } from './routes/tournaments.js';
 import { coachTournamentRoutes } from './routes/coachTournaments.js';
 import { bookingMessageRoutes } from './routes/bookingMessages.js';
 import { reviewRoutes } from './routes/reviews.js';
+import { matchRoutes } from './routes/matches.js';
 
 export function buildApp() {
   const app = Fastify({ logger: true });
@@ -41,6 +42,7 @@ export function buildApp() {
   app.register(coachTournamentRoutes);
   app.register(bookingMessageRoutes);
   app.register(reviewRoutes);
+  app.register(matchRoutes);
 
   return app;
 }

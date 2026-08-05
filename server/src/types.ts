@@ -240,3 +240,42 @@ export interface Review {
 export interface ReviewWithParent extends Review {
   parentName: string;
 }
+
+/** El enum de DB usa strings ('1'/'3'), no números — ver CREATE TYPE match_best_of en db/schema.sql. */
+export type MatchBestOf = '1' | '3';
+export type MatchPlayerSlot = 'player1' | 'player2';
+export type MatchStatus = 'in_progress' | 'completed';
+export type CaptureMode = 'rapida' | 'detallada';
+export type PointDetail =
+  | 'winner_derecha'
+  | 'winner_reves'
+  | 'winner_volea'
+  | 'ace'
+  | 'doble_falta'
+  | 'error_no_forzado'
+  | 'error_forzado';
+
+export interface Match {
+  id: string;
+  bookingId: string;
+  player1Id: string;
+  player2Label: string;
+  bestOf: MatchBestOf;
+  noAd: boolean;
+  initialServer: MatchPlayerSlot;
+  captureMode: CaptureMode;
+  status: MatchStatus;
+  coachObservations: string | null;
+  startedAt: string;
+  completedAt: string | null;
+}
+
+export interface MatchPointEvent {
+  id: string;
+  matchId: string;
+  sequenceNumber: number;
+  occurredAt: string;
+  wonBy: MatchPlayerSlot;
+  detail: PointDetail | null;
+  firstServeIn: boolean;
+}

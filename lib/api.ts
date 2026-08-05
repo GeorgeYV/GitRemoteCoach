@@ -456,3 +456,118 @@ export function settleTournament(
 ): Promise<{ message?: string; settlement: ClubSettlement | null }> {
   return request(`/tournaments/${tournamentId}/settle`, { method: 'POST' });
 }
+
+export type MatchBestOf = '1' | '3';
+export type MatchPlayerSlot = 'player1' | 'player2';
+export type MatchStatus = 'in_progress' | 'completed';
+export type CaptureMode = 'rapida' | 'detallada';
+export type PointDetail =
+  | 'winner_derecha'
+  | 'winner_reves'
+  | 'winner_volea'
+  | 'ace'
+  | 'doble_falta'
+  | 'error_no_forzado'
+  | 'error_forzado';
+
+/** Espeja server/src/types.ts#Match. */
+export interface Match {
+  id: string;
+  bookingId: string;
+  player1Id: string;
+  player2Label: string;
+  bestOf: MatchBestOf;
+  noAd: boolean;
+  initialServer: MatchPlayerSlot;
+  captureMode: CaptureMode;
+  status: MatchStatus;
+  coachObservations: string | null;
+  startedAt: string;
+  completedAt: string | null;
+}
+
+/** Espeja server/src/types.ts#MatchPointEvent. */
+export interface MatchPointEvent {
+  id: string;
+  matchId: string;
+  sequenceNumber: number;
+  occurredAt: string;
+  wonBy: MatchPlayerSlot;
+  detail: PointDetail | null;
+  firstServeIn: boolean;
+}
+
+export interface MatchPointInput {
+  sequenceNumber: number;
+  wonBy: MatchPlayerSlot;
+  detail: PointDetail | null;
+  firstServeIn: boolean;
+}
+
+/** POST /matches — CoachMatchSetupScreen "Comenzar captura en vivo". Idempotente por bookingId. */
+export function createOrGetMatch(params: {
+  bookingId: string;
+  player2Label: string;
+  bestOf: MatchBestOf;
+  noAd: boolean;
+  initialServer: MatchPlayerSlot;
+  captureMode: CaptureMode;
+}): Promise<Match> {
+  return request('/matches', {
+    method: 'POST',
+    body: JSON.stringify(params),
+  });
+}
+
+/** POST /matches/:id/points — LiveCaptureView, cada punto anotado en vivo. */
+export function createMatchPoint(matchId: string, point: MatchPointInput): Promise<MatchPointEvent> {
+  return request(`/matches/${matchId}/points`, {
+    method: 'POST',
+    body: JSON.stringify(point),
+  });
+}
+
+/** POST /matches/:id/points/bulk — LiveCaptureView, catálogo de recuperación (hidratación de
+ * AsyncStorage o botón "Reintentar sincronización"). Idempotente: reenviar puntos ya
+ * sincronizados no los duplica. */
+export function createMatchPointsBulk(matchId: string, points: MatchPointInput[]): Promise<MatchPointEvent[]> {
+  return request(`/matches/${matchId}/points/bulk`, {
+    method: 'POST',
+    body: JSON.stringify({ points }),
+  });
+}
+
+/** DELETE /matches/:id/points/:sequenceNumber — LiveCaptureView, deshacer último punto. */
+export function deleteMatchPoint(matchId: string, sequenceNumber: number): Promise<void> {
+  return request(`/matches/${matchId}/points/${sequenceNumber}`, { method: 'DELETE' });
+}
+
+/** POST /matches/:id/restart — MatchSummaryView "Nuevo partido": reinicia el mismo partido
+ * (booking_id es UNIQUE, no se puede crear uno nuevo para la misma reserva). */
+export function restartMatch(matchId: string): Promise<Match> {
+  return request(`/matches/${matchId}/restart`, { method: 'POST' });
+}
+
+/** PATCH /matches/:id/status — LiveCaptureView "Finalizar partido" / MatchSummaryView "Deshacer último punto y volver". */
+export function updateMatchStatus(matchId: string, status: MatchStatus): Promise<Match> {
+  return request(`/matches/${matchId}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  });
+}
+
+/** PATCH /matches/:id/observations — MatchSummaryView, debounced mientras el entrenador escribe. */
+export function updateMatchObservations(matchId: string, coachObservations: string): Promise<Match> {
+  return request(`/matches/${matchId}/observations`, {
+    method: 'PATCH',
+    body: JSON.stringify({ coachObservations }),
+  });
+}
+
+/** PATCH /matches/:id/capture-mode — LiveCaptureView, ModeSwitch (rápida/detallada). */
+export function updateMatchCaptureMode(matchId: string, captureMode: CaptureMode): Promise<Match> {
+  return request(`/matches/${matchId}/capture-mode`, {
+    method: 'PATCH',
+    body: JSON.stringify({ captureMode }),
+  });
+}

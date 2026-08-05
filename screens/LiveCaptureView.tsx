@@ -7,11 +7,12 @@ import ModeSwitch from '../components/ModeSwitch';
 import PointButtons from '../components/PointButtons';
 import ScoreHeader from '../components/ScoreHeader';
 import { useMatch } from '../context/MatchContext';
-import { colors } from '../lib/theme';
+import { colors, withOpacity } from '../lib/theme';
 import { PlayerId, PointDetail } from '../lib/types';
 
 export default function LiveCaptureView({ roundLabel }: { roundLabel: string }) {
-  const { reducerState, matchState, addPoint, undoLast, setMode, closeMatch, canUndo } = useMatch();
+  const { reducerState, matchState, addPoint, undoLast, setMode, closeMatch, canUndo, syncError, retrySync } =
+    useMatch();
   const [pendingWonBy, setPendingWonBy] = useState<PlayerId | null>(null);
 
   const matchEnded = matchState.matchEnded;
@@ -40,6 +41,15 @@ export default function LiveCaptureView({ roundLabel }: { roundLabel: string }) 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <ScoreHeader roundLabel={roundLabel} canUndo={canUndo} onUndo={undoLast} />
+
+      {syncError && (
+        <View style={styles.syncBanner}>
+          <Text style={styles.syncBannerText}>{syncError}</Text>
+          <Pressable onPress={retrySync} hitSlop={8}>
+            <Text style={styles.syncBannerRetry}>Reintentar</Text>
+          </Pressable>
+        </View>
+      )}
 
       <View style={styles.captureArea}>
         <Pressable style={styles.finishLink} onPress={closeMatch} disabled={matchEnded}>
@@ -76,6 +86,28 @@ const styles = StyleSheet.create({
   finishLabel: {
     color: colors.textDim,
     fontSize: 12,
+    textDecorationLine: 'underline',
+  },
+  syncBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: withOpacity(colors.errorCoral, 0.12),
+    borderBottomWidth: 1,
+    borderBottomColor: withOpacity(colors.errorCoral, 0.35),
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  syncBannerText: {
+    flex: 1,
+    color: colors.errorCoral,
+    fontSize: 11,
+    marginRight: 10,
+  },
+  syncBannerRetry: {
+    color: colors.errorCoral,
+    fontSize: 11,
+    fontWeight: '800',
     textDecorationLine: 'underline',
   },
 });
