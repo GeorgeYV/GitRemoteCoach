@@ -1,3 +1,4 @@
+import { withTransaction } from '../lib/db.js';
 import * as bookingRepository from '../repositories/bookingRepository.js';
 import * as matchPointEventRepository from '../repositories/matchPointEventRepository.js';
 import type { PointInput } from '../repositories/matchPointEventRepository.js';
@@ -41,10 +42,14 @@ export async function removePoint(matchId: string, sequenceNumber: number): Prom
 }
 
 /** "Nuevo partido": borra todos los puntos y vuelve el partido a in_progress, en vez de
- * crear una segunda fila matches (booking_id es UNIQUE). */
+ * crear una segunda fila matches (booking_id es UNIQUE). Ambos pasos van en una sola
+ * transacción — un crash a mitad de camino no debe dejar los puntos borrados con el
+ * partido todavía marcado 'completed'. */
 export async function restartMatch(matchId: string): Promise<Match> {
-  await matchPointEventRepository.deleteAllForMatch(matchId);
-  return matchRepository.updateStatus(matchId, 'in_progress');
+  return withTransaction(async (client) => {
+    await matchPointEventRepository.deleteAllForMatch(matchId, client);
+    return matchRepository.updateStatus(matchId, 'in_progress', client);
+  });
 }
 
 export async function setStatus(matchId: string, status: MatchStatus): Promise<Match> {
