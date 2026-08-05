@@ -1,7 +1,7 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import React, { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors, radius } from '../lib/theme';
 import { PlayerId } from '../lib/types';
 
@@ -57,7 +57,12 @@ function PointButton({
       onPressIn={() => setPressed(true)}
       onPressOut={() => setPressed(false)}
       onPress={() => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+        // navigator.vibrate() en web no aporta nada (sin hardware de vibración en desktop/laptop)
+        // y algunos navegadores lo tratan como una intervención sin gesto de usuario confiable —
+        // se salta ahí en vez de dispararlo en cada punto.
+        if (Platform.OS !== 'web') {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+        }
         onPress();
       }}
       style={[styles.buttonWrap, pressed && styles.buttonPressed, disabled && styles.buttonDisabled]}
