@@ -231,6 +231,25 @@ export function getCoachProfile(coachId: string): Promise<CoachProfileWithTraini
   return request(`/coaches/${coachId}`);
 }
 
+/** Espeja server/src/types.ts#CoachSearchResult. */
+export interface CoachSearchResult {
+  id: string;
+  name: string;
+  city: string;
+  ratingAvg: string;
+  yearsExperience: number;
+  specialty: string | null;
+}
+
+/** GET /coaches?search=&excludeTournamentId= — ClubInviteCoachScreen. */
+export function searchCoaches(params: { query?: string; excludeTournamentId?: string }): Promise<CoachSearchResult[]> {
+  const qs = new URLSearchParams();
+  if (params.query) qs.set('search', params.query);
+  if (params.excludeTournamentId) qs.set('excludeTournamentId', params.excludeTournamentId);
+  const suffix = qs.toString();
+  return request(`/coaches${suffix ? `?${suffix}` : ''}`);
+}
+
 /** PUT /coaches/:id/training — CoachRegistrationScreen. */
 export function updateCoachTraining(
   coachId: string,
@@ -320,6 +339,20 @@ export function listClubInvitations(coachId: string): Promise<ClubCoachInvitatio
   return request(`/coaches/${coachId}/club-invitations`);
 }
 
+/** POST /club-invitations — ClubInviteCoachScreen. Club/federación invita a un entrenador a ser oficial en un torneo. */
+export function createClubInvitation(params: {
+  clubId: string;
+  tournamentId: string;
+  coachId: string;
+  invitedBy: string;
+  message?: string;
+}): Promise<ClubCoachInvitation> {
+  return request('/club-invitations', {
+    method: 'POST',
+    body: JSON.stringify(params),
+  });
+}
+
 /** POST /club-invitations/:id/respond — CoachClubInvitationScreen. */
 export function respondClubInvitation(
   invitationId: string,
@@ -329,4 +362,97 @@ export function respondClubInvitation(
     method: 'POST',
     body: JSON.stringify({ decision }),
   });
+}
+
+/** Espeja server/src/types.ts#ClubSettlement. */
+export interface ClubSettlement {
+  id: string;
+  clubId: string;
+  tournamentId: string;
+  periodStart: string;
+  periodEnd: string;
+  totalCommissionAmount: string;
+  status: 'pending' | 'paid';
+  paymentReference: string | null;
+  createdAt: string;
+  paidAt: string | null;
+}
+
+/** Espeja server/src/types.ts#ClubSettlementWithTournamentName — lo que devuelve el listado por club. */
+export interface ClubSettlementWithTournamentName extends ClubSettlement {
+  tournamentName: string;
+}
+
+/** Espeja server/src/types.ts#Club. */
+export interface Club {
+  id: string;
+  name: string;
+  type: 'club' | 'federation';
+  city: string;
+  contactEmail: string | null;
+  contactPhone: string | null;
+  defaultCommissionRate: string;
+  createdAt: string;
+}
+
+/** GET /clubs/:id — ClubHomeScreen. */
+export function getClub(clubId: string): Promise<Club> {
+  return request(`/clubs/${clubId}`);
+}
+
+/** GET /clubs/:id/settlements — ClubSettlementsScreen. */
+export function listClubSettlements(clubId: string): Promise<ClubSettlementWithTournamentName[]> {
+  return request(`/clubs/${clubId}/settlements`);
+}
+
+export type TournamentStatus = 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
+
+/** Espeja server/src/types.ts#TournamentSummary — lo que devuelve el listado por club. */
+export interface TournamentSummary {
+  id: string;
+  clubId: string;
+  name: string;
+  venue: string;
+  startDate: string;
+  endDate: string;
+  status: TournamentStatus;
+  officialCoachCount: number;
+  pendingCommissionAmount: string;
+}
+
+/** GET /clubs/:id/tournaments — ClubTournamentListScreen. */
+export function listClubTournaments(clubId: string): Promise<TournamentSummary[]> {
+  return request(`/clubs/${clubId}/tournaments`);
+}
+
+/** Espeja server/src/types.ts#TournamentCoachTagWithProfile. */
+export interface TournamentCoachTagWithProfile {
+  coachId: string;
+  name: string;
+  city: string;
+  ratingAvg: string;
+  taggedAt: string;
+}
+
+/** Espeja server/src/types.ts#ClubCoachInvitationWithCoachName. */
+export interface ClubCoachInvitationWithCoachName extends ClubCoachInvitation {
+  coachName: string;
+}
+
+export interface TournamentRoster {
+  officialCoaches: TournamentCoachTagWithProfile[];
+  pendingInvitations: ClubCoachInvitationWithCoachName[];
+  pendingCommissionAmount: string;
+}
+
+/** GET /tournaments/:id/coaches — ClubTournamentDetailScreen. */
+export function getTournamentRoster(tournamentId: string): Promise<TournamentRoster> {
+  return request(`/tournaments/${tournamentId}/coaches`);
+}
+
+/** POST /tournaments/:id/settle — ClubTournamentDetailScreen "Liquidar". */
+export function settleTournament(
+  tournamentId: string,
+): Promise<{ message?: string; settlement: ClubSettlement | null }> {
+  return request(`/tournaments/${tournamentId}/settle`, { method: 'POST' });
 }

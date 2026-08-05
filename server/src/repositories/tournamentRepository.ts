@@ -1,8 +1,51 @@
 import type { Pool, PoolClient } from 'pg';
 import { pool } from '../lib/db.js';
 import { NotFoundError } from '../lib/errors.js';
+import type { TournamentSummary } from '../types.js';
 
 type Queryable = Pool | PoolClient;
+
+function mapSummaryRow(row: any): TournamentSummary {
+  return {
+    id: row.id,
+    clubId: row.club_id,
+    name: row.name,
+    venue: row.venue,
+    startDate: row.start_date,
+    endDate: row.end_date,
+    status: row.status,
+    officialCoachCount: Number(row.official_coach_count),
+    pendingCommissionAmount: row.pending_commission_amount,
+  };
+}
+
+/** ClubTournamentListScreen: torneos del club con conteo de coaches oficiales y comisión
+ * pendiente de liquidar por torneo. JOINs a subconsultas derivadas (ya agregadas) en vez de
+ * JOIN directo + GROUP BY, para no inflar la suma de comisiones con el producto cartesiano
+ * de tags × bookings. */
+export async function listByClub(clubId: string, db: Queryable = pool): Promise<TournamentSummary[]> {
+  const { rows } = await db.query(
+    `SELECT t.id, t.club_id, t.name, t.venue, t.start_date, t.end_date, t.status,
+            COALESCE(tag_counts.official_coach_count, 0) AS official_coach_count,
+            COALESCE(commission_totals.pending_commission_amount, 0) AS pending_commission_amount
+     FROM tournaments t
+     LEFT JOIN (
+       SELECT tournament_id, COUNT(*) AS official_coach_count
+       FROM tournament_coach_tags
+       GROUP BY tournament_id
+     ) tag_counts ON tag_counts.tournament_id = t.id
+     LEFT JOIN (
+       SELECT tournament_id, SUM(club_commission_amount) AS pending_commission_amount
+       FROM bookings
+       WHERE status = 'completed' AND club_commission_status = 'generated'
+       GROUP BY tournament_id
+     ) commission_totals ON commission_totals.tournament_id = t.id
+     WHERE t.club_id = $1
+     ORDER BY t.start_date DESC`,
+    [clubId],
+  );
+  return rows.map(mapSummaryRow);
+}
 
 export interface TournamentCommissionInfo {
   tournamentId: string;
@@ -33,6 +76,19 @@ export async function getTournamentCommissionInfo(
     endDate: rows[0].end_date,
     clubCommissionRate: Number(rows[0].club_commission_rate),
   };
+}
+
+/** ClubTournamentDetailScreen: comisión de club generada y todavía sin liquidar para este torneo,
+ * de solo lectura (a diferencia de bookingRepository.findPendingCommissionsForTournament, que
+ * bloquea las filas con FOR UPDATE porque se usa dentro de settlementService al liquidar). */
+export async function getPendingCommissionAmount(tournamentId: string, db: Queryable = pool): Promise<string> {
+  const { rows } = await db.query(
+    `SELECT COALESCE(SUM(club_commission_amount), 0) AS amount
+     FROM bookings
+     WHERE tournament_id = $1 AND status = 'completed' AND club_commission_status = 'generated'`,
+    [tournamentId],
+  );
+  return rows[0].amount;
 }
 
 export async function findTournamentsEndedWithoutFullSettlement(db: Queryable = pool): Promise<string[]> {

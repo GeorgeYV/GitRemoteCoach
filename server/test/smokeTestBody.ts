@@ -281,7 +281,7 @@ console.log('\n=== Escenario 11: invitación de club (CoachClubInvitationScreen)
       clubId: fixtures.clubId,
       tournamentId: fixtures.tournamentId,
       coachId: fixtures.coachBUserId,
-      invitedBy: fixtures.parentUserId,
+      invitedBy: fixtures.clubAdminUserId,
       message: 'Nos gustaría que fueras entrenador oficial.',
     },
   });

@@ -1,11 +1,18 @@
 import { withTransaction } from '../lib/db.js';
 import * as coachRepository from '../repositories/coachRepository.js';
-import type { AgeCategory, CoachProfile, PlayingLevel } from '../types.js';
+import type { AgeCategory, CoachProfile, CoachSearchResult, PlayingLevel } from '../types.js';
 
 export interface CoachProfileWithTraining {
   profile: CoachProfile;
   ageCategories: AgeCategory[];
   levels: PlayingLevel[];
+}
+
+export async function searchCoaches(params: {
+  query?: string;
+  excludeTournamentId?: string;
+}): Promise<CoachSearchResult[]> {
+  return coachRepository.search(params);
 }
 
 export async function getCoachProfile(coachId: string): Promise<CoachProfileWithTraining> {

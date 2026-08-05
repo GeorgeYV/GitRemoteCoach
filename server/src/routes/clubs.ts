@@ -1,0 +1,22 @@
+import type { FastifyInstance } from 'fastify';
+import * as clubService from '../services/clubService.js';
+
+export async function clubRoutes(app: FastifyInstance): Promise<void> {
+  // ClubHomeScreen
+  app.get('/clubs/:id', async (req) => {
+    const { id } = req.params as { id: string };
+    return clubService.getClub(id);
+  });
+
+  // ClubSettlementsScreen
+  app.get('/clubs/:id/settlements', async (req) => {
+    const { id } = req.params as { id: string };
+    return clubService.listSettlementsForClub(id);
+  });
+
+  // ClubTournamentListScreen
+  app.get('/clubs/:id/tournaments', async (req) => {
+    const { id } = req.params as { id: string };
+    return clubService.listTournamentsForClub(id);
+  });
+}

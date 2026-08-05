@@ -13,6 +13,12 @@ const updateTrainingSchema = z.object({
 });
 
 export async function coachRoutes(app: FastifyInstance): Promise<void> {
+  // ClubInviteCoachScreen: búsqueda por nombre/ciudad, excluyendo coaches ya oficiales o ya invitados.
+  app.get('/coaches', async (req) => {
+    const { search, excludeTournamentId } = req.query as { search?: string; excludeTournamentId?: string };
+    return coachProfileService.searchCoaches({ query: search, excludeTournamentId });
+  });
+
   app.get('/coaches/:id', async (req) => {
     const { id } = req.params as { id: string };
     return coachProfileService.getCoachProfile(id);

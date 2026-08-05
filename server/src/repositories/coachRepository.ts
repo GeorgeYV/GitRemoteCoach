@@ -1,9 +1,61 @@
 import type { Pool, PoolClient } from 'pg';
 import { pool } from '../lib/db.js';
 import { NotFoundError, ValidationError } from '../lib/errors.js';
-import type { AgeCategory, CoachProfile, PlayingLevel } from '../types.js';
+import type { AgeCategory, CoachProfile, CoachSearchResult, PlayingLevel } from '../types.js';
 
 type Queryable = Pool | PoolClient;
+
+function mapSearchRow(row: any): CoachSearchResult {
+  return {
+    id: row.user_id,
+    name: row.name,
+    city: row.city,
+    ratingAvg: row.rating_avg,
+    yearsExperience: row.years_experience,
+    specialty: row.specialty,
+  };
+}
+
+/**
+ * ClubInviteCoachScreen: entrenadores aprobados que coinciden con el texto de búsqueda
+ * (nombre o ciudad), excluyendo a quienes ya son oficiales o ya tienen invitación
+ * pendiente en el torneo indicado. Ambos filtros de exclusión reutilizan el mismo
+ * placeholder — es el mismo tournamentId en las dos mitades del UNION.
+ */
+export async function search(
+  params: { query?: string; excludeTournamentId?: string },
+  db: Queryable = pool,
+): Promise<CoachSearchResult[]> {
+  const conditions: string[] = [`cp.verification_status = 'approved'`];
+  const values: unknown[] = [];
+
+  if (params.query) {
+    values.push(`%${params.query}%`);
+    conditions.push(`(u.full_name ILIKE $${values.length} OR cp.city ILIKE $${values.length})`);
+  }
+
+  if (params.excludeTournamentId) {
+    values.push(params.excludeTournamentId);
+    conditions.push(
+      `cp.user_id NOT IN (
+         SELECT coach_id FROM tournament_coach_tags WHERE tournament_id = $${values.length}
+         UNION
+         SELECT coach_id FROM club_coach_invitations WHERE tournament_id = $${values.length} AND status = 'pending'
+       )`,
+    );
+  }
+
+  const { rows } = await db.query(
+    `SELECT cp.user_id, u.full_name AS name, cp.city, cp.rating_avg, cp.years_experience, cp.specialty
+     FROM coach_profiles cp
+     JOIN users u ON u.id = cp.user_id
+     WHERE ${conditions.join(' AND ')}
+     ORDER BY u.full_name
+     LIMIT 25`,
+    values,
+  );
+  return rows.map(mapSearchRow);
+}
 
 export interface CoachPayoutInfo {
   userId: string;

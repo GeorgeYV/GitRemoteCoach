@@ -1,7 +1,12 @@
 import type { Pool, PoolClient } from 'pg';
 import { pool } from '../lib/db.js';
 import { ConflictError, NotFoundError } from '../lib/errors.js';
-import type { ClubCoachInvitation, ClubCoachInvitationWithNames, ClubInvitationStatus } from '../types.js';
+import type {
+  ClubCoachInvitation,
+  ClubCoachInvitationWithCoachName,
+  ClubCoachInvitationWithNames,
+  ClubInvitationStatus,
+} from '../types.js';
 
 type Queryable = Pool | PoolClient;
 
@@ -23,6 +28,10 @@ function mapRow(row: any): ClubCoachInvitation {
 
 function mapRowWithNames(row: any): ClubCoachInvitationWithNames {
   return { ...mapRow(row), clubName: row.club_name, tournamentName: row.tournament_name };
+}
+
+function mapRowWithCoachName(row: any): ClubCoachInvitationWithCoachName {
+  return { ...mapRow(row), coachName: row.coach_name };
 }
 
 export async function createInvitation(
@@ -71,6 +80,24 @@ export async function listPendingInvitationsForCoach(
     [coachId],
   );
   return rows.map(mapRowWithNames);
+}
+
+/** ClubTournamentDetailScreen: invitaciones pendientes que el club ya envió para este torneo,
+ * con el nombre del entrenador invitado (el club ya sabe el club/torneo, así que no hace falta
+ * repetirlos como en listPendingInvitationsForCoach). */
+export async function listPendingInvitationsForTournament(
+  tournamentId: string,
+  db: Queryable = pool,
+): Promise<ClubCoachInvitationWithCoachName[]> {
+  const { rows } = await db.query(
+    `SELECT i.*, u.full_name AS coach_name
+     FROM club_coach_invitations i
+     JOIN users u ON u.id = i.coach_id
+     WHERE i.tournament_id = $1 AND i.status = 'pending'
+     ORDER BY i.invited_at DESC`,
+    [tournamentId],
+  );
+  return rows.map(mapRowWithCoachName);
 }
 
 /** Transición atómica 'pending' -> 'accepted'/'declined' (CoachClubInvitationScreen). Null si ya fue respondida. */

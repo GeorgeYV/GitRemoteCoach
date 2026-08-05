@@ -2,6 +2,7 @@ import type { Pool } from 'pg';
 
 export interface Fixtures {
   clubId: string;
+  clubAdminUserId: string;
   tournamentId: string;
   parentUserId: string;
   coachAUserId: string;
@@ -15,14 +16,16 @@ const PARENT_ID = '00000000-0000-0000-0000-000000000003';
 const COACH_A_ID = '00000000-0000-0000-0000-000000000004';
 const COACH_B_ID = '00000000-0000-0000-0000-000000000005';
 const PLAYER_ID = '00000000-0000-0000-0000-000000000006';
+const CLUB_ADMIN_ID = '00000000-0000-0000-0000-000000000007';
 
 export async function seedFixtures(pool: Pool): Promise<Fixtures> {
   await pool.query(
     `INSERT INTO users (id, email, password_hash, full_name, primary_role) VALUES
      ($1, 'maria@example.com', 'x', 'María Guardián', 'parent'),
      ($2, 'carlos@example.com', 'x', 'Carlos Medina', 'coach'),
-     ($3, 'ana@example.com', 'x', 'Ana Beltrán', 'coach')`,
-    [PARENT_ID, COACH_A_ID, COACH_B_ID],
+     ($3, 'ana@example.com', 'x', 'Ana Beltrán', 'coach'),
+     ($4, 'club.bosques@example.com', 'x', 'Laura Ibarra', 'club_admin')`,
+    [PARENT_ID, COACH_A_ID, COACH_B_ID, CLUB_ADMIN_ID],
   );
 
   await pool.query(
@@ -38,6 +41,8 @@ export async function seedFixtures(pool: Pool): Promise<Fixtures> {
     [CLUB_ID],
   );
 
+  await pool.query(`INSERT INTO club_admins (club_id, user_id) VALUES ($1, $2)`, [CLUB_ID, CLUB_ADMIN_ID]);
+
   // end_date en el pasado a propósito, para poder probar el descubrimiento
   // de torneos listos para liquidación (findTournamentsReadyForSettlement).
   await pool.query(
@@ -46,9 +51,10 @@ export async function seedFixtures(pool: Pool): Promise<Fixtures> {
     [TOURNAMENT_ID, CLUB_ID],
   );
 
+  // tagged_by debe ser un club_admin del club dueño del torneo (fn_tournament_coach_tags_validate_tagger).
   await pool.query(
     `INSERT INTO tournament_coach_tags (tournament_id, coach_id, tagged_by) VALUES ($1, $2, $3), ($1, $4, $3)`,
-    [TOURNAMENT_ID, COACH_A_ID, PARENT_ID, COACH_B_ID],
+    [TOURNAMENT_ID, COACH_A_ID, CLUB_ADMIN_ID, COACH_B_ID],
   );
 
   await pool.query(
@@ -59,6 +65,7 @@ export async function seedFixtures(pool: Pool): Promise<Fixtures> {
 
   return {
     clubId: CLUB_ID,
+    clubAdminUserId: CLUB_ADMIN_ID,
     tournamentId: TOURNAMENT_ID,
     parentUserId: PARENT_ID,
     coachAUserId: COACH_A_ID,

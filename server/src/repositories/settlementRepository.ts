@@ -1,5 +1,8 @@
-import type { PoolClient } from 'pg';
-import type { ClubSettlement } from '../types.js';
+import type { Pool, PoolClient } from 'pg';
+import { pool } from '../lib/db.js';
+import type { ClubSettlement, ClubSettlementWithTournamentName } from '../types.js';
+
+type Queryable = Pool | PoolClient;
 
 function mapRow(row: any): ClubSettlement {
   return {
@@ -14,6 +17,23 @@ function mapRow(row: any): ClubSettlement {
     createdAt: row.created_at,
     paidAt: row.paid_at,
   };
+}
+
+function mapRowWithTournamentName(row: any): ClubSettlementWithTournamentName {
+  return { ...mapRow(row), tournamentName: row.tournament_name };
+}
+
+/** ClubSettlementsScreen: nombre de torneo viene de un JOIN, para no mostrar solo UUIDs. */
+export async function listByClub(clubId: string, db: Queryable = pool): Promise<ClubSettlementWithTournamentName[]> {
+  const { rows } = await db.query(
+    `SELECT s.*, t.name AS tournament_name
+     FROM club_settlements s
+     JOIN tournaments t ON t.id = s.tournament_id
+     WHERE s.club_id = $1
+     ORDER BY s.created_at DESC`,
+    [clubId],
+  );
+  return rows.map(mapRowWithTournamentName);
 }
 
 export async function createSettlement(

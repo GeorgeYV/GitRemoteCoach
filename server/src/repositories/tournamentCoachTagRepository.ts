@@ -1,8 +1,18 @@
 import type { Pool, PoolClient } from 'pg';
 import { pool } from '../lib/db.js';
-import type { TournamentCoachTag } from '../types.js';
+import type { TournamentCoachTag, TournamentCoachTagWithProfile } from '../types.js';
 
 type Queryable = Pool | PoolClient;
+
+function mapRowWithProfile(row: any): TournamentCoachTagWithProfile {
+  return {
+    coachId: row.coach_id,
+    name: row.name,
+    city: row.city,
+    ratingAvg: row.rating_avg,
+    taggedAt: row.tagged_at,
+  };
+}
 
 function mapRow(row: any): TournamentCoachTag {
   return {
@@ -37,6 +47,23 @@ export async function addCoachTag(
 export async function listTagsForTournament(tournamentId: string, db: Queryable = pool): Promise<TournamentCoachTag[]> {
   const { rows } = await db.query(`SELECT * FROM tournament_coach_tags WHERE tournament_id = $1`, [tournamentId]);
   return rows.map(mapRow);
+}
+
+/** ClubTournamentDetailScreen: entrenadores oficiales del torneo, con nombre/ciudad/rating vía JOIN. */
+export async function listTagsWithProfilesForTournament(
+  tournamentId: string,
+  db: Queryable = pool,
+): Promise<TournamentCoachTagWithProfile[]> {
+  const { rows } = await db.query(
+    `SELECT tct.coach_id, u.full_name AS name, cp.city, cp.rating_avg, tct.tagged_at
+     FROM tournament_coach_tags tct
+     JOIN coach_profiles cp ON cp.user_id = tct.coach_id
+     JOIN users u ON u.id = tct.coach_id
+     WHERE tct.tournament_id = $1
+     ORDER BY tct.tagged_at DESC`,
+    [tournamentId],
+  );
+  return rows.map(mapRowWithProfile);
 }
 
 export async function getTagForCoachTournament(

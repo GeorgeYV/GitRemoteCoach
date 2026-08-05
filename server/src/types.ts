@@ -13,6 +13,8 @@ export type ClubCommissionStatus = 'generated' | 'settled';
 export type PaymentTransactionType = 'charge' | 'refund' | 'transfer' | 'charge_failed';
 export type PaymentTransactionStatus = 'succeeded' | 'failed' | 'pending';
 
+export type TournamentStatus = 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
+
 export type AgeCategory = 'U10' | 'U12' | 'U14' | 'U16' | 'U18';
 export type PlayingLevel = 'recreativo' | 'competitivo' | 'alto_rendimiento';
 export type RateMode = 'per_match' | 'per_day' | 'per_tournament';
@@ -87,6 +89,32 @@ export interface ClubSettlement {
   paidAt: string | null;
 }
 
+/** Lo que devuelve el listado por club (ClubSettlementsScreen) — nombre de torneo viene de un JOIN. */
+export interface ClubSettlementWithTournamentName extends ClubSettlement {
+  tournamentName: string;
+}
+
+/** Lo que devuelve la búsqueda de entrenadores (ClubInviteCoachScreen) — solo lo necesario para elegir a quién invitar. */
+export interface CoachSearchResult {
+  id: string;
+  name: string;
+  city: string;
+  ratingAvg: string;
+  yearsExperience: number;
+  specialty: string | null;
+}
+
+export interface Club {
+  id: string;
+  name: string;
+  type: 'club' | 'federation';
+  city: string;
+  contactEmail: string | null;
+  contactPhone: string | null;
+  defaultCommissionRate: string;
+  createdAt: string;
+}
+
 export type CancelActor = 'parent' | 'coach';
 
 export interface CoachProfile {
@@ -123,6 +151,29 @@ export interface TournamentCoachTag {
   taggedAt: string;
 }
 
+/** Lo que devuelve el listado por club (ClubTournamentListScreen) — conteo de entrenadores
+ * etiquetados y comisión pendiente de liquidar vienen de subqueries. */
+export interface TournamentSummary {
+  id: string;
+  clubId: string;
+  name: string;
+  venue: string;
+  startDate: string;
+  endDate: string;
+  status: TournamentStatus;
+  officialCoachCount: number;
+  pendingCommissionAmount: string;
+}
+
+/** Entrenador etiquetado como oficial en un torneo (ClubTournamentDetailScreen) — nombre/ciudad/rating vienen de un JOIN. */
+export interface TournamentCoachTagWithProfile {
+  coachId: string;
+  name: string;
+  city: string;
+  ratingAvg: string;
+  taggedAt: string;
+}
+
 export interface ClubCoachInvitation {
   id: string;
   clubId: string;
@@ -139,6 +190,11 @@ export interface ClubCoachInvitation {
 export interface ClubCoachInvitationWithNames extends ClubCoachInvitation {
   clubName: string;
   tournamentName: string;
+}
+
+/** Lo que devuelve el listado por torneo (ClubTournamentDetailScreen) — nombre del entrenador viene de un JOIN. */
+export interface ClubCoachInvitationWithCoachName extends ClubCoachInvitation {
+  coachName: string;
 }
 
 export interface CoachTournamentAvailability {

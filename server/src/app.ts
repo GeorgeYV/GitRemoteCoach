@@ -6,6 +6,8 @@ import { webhookRoutes } from './routes/webhooks.js';
 import { settlementRoutes } from './routes/settlements.js';
 import { coachRoutes } from './routes/coaches.js';
 import { clubInvitationRoutes } from './routes/clubInvitations.js';
+import { clubRoutes } from './routes/clubs.js';
+import { tournamentRoutes } from './routes/tournaments.js';
 import { coachTournamentRoutes } from './routes/coachTournaments.js';
 import { bookingMessageRoutes } from './routes/bookingMessages.js';
 import { reviewRoutes } from './routes/reviews.js';
@@ -34,6 +36,8 @@ export function buildApp() {
   app.register(settlementRoutes);
   app.register(coachRoutes);
   app.register(clubInvitationRoutes);
+  app.register(clubRoutes);
+  app.register(tournamentRoutes);
   app.register(coachTournamentRoutes);
   app.register(bookingMessageRoutes);
   app.register(reviewRoutes);

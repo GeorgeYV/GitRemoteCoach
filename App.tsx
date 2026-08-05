@@ -30,9 +30,14 @@ import BookingPaymentScreen from './screens/parent/BookingPaymentScreen';
 import BookingStatusScreen from './screens/parent/BookingStatusScreen';
 import ParentChatScreen from './screens/parent/ParentChatScreen';
 import BookingHistoryScreen from './screens/parent/BookingHistoryScreen';
+import ClubHomeScreen from './screens/club/ClubHomeScreen';
+import ClubSettlementsScreen from './screens/club/ClubSettlementsScreen';
+import ClubTournamentListScreen from './screens/club/ClubTournamentListScreen';
+import ClubTournamentDetailScreen from './screens/club/ClubTournamentDetailScreen';
+import ClubInviteCoachScreen from './screens/club/ClubInviteCoachScreen';
 import { BookingSlotSelection, mockCarlosMedinaProfile, REAL_COMPLETED_BOOKING_ID, Tournament } from './mock/parentFlow';
 import { MatchConfig } from './lib/types';
-import { ApiError, BookingWithParticipants, cancelBooking, getCoachProfile, listCoachBookings } from './lib/api';
+import { ApiError, BookingWithParticipants, cancelBooking, getCoachProfile, listCoachBookings, TournamentSummary } from './lib/api';
 import { isUpcoming, toCoachBooking } from './lib/coachBookingDisplay';
 
 type PreviewScreen =
@@ -52,7 +57,10 @@ type PreviewScreen =
   | 'parentList'
   | 'parentProfile'
   | 'parentChat'
-  | 'parentHistory';
+  | 'parentHistory'
+  | 'clubSettlements'
+  | 'clubTournaments'
+  | 'clubHome';
 
 const PREVIEW_OPTIONS: { key: PreviewScreen; label: string }[] = [
   { key: 'parentHome', label: 'Padre · Inicio' },
@@ -72,6 +80,9 @@ const PREVIEW_OPTIONS: { key: PreviewScreen; label: string }[] = [
   { key: 'coachEarnings', label: 'Coach · Ingresos' },
   { key: 'coachReputation', label: 'Coach · Reputación' },
   { key: 'coachClubInvitation', label: 'Coach · Invitación club' },
+  { key: 'clubHome', label: 'Club · Inicio' },
+  { key: 'clubTournaments', label: 'Club · Torneos' },
+  { key: 'clubSettlements', label: 'Club · Liquidaciones' },
 ];
 
 /** UUID real de Carlos Medina — coincide con coachAUserId en server/test/seed.ts. Toda la previsualización
@@ -272,6 +283,28 @@ function CoachMatchDayFlow() {
   );
 }
 
+/** Local three-step flow: lista de torneos del club → detalle (roster + liquidar) → invitar entrenador. */
+function ClubTournamentFlow() {
+  const [tournament, setTournament] = useState<TournamentSummary | null>(null);
+  const [inviting, setInviting] = useState(false);
+
+  if (!tournament) {
+    return <ClubTournamentListScreen onSelect={setTournament} />;
+  }
+
+  if (inviting) {
+    return <ClubInviteCoachScreen tournamentId={tournament.id} onBack={() => setInviting(false)} />;
+  }
+
+  return (
+    <ClubTournamentDetailScreen
+      tournament={tournament}
+      onBack={() => setTournament(null)}
+      onInvite={() => setInviting(true)}
+    />
+  );
+}
+
 /**
  * Selector temporal para previsualizar las pantallas del flujo padre junto
  * al flujo del entrenador, ya que todavía no hay navegación real entre
@@ -317,6 +350,15 @@ function ScreenPreviewSwitcher() {
           <ParentChatScreen bookingId={REAL_COMPLETED_BOOKING_ID} />
         ) : screen === 'parentHistory' ? (
           <BookingHistoryScreen />
+        ) : screen === 'clubSettlements' ? (
+          <ClubSettlementsScreen />
+        ) : screen === 'clubTournaments' ? (
+          <ClubTournamentFlow />
+        ) : screen === 'clubHome' ? (
+          <ClubHomeScreen
+            onOpenTournaments={() => setScreen('clubTournaments')}
+            onOpenSettlements={() => setScreen('clubSettlements')}
+          />
         ) : (
           <ParentBookingFlow />
         )}
