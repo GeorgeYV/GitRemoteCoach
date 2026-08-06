@@ -6,11 +6,11 @@ import { colors, radius } from '../../lib/theme';
 import { CoachBooking } from '../../mock/coachFlow';
 
 const QUICK_LINKS = [
-  { label: 'Disponibilidad', hint: 'Ajusta tus días y tarifa por torneo' },
-  { label: 'Historial de sesiones', hint: 'Revisa partidos pasados y en curso' },
-  { label: 'Ingresos', hint: 'Ve lo liberado y lo pendiente de pago' },
-  { label: 'Reputación', hint: 'Reseñas y estadísticas de actividad' },
-];
+  { key: 'availability', label: 'Disponibilidad', hint: 'Ajusta tus días y tarifa por torneo' },
+  { key: 'sessions', label: 'Historial de sesiones', hint: 'Revisa partidos pasados y en curso' },
+  { key: 'earnings', label: 'Ingresos', hint: 'Ve lo liberado y lo pendiente de pago' },
+  { key: 'reputation', label: 'Reputación', hint: 'Reseñas y estadísticas de actividad' },
+] as const;
 
 function money(amount: number): string {
   return `$${amount.toFixed(2)}`;
@@ -23,6 +23,11 @@ export default function CoachHomeScreen({
   pendingEarnings,
   nextBooking,
   onOpenBooking,
+  onOpenRequests,
+  onOpenAvailability,
+  onOpenSessions,
+  onOpenEarnings,
+  onOpenReputation,
 }: {
   coachName: string;
   rating: string;
@@ -30,7 +35,18 @@ export default function CoachHomeScreen({
   pendingEarnings: number;
   nextBooking?: CoachBooking;
   onOpenBooking?: () => void;
+  onOpenRequests?: () => void;
+  onOpenAvailability?: () => void;
+  onOpenSessions?: () => void;
+  onOpenEarnings?: () => void;
+  onOpenReputation?: () => void;
 }) {
+  const quickLinkHandlers: Record<(typeof QUICK_LINKS)[number]['key'], (() => void) | undefined> = {
+    availability: onOpenAvailability,
+    sessions: onOpenSessions,
+    earnings: onOpenEarnings,
+    reputation: onOpenReputation,
+  };
   const firstName = coachName.split(' ')[0];
 
   return (
@@ -45,9 +61,9 @@ export default function CoachHomeScreen({
         <Text style={styles.headline}>Este es el resumen de tu actividad como entrenador</Text>
 
         <View style={styles.statsRow}>
-          <StatChip value={String(pendingRequests)} label="Solicitudes" />
-          <StatChip value={money(pendingEarnings)} label="Por liberar" />
-          <StatChip value={`★ ${rating}`} label="Reputación" />
+          <StatChip value={String(pendingRequests)} label="Solicitudes" onPress={onOpenRequests} />
+          <StatChip value={money(pendingEarnings)} label="Por liberar" onPress={onOpenEarnings} />
+          <StatChip value={`★ ${rating}`} label="Reputación" onPress={onOpenReputation} />
         </View>
 
         <Text style={styles.sectionLabel}>Próxima sesión</Text>
@@ -76,7 +92,7 @@ export default function CoachHomeScreen({
         <Text style={styles.sectionLabel}>Accesos rápidos</Text>
         <View style={styles.linkList}>
           {QUICK_LINKS.map((link) => (
-            <Pressable key={link.label} style={styles.linkRow}>
+            <Pressable key={link.key} style={styles.linkRow} onPress={quickLinkHandlers[link.key]}>
               <View style={styles.linkInfo}>
                 <Text style={styles.linkLabel}>{link.label}</Text>
                 <Text style={styles.linkHint}>{link.hint}</Text>
@@ -90,14 +106,14 @@ export default function CoachHomeScreen({
   );
 }
 
-function StatChip({ value, label }: { value: string; label: string }) {
+function StatChip({ value, label, onPress }: { value: string; label: string; onPress?: () => void }) {
   return (
-    <View style={styles.statChip}>
+    <Pressable style={styles.statChip} onPress={onPress}>
       <Text style={styles.statValue} numberOfLines={1}>
         {value}
       </Text>
       <Text style={styles.statLabel}>{label}</Text>
-    </View>
+    </Pressable>
   );
 }
 

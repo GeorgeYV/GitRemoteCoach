@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ReviewCard from '../../components/coach/ReviewCard';
 import StatTile from '../../components/shared/StatTile';
@@ -7,7 +7,6 @@ import TrainerAvatarPlaceholder from '../../components/shared/TrainerAvatarPlace
 import { ApiError, CoachProfile, getCoachProfile, listCoachBookings, listCoachReviews, ReviewWithParent } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
 import { CoachReview, mockOfficialClubTaggings } from '../../mock/coachFlow';
-import { mockCarlosMedinaProfile } from '../../mock/parentFlow';
 
 interface ActivityStats {
   matchesPlayed: number;
@@ -27,9 +26,15 @@ function toCoachReview(review: ReviewWithParent): CoachReview {
   };
 }
 
-export default function CoachReputationScreen() {
-  const { trainer } = mockCarlosMedinaProfile;
-  const coachId = trainer.id;
+export default function CoachReputationScreen({
+  coachId,
+  coachName,
+  onBack,
+}: {
+  coachId: string;
+  coachName: string;
+  onBack?: () => void;
+}) {
   const taggings = mockOfficialClubTaggings;
 
   const [profile, setProfile] = useState<CoachProfile | null>(null);
@@ -87,10 +92,17 @@ export default function CoachReputationScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <View style={styles.header}>
+        <Pressable style={styles.backButton} onPress={onBack}>
+          <Text style={styles.backIcon}>←</Text>
+        </Pressable>
+        <Text style={styles.headerTitle}>Reputación</Text>
+      </View>
+
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.profileHeader}>
           <TrainerAvatarPlaceholder size={72} />
-          <Text style={styles.name}>{trainer.name}</Text>
+          <Text style={styles.name}>{coachName}</Text>
           <View style={styles.ratingRow}>
             <Text style={styles.ratingValue}>★ {profile.ratingAvg}</Text>
             <Text style={styles.reviewsCount}>({profile.ratingCount} reseñas)</Text>
@@ -155,6 +167,26 @@ const styles = StyleSheet.create({
   centerState: {
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderSoft,
+  },
+  backButton: {
+    paddingRight: 12,
+  },
+  backIcon: {
+    color: colors.lineWhite,
+    fontSize: 20,
+  },
+  headerTitle: {
+    color: colors.lineWhite,
+    fontSize: 17,
+    fontWeight: '800',
   },
   content: {
     padding: 20,

@@ -1,11 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import EarningsRow from '../../components/coach/EarningsRow';
 import { ApiError, BookingWithParticipants, listCoachBookings } from '../../lib/api';
 import { colors, radius } from '../../lib/theme';
 import { EarningsEntry, PLATFORM_COMMISSION_RATE } from '../../mock/coachFlow';
-import { mockCarlosMedinaProfile } from '../../mock/parentFlow';
 
 function money(amount: number): string {
   return `$${amount.toFixed(2)}`;
@@ -26,14 +25,14 @@ function toEarningsEntry(booking: BookingWithParticipants): EarningsEntry {
   };
 }
 
-export default function CoachEarningsScreen() {
+export default function CoachEarningsScreen({ coachId, onBack }: { coachId: string; onBack?: () => void }) {
   const [entries, setEntries] = useState<EarningsEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     setError(null);
-    listCoachBookings(mockCarlosMedinaProfile.trainer.id)
+    listCoachBookings(coachId)
       .then((result) => {
         if (!cancelled) {
           setEntries(
@@ -48,7 +47,7 @@ export default function CoachEarningsScreen() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [coachId]);
 
   if (error) {
     return (
@@ -77,7 +76,12 @@ export default function CoachEarningsScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Ingresos</Text>
+        <View style={styles.headerTopRow}>
+          <Pressable style={styles.backButton} onPress={onBack}>
+            <Text style={styles.backIcon}>←</Text>
+          </Pressable>
+          <Text style={styles.headerTitle}>Ingresos</Text>
+        </View>
         <Text style={styles.headerSubtitle}>{entries.length} partidos acompañados</Text>
       </View>
 
@@ -113,11 +117,22 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 12,
   },
+  headerTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  backButton: {
+    paddingRight: 12,
+  },
+  backIcon: {
+    color: colors.lineWhite,
+    fontSize: 20,
+  },
   headerTitle: {
     color: colors.lineWhite,
     fontSize: 22,
     fontWeight: '800',
-    marginBottom: 4,
   },
   headerSubtitle: {
     color: colors.textDim,

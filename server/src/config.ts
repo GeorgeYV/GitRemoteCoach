@@ -10,6 +10,7 @@ export const env = {
   databaseUrl: required('DATABASE_URL'),
   stripeSecretKey: required('STRIPE_SECRET_KEY'),
   stripeWebhookSecret: required('STRIPE_WEBHOOK_SECRET'),
+  jwtSecret: required('JWT_SECRET'),
   port: Number(process.env.PORT ?? 3000),
 };
 

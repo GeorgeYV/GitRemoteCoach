@@ -6,6 +6,7 @@
 process.env.DATABASE_URL = 'postgres://test:test@localhost:5432/test';
 process.env.STRIPE_SECRET_KEY = 'sk_test_fake';
 process.env.STRIPE_WEBHOOK_SECRET = 'whsec_fake';
+process.env.JWT_SECRET = 'test-jwt-secret';
 process.env.PORT = '0';
 
 await import('./smokeTestBody.js');

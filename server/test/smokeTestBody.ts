@@ -1,8 +1,10 @@
 import { createTestPool } from './setupDb.js';
 import { createFakeStripe } from './fakeStripe.js';
+import { createFakePushSender } from './fakePush.js';
 import { seedFixtures } from './seed.js';
 import { setPoolForTesting } from '../src/lib/db.js';
 import { setStripeClientForTesting } from '../src/lib/stripe.js';
+import { setPushSenderForTesting } from '../src/lib/pushNotifications.js';
 import { buildApp } from '../src/app.js';
 import { runExpireBookingsJob } from '../src/jobs/expireBookings.js';
 import { findTournamentsReadyForSettlement } from '../src/services/settlementService.js';
@@ -36,6 +38,9 @@ setPoolForTesting(testPool);
 
 const { stripe: fakeStripe, state: stripeState } = createFakeStripe();
 setStripeClientForTesting(fakeStripe);
+
+const { sender: fakePushSender, state: pushState } = createFakePushSender();
+setPushSenderForTesting(fakePushSender);
 
 const fixtures = await seedFixtures(testPool);
 const app = buildApp();
@@ -410,6 +415,100 @@ console.log('\n=== Escenario 12: captura en vivo de un partido (matches / match_
     afterRestartBulk[0].id !== point1.id,
     'restart borró los puntos anteriores del mismo partido (el punto 1 se recrea con id nuevo)',
   );
+}
+
+console.log('\n=== Escenario 13: auth (registro / login / sesión) ===');
+{
+  const registerPayload = {
+    email: 'nueva.mama@example.com',
+    password: 'super-secreta-123',
+    fullName: 'Nueva Mamá',
+    primaryRole: 'parent',
+  };
+  const registerRes = await app.inject({ method: 'POST', url: '/auth/register', payload: registerPayload });
+  assertEqual(registerRes.statusCode, 201, 'POST /auth/register devuelve 201');
+  const registered = registerRes.json();
+  assertEqual(registered.user.email, registerPayload.email, 'el usuario creado trae el email registrado');
+  assertTrue(typeof registered.token === 'string' && registered.token.length > 0, 'devuelve un token');
+  assertTrue(!('passwordHash' in registered.user), 'la respuesta no expone el hash de la contraseña');
+
+  const dupRes = await app.inject({ method: 'POST', url: '/auth/register', payload: registerPayload });
+  assertEqual(dupRes.statusCode, 409, 'registrar el mismo email de nuevo devuelve 409');
+
+  const adminRes = await app.inject({
+    method: 'POST',
+    url: '/auth/register',
+    payload: { ...registerPayload, email: 'admin@example.com', primaryRole: 'platform_admin' },
+  });
+  assertEqual(adminRes.statusCode, 422, 'no se puede auto-registrar como platform_admin');
+
+  const loginRes = await app.inject({
+    method: 'POST',
+    url: '/auth/login',
+    payload: { email: registerPayload.email, password: registerPayload.password },
+  });
+  assertEqual(loginRes.statusCode, 200, 'POST /auth/login devuelve 200');
+  const { token } = loginRes.json();
+
+  const badLoginRes = await app.inject({
+    method: 'POST',
+    url: '/auth/login',
+    payload: { email: registerPayload.email, password: 'contraseña-incorrecta' },
+  });
+  assertEqual(badLoginRes.statusCode, 401, 'login con contraseña incorrecta devuelve 401');
+
+  const meRes = await app.inject({ method: 'GET', url: '/auth/me', headers: { authorization: `Bearer ${token}` } });
+  assertEqual(meRes.statusCode, 200, 'GET /auth/me con token válido devuelve 200');
+  assertEqual(meRes.json().email, registerPayload.email, '/auth/me devuelve el usuario de la sesión');
+
+  const meNoTokenRes = await app.inject({ method: 'GET', url: '/auth/me' });
+  assertEqual(meNoTokenRes.statusCode, 401, 'GET /auth/me sin token devuelve 401');
+}
+
+console.log('\n=== Escenario 14: push notifications (accept/reject de reserva avisan al padre) ===');
+{
+  // Sin pasar por /auth/login — se firma el JWT directo, mismo mecanismo que routes/auth.ts.
+  const parentToken = app.jwt.sign({ sub: fixtures.parentUserId, role: 'parent' });
+  const deviceToken = 'ExponentPushToken[smoke-test-device]';
+
+  const noAuthRes = await app.inject({ method: 'POST', url: '/push-tokens', payload: { token: deviceToken } });
+  assertEqual(noAuthRes.statusCode, 401, 'POST /push-tokens sin Bearer token devuelve 401');
+
+  const registerRes = await app.inject({
+    method: 'POST',
+    url: '/push-tokens',
+    headers: { authorization: `Bearer ${parentToken}` },
+    payload: { token: deviceToken },
+  });
+  assertEqual(registerRes.statusCode, 204, 'POST /push-tokens con sesión devuelve 204');
+
+  const acceptReq = await requestBooking(fixtures.coachBUserId, inFuture(50));
+  const bookingToAccept = acceptReq.json();
+  pushState.sent.length = 0; // limpia cualquier push de escenarios anteriores antes de medir
+  await app.inject({ method: 'POST', url: `/bookings/${bookingToAccept.id}/accept` });
+  assertEqual(pushState.sent.length, 1, 'aceptar la reserva dispara exactamente un push');
+  assertEqual(pushState.sent[0]?.to, deviceToken, 'el push va al device token del padre');
+  assertEqual(pushState.sent[0]?.title, 'Reserva confirmada', 'el título del push de aceptación es el esperado');
+
+  const rejectReq = await requestBooking(fixtures.coachBUserId, inFuture(55));
+  const bookingToReject = rejectReq.json();
+  pushState.sent.length = 0;
+  await app.inject({ method: 'POST', url: `/bookings/${bookingToReject.id}/reject` });
+  assertEqual(pushState.sent.length, 1, 'rechazar la reserva también dispara un push');
+  assertEqual(pushState.sent[0]?.title, 'Solicitud rechazada', 'el título del push de rechazo es el esperado');
+
+  const deleteRes = await app.inject({
+    method: 'DELETE',
+    url: `/push-tokens/${deviceToken}`,
+    headers: { authorization: `Bearer ${parentToken}` },
+  });
+  assertEqual(deleteRes.statusCode, 204, 'DELETE /push-tokens/:token devuelve 204');
+
+  const rejectAfterUnregisterReq = await requestBooking(fixtures.coachBUserId, inFuture(60));
+  const bookingAfterUnregister = rejectAfterUnregisterReq.json();
+  pushState.sent.length = 0;
+  await app.inject({ method: 'POST', url: `/bookings/${bookingAfterUnregister.id}/reject` });
+  assertEqual(pushState.sent.length, 0, 'sin token registrado, aceptar/rechazar ya no dispara push (y no falla)');
 }
 
 console.log(`\n=== Resultado: ${passed} pasaron, ${failed} fallaron ===`);

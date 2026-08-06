@@ -1,11 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import RequestCard from '../../components/coach/RequestCard';
 import { acceptBookingRequest, ApiError, BookingWithParticipants, listCoachBookings, rejectBookingRequest } from '../../lib/api';
 import { colors } from '../../lib/theme';
 import { BookingRequest } from '../../mock/coachFlow';
-import { mockCarlosMedinaProfile } from '../../mock/parentFlow';
 
 function toBookingRequest(booking: BookingWithParticipants): BookingRequest {
   const matchDate = new Date(booking.matchDatetime);
@@ -23,7 +22,7 @@ function toBookingRequest(booking: BookingWithParticipants): BookingRequest {
   };
 }
 
-export default function CoachRequestInboxScreen() {
+export default function CoachRequestInboxScreen({ coachId, onBack }: { coachId: string; onBack?: () => void }) {
   const [requests, setRequests] = useState<BookingRequest[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -31,7 +30,7 @@ export default function CoachRequestInboxScreen() {
   useEffect(() => {
     let cancelled = false;
     setLoadError(null);
-    listCoachBookings(mockCarlosMedinaProfile.trainer.id)
+    listCoachBookings(coachId)
       .then((result) => {
         if (!cancelled) setRequests(result.filter((b) => b.status === 'requested').map(toBookingRequest));
       })
@@ -42,7 +41,7 @@ export default function CoachRequestInboxScreen() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [coachId]);
 
   async function respond(id: string, action: 'accept' | 'reject') {
     setActionError(null);
@@ -57,7 +56,12 @@ export default function CoachRequestInboxScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Solicitudes</Text>
+        <View style={styles.headerTopRow}>
+          <Pressable style={styles.backButton} onPress={onBack}>
+            <Text style={styles.backIcon}>←</Text>
+          </Pressable>
+          <Text style={styles.headerTitle}>Solicitudes</Text>
+        </View>
         <Text style={styles.headerSubtitle}>
           {requests === null
             ? 'Cargando…'
@@ -113,11 +117,22 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.borderSoft,
   },
+  headerTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  backButton: {
+    paddingRight: 12,
+  },
+  backIcon: {
+    color: colors.lineWhite,
+    fontSize: 20,
+  },
   headerTitle: {
     color: colors.lineWhite,
     fontSize: 22,
     fontWeight: '800',
-    marginBottom: 4,
   },
   headerSubtitle: {
     color: colors.textDim,

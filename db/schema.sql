@@ -1148,6 +1148,23 @@ CREATE TRIGGER trg_reviews_maintain_coach_rating
 AFTER INSERT OR UPDATE OF rating, coach_id OR DELETE ON reviews
 FOR EACH ROW EXECUTE FUNCTION fn_reviews_maintain_coach_rating();
 
+-- ---------------------------------------------------------------------
+-- Push notifications (Expo)
+-- ---------------------------------------------------------------------
+-- UNIQUE(expo_push_token): el token identifica un dispositivo, no un usuario —
+-- si otra persona inicia sesión en el mismo dispositivo, re-registrar el mismo
+-- token reasigna la fila a ese user_id en vez de duplicarla (ver
+-- pushTokenRepository.upsert).
+CREATE TABLE push_tokens (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id          UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  expo_push_token  TEXT NOT NULL UNIQUE,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_push_tokens_user_id ON push_tokens (user_id);
+
 -- =====================================================================
 -- Decisiones de diseño
 -- =====================================================================

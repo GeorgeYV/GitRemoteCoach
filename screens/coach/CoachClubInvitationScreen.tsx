@@ -4,11 +4,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import ClubTagBadge from '../../components/coach/ClubTagBadge';
 import { ApiError, ClubCoachInvitationWithNames, listClubInvitations, respondClubInvitation } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
-import { mockCarlosMedinaProfile } from '../../mock/parentFlow';
 
 type Decision = 'pending' | 'accepted' | 'declined';
 
-export default function CoachClubInvitationScreen() {
+export default function CoachClubInvitationScreen({ coachId, onBack }: { coachId: string; onBack?: () => void }) {
   const [invitation, setInvitation] = useState<ClubCoachInvitationWithNames | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [decision, setDecision] = useState<Decision>('pending');
@@ -18,7 +17,7 @@ export default function CoachClubInvitationScreen() {
   useEffect(() => {
     let cancelled = false;
     setLoadError(null);
-    listClubInvitations(mockCarlosMedinaProfile.trainer.id)
+    listClubInvitations(coachId)
       .then((result) => {
         if (!cancelled) setInvitation(result[0] ?? null);
       })
@@ -29,7 +28,7 @@ export default function CoachClubInvitationScreen() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [coachId]);
 
   async function respond(decisionValue: Extract<Decision, 'accepted' | 'declined'>) {
     if (!invitation) return;
@@ -70,7 +69,12 @@ export default function CoachClubInvitationScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Invitación de club</Text>
+        <View style={styles.headerTopRow}>
+          <Pressable style={styles.backButton} onPress={onBack}>
+            <Text style={styles.backIcon}>←</Text>
+          </Pressable>
+          <Text style={styles.headerTitle}>Invitación de club</Text>
+        </View>
         <Text style={styles.headerSubtitle}>{invitedAtLabel}</Text>
       </View>
 
@@ -152,11 +156,22 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.borderSoft,
   },
+  headerTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  backButton: {
+    paddingRight: 12,
+  },
+  backIcon: {
+    color: colors.lineWhite,
+    fontSize: 20,
+  },
   headerTitle: {
     color: colors.lineWhite,
     fontSize: 22,
     fontWeight: '800',
-    marginBottom: 4,
   },
   headerSubtitle: {
     color: colors.textDim,

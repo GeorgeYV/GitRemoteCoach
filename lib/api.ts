@@ -36,6 +36,59 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return body as T;
 }
 
+/** Espeja server/src/types.ts#UserRole. */
+export type UserRole = 'parent' | 'coach' | 'club_admin' | 'platform_admin';
+
+/** Espeja server/src/types.ts#PublicUser. */
+export interface PublicUser {
+  id: string;
+  email: string;
+  fullName: string;
+  primaryRole: UserRole;
+}
+
+export interface AuthSession {
+  user: PublicUser;
+  token: string;
+}
+
+/** POST /auth/register — AuthContext. primaryRole se limita a los roles auto-registrables. */
+export function registerUser(params: {
+  email: string;
+  password: string;
+  fullName: string;
+  primaryRole: Exclude<UserRole, 'platform_admin'>;
+}): Promise<AuthSession> {
+  return request('/auth/register', { method: 'POST', body: JSON.stringify(params) });
+}
+
+/** POST /auth/login — AuthContext. */
+export function loginUser(params: { email: string; password: string }): Promise<AuthSession> {
+  return request('/auth/login', { method: 'POST', body: JSON.stringify(params) });
+}
+
+/** GET /auth/me — AuthContext, para hidratar/validar la sesión persistida al abrir la app. */
+export function getCurrentUser(token: string): Promise<PublicUser> {
+  return request('/auth/me', { headers: { Authorization: `Bearer ${token}` } });
+}
+
+/** POST /push-tokens — AuthContext, tras login/registro y al hidratar una sesión existente. */
+export function registerPushToken(authToken: string, expoPushToken: string): Promise<void> {
+  return request('/push-tokens', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${authToken}` },
+    body: JSON.stringify({ token: expoPushToken }),
+  });
+}
+
+/** DELETE /push-tokens/:token — AuthContext#logout, best-effort. */
+export function unregisterPushToken(authToken: string, expoPushToken: string): Promise<void> {
+  return request(`/push-tokens/${encodeURIComponent(expoPushToken)}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${authToken}` },
+  });
+}
+
 /** Espeja server/src/types.ts#Review — la reseña recién creada, sin el nombre del padre. */
 export interface Review {
   id: string;

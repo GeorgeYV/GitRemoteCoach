@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -15,6 +16,17 @@ const TABS: { key: TabKey; label: string }[] = [
 ];
 
 export default function ParentHomeScreen() {
+  const router = useRouter();
+
+  function goToTrainers() {
+    router.push('/trainers');
+  }
+
+  function handleTabPress(tab: TabKey) {
+    if (tab === 'reservas') router.push('/bookings');
+    // 'reportes'/'perfil' no tienen pantalla todavía; 'inicio' ya es esta pantalla.
+  }
+
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.header}>
@@ -38,12 +50,12 @@ export default function ParentHomeScreen() {
             {mockFeaturedTournament.venue} · {mockFeaturedTournament.city}
           </Text>
           <Text style={styles.featuredMeta}>{mockFeaturedTournament.dates}</Text>
-          <Pressable style={styles.ctaButton}>
+          <Pressable style={styles.ctaButton} onPress={goToTrainers}>
             <Text style={styles.ctaLabel}>Ver entrenadores</Text>
           </Pressable>
         </View>
 
-        <Pressable style={styles.searchBar}>
+        <Pressable style={styles.searchBar} onPress={goToTrainers}>
           <Text style={styles.searchIcon}>⌕</Text>
           <Text style={styles.searchPlaceholder}>Buscar por nombre o sede del torneo</Text>
         </Pressable>
@@ -51,26 +63,26 @@ export default function ParentHomeScreen() {
         <Text style={styles.sectionLabel}>Torneos activos</Text>
         <View style={styles.tournamentList}>
           {mockActiveTournaments.map((tournament) => (
-            <TournamentRow key={tournament.id} tournament={tournament} />
+            <TournamentRow key={tournament.id} tournament={tournament} onPress={goToTrainers} />
           ))}
         </View>
       </ScrollView>
 
       <View style={styles.tabBar}>
         {TABS.map((tab) => (
-          <View key={tab.key} style={styles.tabItem}>
+          <Pressable key={tab.key} style={styles.tabItem} onPress={() => handleTabPress(tab.key)}>
             <View style={[styles.tabDot, tab.key === 'inicio' && styles.tabDotActive]} />
             <Text style={[styles.tabLabel, tab.key === 'inicio' && styles.tabLabelActive]}>{tab.label}</Text>
-          </View>
+          </Pressable>
         ))}
       </View>
     </SafeAreaView>
   );
 }
 
-function TournamentRow({ tournament }: { tournament: Tournament }) {
+function TournamentRow({ tournament, onPress }: { tournament: Tournament; onPress?: () => void }) {
   return (
-    <Pressable style={styles.tournamentRow}>
+    <Pressable style={styles.tournamentRow} onPress={onPress}>
       <View style={styles.tournamentInfo}>
         <Text style={styles.tournamentName}>{tournament.name}</Text>
         <Text style={styles.tournamentMeta}>

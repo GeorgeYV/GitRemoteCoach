@@ -6,7 +6,13 @@ import { colors, radius } from '../../lib/theme';
 import { mockOfficialClubTaggings } from '../../mock/coachFlow';
 import { mockActiveTournaments, Tournament } from '../../mock/parentFlow';
 
-export default function CoachTournamentSearchScreen({ onSelect }: { onSelect: (tournament: Tournament) => void }) {
+export default function CoachTournamentSearchScreen({
+  onSelect,
+  onBack,
+}: {
+  onSelect: (tournament: Tournament) => void;
+  onBack?: () => void;
+}) {
   const [query, setQuery] = useState('');
 
   const results = useMemo(() => {
@@ -24,7 +30,12 @@ export default function CoachTournamentSearchScreen({ onSelect }: { onSelect: (t
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>¿En qué torneo vas a estar?</Text>
+        <View style={styles.headerTopRow}>
+          <Pressable style={styles.backButton} onPress={onBack}>
+            <Text style={styles.backIcon}>←</Text>
+          </Pressable>
+          <Text style={styles.headerTitle}>¿En qué torneo vas a estar?</Text>
+        </View>
         <Text style={styles.headerSubtitle}>
           Busca por nombre, sede o fecha para configurar tu disponibilidad y tarifa ahí.
         </Text>
@@ -85,11 +96,22 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 16,
   },
+  headerTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  backButton: {
+    paddingRight: 12,
+  },
+  backIcon: {
+    color: colors.lineWhite,
+    fontSize: 20,
+  },
   headerTitle: {
     color: colors.lineWhite,
     fontSize: 20,
     fontWeight: '800',
-    marginBottom: 6,
   },
   headerSubtitle: {
     color: colors.textSoft,

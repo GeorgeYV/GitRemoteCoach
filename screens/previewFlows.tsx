@@ -1,114 +1,62 @@
-import { StatusBar } from 'expo-status-bar';
+import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { MatchProvider, useMatch } from './context/MatchContext';
-import { colors } from './lib/theme';
-import { mockMatchConfig, mockRoundLabel } from './mock/players';
-import LiveCaptureView from './screens/LiveCaptureView';
-import MatchSummaryView from './screens/MatchSummaryView';
-import CoachAvailabilityScreen from './screens/coach/CoachAvailabilityScreen';
-import CoachBookingCancelScreen from './screens/coach/CoachBookingCancelScreen';
-import CoachBookingDetailScreen from './screens/coach/CoachBookingDetailScreen';
-import CoachChatScreen from './screens/coach/CoachChatScreen';
-import CoachClubInvitationScreen from './screens/coach/CoachClubInvitationScreen';
-import CoachEarningsScreen from './screens/coach/CoachEarningsScreen';
-import CoachHomeScreen from './screens/coach/CoachHomeScreen';
-import CoachMatchSetupScreen from './screens/coach/CoachMatchSetupScreen';
-import CoachPreMatchReminderScreen from './screens/coach/CoachPreMatchReminderScreen';
-import CoachRegistrationScreen from './screens/coach/CoachRegistrationScreen';
-import CoachReputationScreen from './screens/coach/CoachReputationScreen';
-import CoachRequestInboxScreen from './screens/coach/CoachRequestInboxScreen';
-import CoachSessionHistoryScreen from './screens/coach/CoachSessionHistoryScreen';
-import CoachTournamentSearchScreen from './screens/coach/CoachTournamentSearchScreen';
-import CoachVerificationPendingScreen from './screens/coach/CoachVerificationPendingScreen';
-import ParentHomeScreen from './screens/parent/ParentHomeScreen';
-import TrainerListScreen from './screens/parent/TrainerListScreen';
-import TrainerProfileScreen from './screens/parent/TrainerProfileScreen';
-import BookingConfirmScreen from './screens/parent/BookingConfirmScreen';
-import BookingPaymentScreen from './screens/parent/BookingPaymentScreen';
-import BookingStatusScreen from './screens/parent/BookingStatusScreen';
-import ParentChatScreen from './screens/parent/ParentChatScreen';
-import BookingHistoryScreen from './screens/parent/BookingHistoryScreen';
-import ClubHomeScreen from './screens/club/ClubHomeScreen';
-import ClubSettlementsScreen from './screens/club/ClubSettlementsScreen';
-import ClubTournamentListScreen from './screens/club/ClubTournamentListScreen';
-import ClubTournamentDetailScreen from './screens/club/ClubTournamentDetailScreen';
-import ClubInviteCoachScreen from './screens/club/ClubInviteCoachScreen';
-import { BookingSlotSelection, mockCarlosMedinaProfile, REAL_COMPLETED_BOOKING_ID, Tournament } from './mock/parentFlow';
-import { MatchConfig } from './lib/types';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { MatchProvider, useMatch } from '../context/MatchContext';
+import { colors } from '../lib/theme';
+import { MatchConfig } from '../lib/types';
 import {
   ApiError,
   BookingWithParticipants,
-  cancelBooking,
   createOrGetMatch,
   getCoachProfile,
   listCoachBookings,
   TournamentSummary,
-} from './lib/api';
-import { isUpcoming, toCoachBooking } from './lib/coachBookingDisplay';
-
-type PreviewScreen =
-  | 'coachCapture'
-  | 'coachRegister'
-  | 'coachPending'
-  | 'coachHome'
-  | 'coachAvailability'
-  | 'coachInbox'
-  | 'coachChat'
-  | 'coachPreMatch'
-  | 'coachSessions'
-  | 'coachEarnings'
-  | 'coachReputation'
-  | 'coachClubInvitation'
-  | 'parentHome'
-  | 'parentList'
-  | 'parentProfile'
-  | 'parentChat'
-  | 'parentHistory'
-  | 'clubSettlements'
-  | 'clubTournaments'
-  | 'clubHome';
-
-const PREVIEW_OPTIONS: { key: PreviewScreen; label: string }[] = [
-  { key: 'parentHome', label: 'Padre · Inicio' },
-  { key: 'parentList', label: 'Padre · Lista' },
-  { key: 'parentProfile', label: 'Padre · Reservar' },
-  { key: 'parentChat', label: 'Padre · Chat' },
-  { key: 'parentHistory', label: 'Padre · Historial' },
-  { key: 'coachRegister', label: 'Coach · Registro' },
-  { key: 'coachPending', label: 'Coach · Verificación' },
-  { key: 'coachHome', label: 'Coach · Inicio' },
-  { key: 'coachAvailability', label: 'Coach · Disponibilidad' },
-  { key: 'coachInbox', label: 'Coach · Solicitudes' },
-  { key: 'coachChat', label: 'Coach · Chat' },
-  { key: 'coachPreMatch', label: 'Coach · Día de partido' },
-  { key: 'coachCapture', label: 'Coach · Captura' },
-  { key: 'coachSessions', label: 'Coach · Sesiones' },
-  { key: 'coachEarnings', label: 'Coach · Ingresos' },
-  { key: 'coachReputation', label: 'Coach · Reputación' },
-  { key: 'coachClubInvitation', label: 'Coach · Invitación club' },
-  { key: 'clubHome', label: 'Club · Inicio' },
-  { key: 'clubTournaments', label: 'Club · Torneos' },
-  { key: 'clubSettlements', label: 'Club · Liquidaciones' },
-];
+} from '../lib/api';
+import { isUpcoming, toCoachBooking } from '../lib/coachBookingDisplay';
+import { mockMatchConfig, mockRoundLabel } from '../mock/players';
+import { BookingSlotSelection, mockCarlosMedinaProfile, REAL_COMPLETED_BOOKING_ID, Tournament } from '../mock/parentFlow';
+import LiveCaptureView from './LiveCaptureView';
+import MatchSummaryView from './MatchSummaryView';
+import CoachAvailabilityScreen from './coach/CoachAvailabilityScreen';
+import CoachBookingCancelScreen from './coach/CoachBookingCancelScreen';
+import CoachBookingDetailScreen from './coach/CoachBookingDetailScreen';
+import CoachChatScreen from './coach/CoachChatScreen';
+import CoachClubInvitationScreen from './coach/CoachClubInvitationScreen';
+import CoachEarningsScreen from './coach/CoachEarningsScreen';
+import CoachHomeScreen from './coach/CoachHomeScreen';
+import CoachMatchSetupScreen from './coach/CoachMatchSetupScreen';
+import CoachPreMatchReminderScreen from './coach/CoachPreMatchReminderScreen';
+import CoachRequestInboxScreen from './coach/CoachRequestInboxScreen';
+import CoachReputationScreen from './coach/CoachReputationScreen';
+import CoachSessionHistoryScreen from './coach/CoachSessionHistoryScreen';
+import CoachTournamentSearchScreen from './coach/CoachTournamentSearchScreen';
+import TrainerListScreen from './parent/TrainerListScreen';
+import TrainerProfileScreen from './parent/TrainerProfileScreen';
+import BookingConfirmScreen from './parent/BookingConfirmScreen';
+import BookingPaymentScreen from './parent/BookingPaymentScreen';
+import BookingStatusScreen from './parent/BookingStatusScreen';
+import ClubHomeScreen from './club/ClubHomeScreen';
+import ClubSettlementsScreen from './club/ClubSettlementsScreen';
+import ClubTournamentListScreen from './club/ClubTournamentListScreen';
+import ClubTournamentDetailScreen from './club/ClubTournamentDetailScreen';
+import ClubInviteCoachScreen from './club/ClubInviteCoachScreen';
 
 /** UUID real de Carlos Medina — coincide con coachAUserId en server/test/seed.ts. Toda la previsualización
  * del lado coach opera como este entrenador hasta que exista una sesión/login real. */
-const COACH_ID = mockCarlosMedinaProfile.trainer.id;
+export const COACH_ID = mockCarlosMedinaProfile.trainer.id;
 
-function CoachFlow({ roundLabel = mockRoundLabel }: { roundLabel?: string }) {
+export function CoachFlow({ roundLabel = mockRoundLabel }: { roundLabel?: string }) {
   const { matchState, reducerState } = useMatch();
   const showSummary = matchState.matchEnded || reducerState.matchClosed;
   return showSummary ? <MatchSummaryView /> : <LiveCaptureView roundLabel={roundLabel} />;
 }
 
 /** Local two-step flow: pick a tournament, then configure days/rate within it. */
-function CoachAvailabilityFlow() {
+export function CoachAvailabilityFlow({ onBack }: { onBack?: () => void } = {}) {
   const [tournament, setTournament] = useState<Tournament | null>(null);
 
   if (!tournament) {
-    return <CoachTournamentSearchScreen onSelect={setTournament} />;
+    return <CoachTournamentSearchScreen onSelect={setTournament} onBack={onBack} />;
   }
 
   return <CoachAvailabilityScreen tournament={tournament} onBack={() => setTournament(null)} />;
@@ -119,14 +67,21 @@ function CoachAvailabilityFlow() {
  * Payment requires the booking to already be 'accepted' server-side, so 'status' sits between 'confirm'
  * and 'payment' and polls the real booking until it is — it isn't just a post-payment receipt.
  */
-function ParentBookingFlow() {
-  const [step, setStep] = useState<'profile' | 'confirm' | 'status' | 'payment'>('profile');
+export function ParentBookingFlow() {
+  const router = useRouter();
+  const [step, setStep] = useState<'list' | 'profile' | 'confirm' | 'status' | 'payment'>('list');
   const [selection, setSelection] = useState<BookingSlotSelection | null>(null);
   const [note, setNote] = useState('');
   const [bookingId, setBookingId] = useState<string | null>(null);
 
+  if (step === 'list') {
+    // Todos los trainers mock llevan al mismo perfil (mockCarlosMedinaProfile) hasta que
+    // TrainerListScreen/TrainerProfileScreen se conecten a searchCoaches/getCoachProfile reales.
+    return <TrainerListScreen onBack={() => router.back()} onSelectTrainer={() => setStep('profile')} />;
+  }
+
   if (step === 'profile') {
-    return <TrainerProfileScreen onReserve={() => setStep('confirm')} />;
+    return <TrainerProfileScreen onBack={() => setStep('list')} onReserve={() => setStep('confirm')} />;
   }
 
   if (step === 'confirm') {
@@ -169,16 +124,18 @@ function ParentBookingFlow() {
 }
 
 /** Local three-step flow: home dashboard → booking detail → cancel, all sharing one local booking list. */
-function CoachHomeFlow() {
+export function CoachHomeFlow({ coachId, coachName }: { coachId: string; coachName: string }) {
   const [bookings, setBookings] = useState<BookingWithParticipants[] | null>(null);
   const [rating, setRating] = useState('—');
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [step, setStep] = useState<'home' | 'detail' | 'cancel' | 'chat'>('home');
+  const [step, setStep] = useState<
+    'home' | 'detail' | 'cancel' | 'chat' | 'requests' | 'availability' | 'sessions' | 'earnings' | 'reputation' | 'match'
+  >('home');
 
   useEffect(() => {
     let cancelled = false;
     setLoadError(null);
-    Promise.all([listCoachBookings(COACH_ID), getCoachProfile(COACH_ID)])
+    Promise.all([listCoachBookings(coachId), getCoachProfile(coachId)])
       .then(([bookingList, profile]) => {
         if (cancelled) return;
         setBookings(bookingList);
@@ -191,7 +148,7 @@ function CoachHomeFlow() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [coachId]);
 
   const nextBookingRaw =
     bookings
@@ -216,6 +173,7 @@ function CoachHomeFlow() {
         onBack={() => setStep('home')}
         onCancel={() => setStep('cancel')}
         onChat={() => setStep('chat')}
+        onStartMatch={nextBooking.status === 'confirmed' ? () => setStep('match') : undefined}
       />
     );
   }
@@ -228,6 +186,31 @@ function CoachHomeFlow() {
 
   if (step === 'chat' && nextBookingRaw) {
     return <CoachChatScreen bookingId={nextBookingRaw.id} onBack={() => setStep('detail')} />;
+  }
+
+  if (step === 'match' && nextBookingRaw) {
+    // Sin onBack: una vez iniciado el partido es forward-only, igual que CoachCapturePreview en /dev-preview.
+    return <CoachMatchDayFlow bookingId={nextBookingRaw.id} />;
+  }
+
+  if (step === 'requests') {
+    return <CoachRequestInboxScreen coachId={coachId} onBack={() => setStep('home')} />;
+  }
+
+  if (step === 'availability') {
+    return <CoachAvailabilityFlow onBack={() => setStep('home')} />;
+  }
+
+  if (step === 'sessions') {
+    return <CoachSessionHistoryScreen coachId={coachId} onBack={() => setStep('home')} />;
+  }
+
+  if (step === 'earnings') {
+    return <CoachEarningsScreen coachId={coachId} onBack={() => setStep('home')} />;
+  }
+
+  if (step === 'reputation') {
+    return <CoachReputationScreen coachId={coachId} coachName={coachName} onBack={() => setStep('home')} />;
   }
 
   if (loadError) {
@@ -248,12 +231,17 @@ function CoachHomeFlow() {
 
   return (
     <CoachHomeScreen
-      coachName={mockCarlosMedinaProfile.trainer.name}
+      coachName={coachName}
       rating={rating}
       pendingRequests={pendingRequests}
       pendingEarnings={pendingEarnings}
       nextBooking={nextBooking}
       onOpenBooking={() => setStep('detail')}
+      onOpenRequests={() => setStep('requests')}
+      onOpenAvailability={() => setStep('availability')}
+      onOpenSessions={() => setStep('sessions')}
+      onOpenEarnings={() => setStep('earnings')}
+      onOpenReputation={() => setStep('reputation')}
     />
   );
 }
@@ -265,7 +253,7 @@ function CoachHomeFlow() {
  * (mockPreMatchReminder) — only the persistence plumbing (bookingId → matchId) is real;
  * re-wiring their displayed content to the real booking is separate follow-up work.
  */
-function CoachMatchDayFlow({ bookingId }: { bookingId: string }) {
+export function CoachMatchDayFlow({ bookingId }: { bookingId: string }) {
   const [step, setStep] = useState<'reminder' | 'setup' | 'loadingMatch' | 'live'>('reminder');
   const [session, setSession] = useState<{ config: MatchConfig; roundLabel: string } | null>(null);
   const [matchId, setMatchId] = useState<string | null>(null);
@@ -335,7 +323,7 @@ function CoachMatchDayFlow({ bookingId }: { bookingId: string }) {
 
 /** Atajo de previsualización directo a la captura (salta reminder/setup) — misma
  * persistencia real que CoachMatchDayFlow, contra el mismo booking fixture. */
-function CoachCapturePreview() {
+export function CoachCapturePreview() {
   const [matchId, setMatchId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -384,7 +372,7 @@ function CoachCapturePreview() {
 }
 
 /** Local three-step flow: lista de torneos del club → detalle (roster + liquidar) → invitar entrenador. */
-function ClubTournamentFlow() {
+export function ClubTournamentFlow() {
   const [tournament, setTournament] = useState<TournamentSummary | null>(null);
   const [inviting, setInviting] = useState(false);
 
@@ -406,87 +394,29 @@ function ClubTournamentFlow() {
 }
 
 /**
- * Selector temporal para previsualizar las pantallas del flujo padre junto
- * al flujo del entrenador, ya que todavía no hay navegación real entre
- * ellas. Quitar cuando se integre una librería de navegación.
+ * Local three-step flow para el club_admin autenticado: inicio → torneos → liquidaciones.
+ * Lifted tal cual del switch inline que tenía ScreenPreviewSwitcher para 'clubHome'.
  */
-function ScreenPreviewSwitcher() {
-  const [screen, setScreen] = useState<PreviewScreen>('parentHome');
+export function ClubFlow() {
+  const [screen, setScreen] = useState<'home' | 'tournaments' | 'settlements'>('home');
+
+  if (screen === 'tournaments') {
+    return <ClubTournamentFlow />;
+  }
+
+  if (screen === 'settlements') {
+    return <ClubSettlementsScreen />;
+  }
 
   return (
-    <View style={styles.root}>
-      <View style={styles.content}>
-        {screen === 'coachCapture' ? (
-          <CoachCapturePreview />
-        ) : screen === 'coachRegister' ? (
-          <CoachRegistrationScreen />
-        ) : screen === 'coachPending' ? (
-          <CoachVerificationPendingScreen />
-        ) : screen === 'coachHome' ? (
-          <CoachHomeFlow />
-        ) : screen === 'coachAvailability' ? (
-          <CoachAvailabilityFlow />
-        ) : screen === 'coachInbox' ? (
-          <CoachRequestInboxScreen />
-        ) : screen === 'coachChat' ? (
-          <CoachChatScreen bookingId={REAL_COMPLETED_BOOKING_ID} />
-        ) : screen === 'coachPreMatch' ? (
-          <CoachMatchDayFlow bookingId={REAL_COMPLETED_BOOKING_ID} />
-        ) : screen === 'coachSessions' ? (
-          <CoachSessionHistoryScreen />
-        ) : screen === 'coachEarnings' ? (
-          <CoachEarningsScreen />
-        ) : screen === 'coachReputation' ? (
-          <CoachReputationScreen />
-        ) : screen === 'coachClubInvitation' ? (
-          <CoachClubInvitationScreen />
-        ) : screen === 'parentHome' ? (
-          <ParentHomeScreen />
-        ) : screen === 'parentList' ? (
-          <TrainerListScreen />
-        ) : screen === 'parentChat' ? (
-          <ParentChatScreen bookingId={REAL_COMPLETED_BOOKING_ID} />
-        ) : screen === 'parentHistory' ? (
-          <BookingHistoryScreen />
-        ) : screen === 'clubSettlements' ? (
-          <ClubSettlementsScreen />
-        ) : screen === 'clubTournaments' ? (
-          <ClubTournamentFlow />
-        ) : screen === 'clubHome' ? (
-          <ClubHomeScreen
-            onOpenTournaments={() => setScreen('clubTournaments')}
-            onOpenSettlements={() => setScreen('clubSettlements')}
-          />
-        ) : (
-          <ParentBookingFlow />
-        )}
-      </View>
-
-      <View style={styles.switcher}>
-        {PREVIEW_OPTIONS.map((opt) => (
-          <Pressable
-            key={opt.key}
-            onPress={() => setScreen(opt.key)}
-            style={[styles.switcherButton, screen === opt.key && styles.switcherButtonActive]}
-          >
-            <Text style={[styles.switcherLabel, screen === opt.key && styles.switcherLabelActive]}>{opt.label}</Text>
-          </Pressable>
-        ))}
-      </View>
-    </View>
+    <ClubHomeScreen
+      onOpenTournaments={() => setScreen('tournaments')}
+      onOpenSettlements={() => setScreen('settlements')}
+    />
   );
 }
 
-export default function App() {
-  return (
-    <SafeAreaProvider>
-      <ScreenPreviewSwitcher />
-      <StatusBar style="light" />
-    </SafeAreaProvider>
-  );
-}
-
-const styles = StyleSheet.create({
+export const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: colors.bg,
@@ -501,35 +431,5 @@ const styles = StyleSheet.create({
     fontSize: 13,
     textAlign: 'center',
     lineHeight: 19,
-  },
-  content: {
-    flex: 1,
-  },
-  switcher: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    backgroundColor: colors.courtBlueDeep,
-    paddingVertical: 8,
-    paddingHorizontal: 6,
-    gap: 6,
-    borderTopWidth: 1,
-    borderTopColor: colors.borderSoft,
-  },
-  switcherButton: {
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-  },
-  switcherButtonActive: {
-    backgroundColor: colors.ballLime,
-  },
-  switcherLabel: {
-    color: colors.textSoft,
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  switcherLabelActive: {
-    color: colors.courtBlueDeep,
   },
 });

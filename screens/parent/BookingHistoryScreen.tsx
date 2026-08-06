@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -22,6 +23,7 @@ const TABS: { key: TabKey; label: string }[] = [
 const CANCELLABLE_STATUSES = ['requested', 'confirmed'];
 
 export default function BookingHistoryScreen() {
+  const router = useRouter();
   const [bookings, setBookings] = useState<BookingHistoryEntry[]>(mockBookingHistory);
   const [cancelTarget, setCancelTarget] = useState<BookingHistoryEntry | null>(null);
   const [reviewTarget, setReviewTarget] = useState<BookingHistoryEntry | null>(null);
@@ -106,10 +108,14 @@ export default function BookingHistoryScreen() {
 
       <View style={styles.tabBar}>
         {TABS.map((tab) => (
-          <View key={tab.key} style={styles.tabItem}>
+          <Pressable
+            key={tab.key}
+            style={styles.tabItem}
+            onPress={() => tab.key === 'inicio' && router.push('/')}
+          >
             <View style={[styles.tabDot, tab.key === 'reservas' && styles.tabDotActive]} />
             <Text style={[styles.tabLabel, tab.key === 'reservas' && styles.tabLabelActive]}>{tab.label}</Text>
-          </View>
+          </Pressable>
         ))}
       </View>
     </SafeAreaView>

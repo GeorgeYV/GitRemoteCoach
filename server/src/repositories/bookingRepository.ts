@@ -219,3 +219,16 @@ export async function markBookingsSettled(
     [settlementId, ...bookingIds],
   );
 }
+
+/** notificationService: a quién avisar (push) cuando cambia el estado de esta reserva. */
+export async function getParentUserIdForBooking(bookingId: string, db: Queryable = pool): Promise<string> {
+  const { rows } = await db.query(
+    `SELECT p.guardian_user_id
+     FROM bookings b
+     JOIN players p ON p.id = b.player_id
+     WHERE b.id = $1`,
+    [bookingId],
+  );
+  if (rows.length === 0) throw new NotFoundError('Booking', bookingId);
+  return rows[0].guardian_user_id;
+}

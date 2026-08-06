@@ -21,11 +21,13 @@ export default function CoachBookingDetailScreen({
   onBack,
   onCancel,
   onChat,
+  onStartMatch,
 }: {
   booking: CoachBooking;
   onBack: () => void;
   onCancel: () => void;
   onChat?: () => void;
+  onStartMatch?: () => void;
 }) {
   const net = booking.coachNetAmount ?? booking.agreedRate * (1 - PLATFORM_COMMISSION_RATE);
   const commission = booking.agreedRate - net;
@@ -81,6 +83,11 @@ export default function CoachBookingDetailScreen({
 
       {confirmed && (
         <View style={styles.footer}>
+          {onStartMatch && (
+            <Pressable style={styles.startMatchButton} onPress={onStartMatch}>
+              <Text style={styles.startMatchLabel}>Iniciar partido</Text>
+            </Pressable>
+          )}
           {onChat && (
             <Pressable style={styles.chatButton} onPress={onChat}>
               <Text style={styles.chatButtonLabel}>Abrir chat</Text>
@@ -230,6 +237,17 @@ const styles = StyleSheet.create({
     backgroundColor: colors.courtBlueDeep,
     padding: 16,
     gap: 10,
+  },
+  startMatchButton: {
+    backgroundColor: colors.ballLime,
+    borderRadius: radius,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  startMatchLabel: {
+    color: colors.courtBlueDeep,
+    fontSize: 15,
+    fontWeight: '800',
   },
   chatButton: {
     borderRadius: radius,

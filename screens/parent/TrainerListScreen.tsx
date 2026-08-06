@@ -6,7 +6,13 @@ import VerificationBadgePill from '../../components/parent/VerificationBadgePill
 import { colors, radius } from '../../lib/theme';
 import { FILTER_CHIPS, mockFeaturedTournament, mockTrainers, Trainer } from '../../mock/parentFlow';
 
-export default function TrainerListScreen() {
+export default function TrainerListScreen({
+  onBack,
+  onSelectTrainer,
+}: {
+  onBack?: () => void;
+  onSelectTrainer?: (trainer: Trainer) => void;
+}) {
   const [activeChips, setActiveChips] = useState<Record<string, boolean>>({});
 
   function toggleChip(chip: string) {
@@ -16,7 +22,7 @@ export default function TrainerListScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.header}>
-        <Pressable style={styles.backButton}>
+        <Pressable style={styles.backButton} onPress={onBack}>
           <Text style={styles.backIcon}>←</Text>
         </Pressable>
         <View style={styles.headerText}>
@@ -44,16 +50,16 @@ export default function TrainerListScreen() {
 
       <ScrollView contentContainerStyle={styles.list}>
         {mockTrainers.map((trainer) => (
-          <TrainerCard key={trainer.id} trainer={trainer} />
+          <TrainerCard key={trainer.id} trainer={trainer} onPress={() => onSelectTrainer?.(trainer)} />
         ))}
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-function TrainerCard({ trainer }: { trainer: Trainer }) {
+function TrainerCard({ trainer, onPress }: { trainer: Trainer; onPress?: () => void }) {
   return (
-    <Pressable style={styles.card}>
+    <Pressable style={styles.card} onPress={onPress}>
       <View style={styles.cardTopRow}>
         <TrainerAvatarPlaceholder size={60} />
         <View style={styles.cardInfo}>

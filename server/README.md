@@ -21,6 +21,9 @@ archivo).
 
 | Método | Ruta | Descripción |
 |---|---|---|
+| POST | `/auth/register` | Crea una cuenta (`parent`/`coach`/`club_admin`) y devuelve `{ user, token }`. |
+| POST | `/auth/login` | Verifica credenciales y devuelve `{ user, token }`. |
+| GET | `/auth/me` | Requiere `Authorization: Bearer <token>`; devuelve el usuario de la sesión. |
 | POST | `/bookings` | Padre solicita reserva. Fija `response_deadline` (4h). |
 | POST | `/bookings/:id/accept` | Entrenador acepta. Fija `payment_deadline` (2h). |
 | POST | `/bookings/:id/reject` | Entrenador rechaza. |
@@ -49,4 +52,6 @@ schema); cambiarlas requiere deploy.
 - Lógica real de sugerencia de entrenadores alternativos (`bookingService.suggestAlternativeCoaches`).
 - Impacto de `flagged_for_coach_penalty` en `rating_avg`/`rating_count`.
 - Transferencia bancaria real al club (`settlementService` ya marca `paid`, sin mover dinero).
-- Autenticación/autorización de los endpoints (quién puede aceptar/cancelar qué reserva).
+- Autorización de los endpoints de negocio (bookings, matches, etc. todavía no exigen el
+  Bearer token — `POST /auth/register`, `POST /auth/login` y `GET /auth/me` ya existen, pero
+  quién puede aceptar/cancelar qué reserva sigue sin validarse contra la sesión).

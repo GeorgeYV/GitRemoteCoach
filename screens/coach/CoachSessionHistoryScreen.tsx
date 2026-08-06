@@ -7,7 +7,6 @@ import { ApiError, BookingWithParticipants, listCoachBookings } from '../../lib/
 import { toCoachBooking } from '../../lib/coachBookingDisplay';
 import { colors, radius } from '../../lib/theme';
 import { CoachBooking } from '../../mock/coachFlow';
-import { mockCarlosMedinaProfile } from '../../mock/parentFlow';
 import CoachBookingCancelScreen from './CoachBookingCancelScreen';
 
 /** 'requested' vive en el inbox de solicitudes, no en el historial de sesiones ya decididas. */
@@ -20,7 +19,7 @@ const DECIDED_STATUSES: BookingWithParticipants['status'][] = [
   'expired',
 ];
 
-export default function CoachSessionHistoryScreen() {
+export default function CoachSessionHistoryScreen({ coachId, onBack }: { coachId: string; onBack?: () => void }) {
   const [bookings, setBookings] = useState<CoachBooking[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [cancelTarget, setCancelTarget] = useState<CoachBooking | null>(null);
@@ -28,7 +27,7 @@ export default function CoachSessionHistoryScreen() {
   useEffect(() => {
     let cancelled = false;
     setError(null);
-    listCoachBookings(mockCarlosMedinaProfile.trainer.id)
+    listCoachBookings(coachId)
       .then((result) => {
         if (!cancelled) setBookings(result.filter((b) => DECIDED_STATUSES.includes(b.status)).map(toCoachBooking));
       })
@@ -39,7 +38,7 @@ export default function CoachSessionHistoryScreen() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [coachId]);
 
   function confirmCancel(_reason: string) {
     if (!cancelTarget) return;
@@ -80,7 +79,12 @@ export default function CoachSessionHistoryScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Sesiones</Text>
+        <View style={styles.headerTopRow}>
+          <Pressable style={styles.backButton} onPress={onBack}>
+            <Text style={styles.backIcon}>←</Text>
+          </Pressable>
+          <Text style={styles.headerTitle}>Sesiones</Text>
+        </View>
         <Text style={styles.headerSubtitle}>
           {bookings.length} sesi{bookings.length === 1 ? 'ón' : 'ones'} en total
         </Text>
@@ -165,11 +169,22 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.borderSoft,
   },
+  headerTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  backButton: {
+    paddingRight: 12,
+  },
+  backIcon: {
+    color: colors.lineWhite,
+    fontSize: 20,
+  },
   headerTitle: {
     color: colors.lineWhite,
     fontSize: 22,
     fontWeight: '800',
-    marginBottom: 4,
   },
   headerSubtitle: {
     color: colors.textDim,

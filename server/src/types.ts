@@ -22,6 +22,15 @@ export type ClubInvitationStatus = 'pending' | 'accepted' | 'declined';
 export type MessageSenderType = 'coach' | 'parent' | 'system';
 export type VerificationStatus = 'pending' | 'approved' | 'rejected';
 
+export type UserRole = 'parent' | 'coach' | 'club_admin' | 'platform_admin';
+
+export interface PublicUser {
+  id: string;
+  email: string;
+  fullName: string;
+  primaryRole: UserRole;
+}
+
 export interface Booking {
   id: string;
   playerId: string;

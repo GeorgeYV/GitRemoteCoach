@@ -3,6 +3,7 @@ import { businessRules } from '../config.js';
 import { ConflictError, ValidationError } from '../lib/errors.js';
 import * as bookingRepository from '../repositories/bookingRepository.js';
 import * as bookingMessageRepository from '../repositories/bookingMessageRepository.js';
+import * as notificationService from './notificationService.js';
 import type { Booking, BookingWithParticipants } from '../types.js';
 
 const BOOKING_CONFIRMED_SYSTEM_MESSAGE = 'Reserva confirmada · usa este chat para coordinar el punto de encuentro';
@@ -36,15 +37,15 @@ export async function requestBooking(params: RequestBookingParams): Promise<Book
  */
 export async function acceptBooking(bookingId: string): Promise<Booking> {
   const paymentDeadline = new Date(Date.now() + businessRules.paymentWindowHours * 3600_000);
-  return withTransaction(async (client) => {
-    const updated = await bookingRepository.updateStatus(
+  const updated = await withTransaction(async (client) => {
+    const result = await bookingRepository.updateStatus(
       bookingId,
       ['requested'],
       'accepted',
       { decided_at: new Date(), payment_deadline: paymentDeadline },
       client,
     );
-    if (!updated) {
+    if (!result) {
       throw new ConflictError(
         'La reserva ya no está en estado "requested" (puede haber expirado o ya fue decidida)',
         'invalid_transition',
@@ -54,8 +55,17 @@ export async function acceptBooking(bookingId: string): Promise<Booking> {
       { bookingId, senderType: 'system', body: BOOKING_CONFIRMED_SYSTEM_MESSAGE },
       client,
     );
-    return updated;
+    return result;
   });
+
+  const parentUserId = await bookingRepository.getParentUserIdForBooking(bookingId);
+  await notificationService.notifyUser(parentUserId, {
+    title: 'Reserva confirmada',
+    body: 'Tu entrenador aceptó tu solicitud — coordina el punto de encuentro en el chat.',
+    data: { bookingId },
+  });
+
+  return updated;
 }
 
 export async function listBookingsForCoach(coachId: string): Promise<BookingWithParticipants[]> {
@@ -75,6 +85,14 @@ export async function rejectBooking(bookingId: string): Promise<Booking> {
       'invalid_transition',
     );
   }
+
+  const parentUserId = await bookingRepository.getParentUserIdForBooking(bookingId);
+  await notificationService.notifyUser(parentUserId, {
+    title: 'Solicitud rechazada',
+    body: 'Tu entrenador no pudo aceptar tu solicitud — buscá otra fecha u otro entrenador.',
+    data: { bookingId },
+  });
+
   return updated;
 }
 

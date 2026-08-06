@@ -10,7 +10,13 @@ import { ApiError, listCoachReviews, ReviewWithParent } from '../../lib/api';
 import { colors, radius } from '../../lib/theme';
 import { mockCarlosMedinaProfile } from '../../mock/parentFlow';
 
-export default function TrainerProfileScreen({ onReserve }: { onReserve?: () => void }) {
+export default function TrainerProfileScreen({
+  onBack,
+  onReserve,
+}: {
+  onBack?: () => void;
+  onReserve?: () => void;
+}) {
   const profile = mockCarlosMedinaProfile;
   const { trainer } = profile;
 
@@ -36,7 +42,7 @@ export default function TrainerProfileScreen({ onReserve }: { onReserve?: () => 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.header}>
-        <Pressable style={styles.backButton}>
+        <Pressable style={styles.backButton} onPress={onBack}>
           <Text style={styles.backIcon}>←</Text>
         </Pressable>
         <TrainerAvatarPlaceholder size={64} />

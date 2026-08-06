@@ -6,7 +6,6 @@ import TrainerAvatarPlaceholder from '../../components/shared/TrainerAvatarPlace
 import { AgeCategory, ApiError, PlayingLevel, updateCoachTraining } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
 import { AGE_CATEGORY_OPTIONS, DocumentItem, LEVEL_OPTIONS, mockDocumentChecklist } from '../../mock/coachFlow';
-import { mockCarlosMedinaProfile } from '../../mock/parentFlow';
 
 const LEVEL_LABEL_TO_VALUE: Record<string, PlayingLevel> = {
   Recreativo: 'recreativo',
@@ -14,7 +13,13 @@ const LEVEL_LABEL_TO_VALUE: Record<string, PlayingLevel> = {
   'Alto rendimiento': 'alto_rendimiento',
 };
 
-export default function CoachRegistrationScreen({ onSubmit }: { onSubmit?: () => void }) {
+export default function CoachRegistrationScreen({
+  coachId,
+  onSubmit,
+}: {
+  coachId: string;
+  onSubmit?: () => void;
+}) {
   const [name, setName] = useState('');
   const [city, setCity] = useState('');
   const [region, setRegion] = useState('');
@@ -37,7 +42,7 @@ export default function CoachRegistrationScreen({ onSubmit }: { onSubmit?: () =>
     setSubmitting(true);
     setError(null);
     try {
-      await updateCoachTraining(mockCarlosMedinaProfile.trainer.id, {
+      await updateCoachTraining(coachId, {
         ageCategories: categories as AgeCategory[],
         levels: levels.map((label) => LEVEL_LABEL_TO_VALUE[label]),
       });
