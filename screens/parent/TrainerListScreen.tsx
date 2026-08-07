@@ -1,19 +1,37 @@
-import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import TrainerAvatarPlaceholder from '../../components/shared/TrainerAvatarPlaceholder';
-import VerificationBadgePill from '../../components/parent/VerificationBadgePill';
+import { ApiError, CoachSearchResult, searchCoaches } from '../../lib/api';
 import { colors, radius } from '../../lib/theme';
-import { FILTER_CHIPS, mockFeaturedTournament, mockTrainers, Trainer } from '../../mock/parentFlow';
+import { FILTER_CHIPS, mockFeaturedTournament } from '../../mock/parentFlow';
 
 export default function TrainerListScreen({
   onBack,
   onSelectTrainer,
 }: {
   onBack?: () => void;
-  onSelectTrainer?: (trainer: Trainer) => void;
+  onSelectTrainer?: (coach: CoachSearchResult) => void;
 }) {
   const [activeChips, setActiveChips] = useState<Record<string, boolean>>({});
+  const [trainers, setTrainers] = useState<CoachSearchResult[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setError(null);
+    searchCoaches({})
+      .then((result) => {
+        if (!cancelled) setTrainers(result);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setError(err instanceof ApiError ? err.message : 'No se pudieron cargar los entrenadores.');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function toggleChip(chip: string) {
     setActiveChips((prev) => ({ ...prev, [chip]: !prev[chip] }));
@@ -46,18 +64,35 @@ export default function TrainerListScreen({
         })}
       </ScrollView>
 
-      <Text style={styles.resultsLabel}>{mockTrainers.length} entrenadores disponibles</Text>
+      {error ? (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyText}>{error}</Text>
+        </View>
+      ) : !trainers ? (
+        <View style={styles.emptyState}>
+          <ActivityIndicator color={colors.ballLime} />
+        </View>
+      ) : (
+        <>
+          <Text style={styles.resultsLabel}>{trainers.length} entrenadores disponibles</Text>
 
-      <ScrollView contentContainerStyle={styles.list}>
-        {mockTrainers.map((trainer) => (
-          <TrainerCard key={trainer.id} trainer={trainer} onPress={() => onSelectTrainer?.(trainer)} />
-        ))}
-      </ScrollView>
+          <ScrollView contentContainerStyle={styles.list}>
+            {trainers.map((trainer) => (
+              <TrainerCard key={trainer.id} trainer={trainer} onPress={() => onSelectTrainer?.(trainer)} />
+            ))}
+
+            {trainers.length === 0 && (
+              <Text style={styles.emptyText}>No hay entrenadores disponibles por ahora.</Text>
+            )}
+          </ScrollView>
+        </>
+      )}
     </SafeAreaView>
   );
 }
 
-function TrainerCard({ trainer, onPress }: { trainer: Trainer; onPress?: () => void }) {
+function TrainerCard({ trainer, onPress }: { trainer: CoachSearchResult; onPress?: () => void }) {
+  const metaParts = [trainer.city, trainer.specialty, `${trainer.yearsExperience} años`].filter(Boolean);
   return (
     <Pressable style={styles.card} onPress={onPress}>
       <View style={styles.cardTopRow}>
@@ -65,18 +100,9 @@ function TrainerCard({ trainer, onPress }: { trainer: Trainer; onPress?: () => v
         <View style={styles.cardInfo}>
           <Text style={styles.trainerName}>{trainer.name}</Text>
           <Text style={styles.trainerMeta}>
-            ★ {trainer.rating} · {trainer.reviews} reseñas · {trainer.category}
+            ★ {trainer.ratingAvg} · {metaParts.join(' · ')}
           </Text>
         </View>
-        <View style={styles.priceBlock}>
-          <Text style={styles.price}>${trainer.price}</Text>
-          <Text style={styles.priceSuffix}>por partido</Text>
-        </View>
-      </View>
-      <View style={styles.badgeRow}>
-        {trainer.badges.map((badge) => (
-          <VerificationBadgePill key={badge} label={badge} />
-        ))}
       </View>
     </Pressable>
   );
@@ -152,6 +178,16 @@ const styles = StyleSheet.create({
     paddingTop: 14,
     paddingBottom: 6,
   },
+  emptyState: {
+    paddingTop: 40,
+    paddingHorizontal: 20,
+  },
+  emptyText: {
+    color: colors.textDim,
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 19,
+  },
   list: {
     paddingHorizontal: 16,
     paddingBottom: 24,
@@ -167,7 +203,6 @@ const styles = StyleSheet.create({
   cardTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
   },
   cardInfo: {
     flex: 1,
@@ -183,23 +218,5 @@ const styles = StyleSheet.create({
   trainerMeta: {
     color: colors.textDim,
     fontSize: 12,
-  },
-  priceBlock: {
-    alignItems: 'flex-end',
-  },
-  price: {
-    color: colors.ballLime,
-    fontSize: 17,
-    fontWeight: '800',
-  },
-  priceSuffix: {
-    color: colors.textDim,
-    fontSize: 10,
-    marginTop: 1,
-  },
-  badgeRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
   },
 });

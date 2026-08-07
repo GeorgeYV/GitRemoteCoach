@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors } from '../lib/theme';
+import { mockClubAdmin } from '../mock/clubFlow';
 import { mockCarlosMedinaProfile, REAL_COMPLETED_BOOKING_ID } from '../mock/parentFlow';
 import LoginScreen from './auth/LoginScreen';
 import RegisterScreen from './auth/RegisterScreen';
@@ -95,9 +96,9 @@ export default function DevPreviewSwitcher() {
         ) : screen === 'coachCapture' ? (
           <CoachCapturePreview />
         ) : screen === 'coachRegister' ? (
-          <CoachRegistrationScreen coachId={COACH_ID} />
+          <CoachRegistrationScreen />
         ) : screen === 'coachPending' ? (
-          <CoachVerificationPendingScreen />
+          <CoachVerificationPendingScreen coachId={COACH_ID} />
         ) : screen === 'coachHome' ? (
           <CoachHomeFlow coachId={COACH_ID} coachName={mockCarlosMedinaProfile.trainer.name} />
         ) : screen === 'coachAvailability' ? (
@@ -125,11 +126,16 @@ export default function DevPreviewSwitcher() {
         ) : screen === 'parentHistory' ? (
           <BookingHistoryScreen />
         ) : screen === 'clubSettlements' ? (
-          <ClubSettlementsScreen />
+          <ClubSettlementsScreen clubId={mockClubAdmin.id} clubName={mockClubAdmin.name} />
         ) : screen === 'clubTournaments' ? (
-          <ClubTournamentFlow />
+          <ClubTournamentFlow
+            clubId={mockClubAdmin.id}
+            clubName={mockClubAdmin.name}
+            adminUserId={mockClubAdmin.adminUserId}
+          />
         ) : screen === 'clubHome' ? (
           <ClubHomeScreen
+            clubId={mockClubAdmin.id}
             onOpenTournaments={() => setScreen('clubTournaments')}
             onOpenSettlements={() => setScreen('clubSettlements')}
           />

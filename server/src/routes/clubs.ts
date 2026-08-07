@@ -19,4 +19,10 @@ export async function clubRoutes(app: FastifyInstance): Promise<void> {
     const { id } = req.params as { id: string };
     return clubService.listTournamentsForClub(id);
   });
+
+  // ClubFlow: resuelve qué club administra el club_admin logueado.
+  app.get('/club-admins/:userId/club', async (req) => {
+    const { userId } = req.params as { userId: string };
+    return clubService.getClubForAdmin(userId);
+  });
 }

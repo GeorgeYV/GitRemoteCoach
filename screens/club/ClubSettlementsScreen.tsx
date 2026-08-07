@@ -4,20 +4,19 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import SettlementRow from '../../components/club/SettlementRow';
 import { ApiError, ClubSettlementWithTournamentName, listClubSettlements } from '../../lib/api';
 import { colors, radius } from '../../lib/theme';
-import { mockClubAdmin } from '../../mock/clubFlow';
 
 function money(amount: number): string {
   return `$${amount.toFixed(2)}`;
 }
 
-export default function ClubSettlementsScreen() {
+export default function ClubSettlementsScreen({ clubId, clubName }: { clubId: string; clubName: string }) {
   const [settlements, setSettlements] = useState<ClubSettlementWithTournamentName[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     setError(null);
-    listClubSettlements(mockClubAdmin.id)
+    listClubSettlements(clubId)
       .then((result) => {
         if (!cancelled) setSettlements(result);
       })
@@ -28,7 +27,7 @@ export default function ClubSettlementsScreen() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [clubId]);
 
   if (error) {
     return (
@@ -55,7 +54,7 @@ export default function ClubSettlementsScreen() {
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Liquidaciones</Text>
-        <Text style={styles.headerSubtitle}>{mockClubAdmin.name}</Text>
+        <Text style={styles.headerSubtitle}>{clubName}</Text>
       </View>
 
       <View style={styles.summaryRow}>

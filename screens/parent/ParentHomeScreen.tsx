@@ -1,10 +1,12 @@
 import { useRouter } from 'expo-router';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import InitialAvatar from '../../components/shared/InitialAvatar';
+import { useAuth } from '../../context/AuthContext';
+import { listPlayers } from '../../lib/api';
 import { colors, radius } from '../../lib/theme';
-import { mockActiveTournaments, mockFeaturedTournament, mockParentUser, Tournament } from '../../mock/parentFlow';
+import { mockActiveTournaments, mockFeaturedTournament, Tournament } from '../../mock/parentFlow';
 
 type TabKey = 'inicio' | 'reservas' | 'reportes' | 'perfil';
 
@@ -17,6 +19,15 @@ const TABS: { key: TabKey; label: string }[] = [
 
 export default function ParentHomeScreen() {
   const router = useRouter();
+  const { user, token } = useAuth();
+  const [childName, setChildName] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!token) return;
+    listPlayers(token)
+      .then((players) => setChildName(players[0]?.fullName ?? null))
+      .catch(() => setChildName(null));
+  }, [token]);
 
   function goToTrainers() {
     router.push('/trainers');
@@ -27,17 +38,21 @@ export default function ParentHomeScreen() {
     // 'reportes'/'perfil' no tienen pantalla todavía; 'inicio' ya es esta pantalla.
   }
 
+  const firstName = user?.fullName.split(' ')[0] ?? '';
+
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.header}>
         <Text style={styles.wordmark}>Remote Coach</Text>
-        <InitialAvatar initial={mockParentUser.initial} size={36} />
+        <InitialAvatar initial={firstName[0] ?? '?'} size={36} />
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.greeting}>Hola, {mockParentUser.name}</Text>
+        <Text style={styles.greeting}>Hola, {firstName}</Text>
         <Text style={styles.headline}>
-          Encuentra un entrenador para el próximo torneo de {mockParentUser.childName}
+          {childName
+            ? `Encuentra un entrenador para el próximo torneo de ${childName}`
+            : 'Encuentra un entrenador para tu próximo torneo'}
         </Text>
 
         <Text style={styles.sectionLabel}>Continuar con</Text>

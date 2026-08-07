@@ -4,12 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import TrainerAvatarPlaceholder from '../../components/shared/TrainerAvatarPlaceholder';
 import { ApiError, Booking, getBooking } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
-import {
-  BOOKING_PERIOD_LABELS,
-  BookingSlotSelection,
-  mockCarlosMedinaProfile,
-  mockFeaturedTournament,
-} from '../../mock/parentFlow';
+import { BOOKING_PERIOD_LABELS, BookingSlotSelection, mockFeaturedTournament } from '../../mock/parentFlow';
 
 /** El coach normalmente responde en minutos, pero la ventana real es de horas — pollear cada 4s alcanza para la demo. */
 const POLL_INTERVAL_MS = 4000;
@@ -19,17 +14,19 @@ const TERMINAL_NEGATIVE_STATUSES: Booking['status'][] = ['rejected', 'expired', 
 export default function BookingStatusScreen({
   bookingId,
   selection,
+  trainerName,
+  price,
   onAccepted,
   onDone,
 }: {
   bookingId: string;
   selection: BookingSlotSelection;
+  trainerName: string;
+  price: number;
   /** Se llama una sola vez, la primera vez que el estado real pasa a 'accepted', para continuar a pago. */
   onAccepted: () => void;
   onDone: () => void;
 }) {
-  const profile = mockCarlosMedinaProfile;
-  const { trainer } = profile;
   const [booking, setBooking] = useState<Booking | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -78,7 +75,7 @@ export default function BookingStatusScreen({
           >
             {statusTitle(booking, error)}
           </Text>
-          <Text style={styles.statusBody}>{statusBody(booking, error, trainer.name.split(' ')[0])}</Text>
+          <Text style={styles.statusBody}>{statusBody(booking, error, trainerName.split(' ')[0])}</Text>
         </View>
 
         <Section label="Detalle de la reserva">
@@ -86,7 +83,7 @@ export default function BookingStatusScreen({
             <View style={styles.detailTopRow}>
               <TrainerAvatarPlaceholder size={48} />
               <View style={styles.detailInfo}>
-                <Text style={styles.trainerName}>{trainer.name}</Text>
+                <Text style={styles.trainerName}>{trainerName}</Text>
                 <Text style={styles.detailMeta}>{mockFeaturedTournament.name}</Text>
               </View>
             </View>
@@ -95,7 +92,7 @@ export default function BookingStatusScreen({
             <DetailLine label="Sede" value={mockFeaturedTournament.venue} />
             <DetailLine
               label={booking?.totalAmountPaid ? 'Total pagado' : 'Tarifa acordada'}
-              value={`$${booking?.totalAmountPaid ?? trainer.price}`}
+              value={`$${booking?.totalAmountPaid ?? price}`}
             />
           </View>
         </Section>

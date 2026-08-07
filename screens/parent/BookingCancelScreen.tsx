@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import InitialAvatar from '../../components/shared/InitialAvatar';
+import { useAuth } from '../../context/AuthContext';
 import { ApiError, cancelBooking } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
-import { BookingHistoryEntry, mockParentUser } from '../../mock/parentFlow';
+import { BookingHistoryEntry } from '../../mock/parentFlow';
 
 export default function BookingCancelScreen({
   booking,
@@ -15,17 +16,22 @@ export default function BookingCancelScreen({
   onBack: () => void;
   onConfirm: (reason: string) => void;
 }) {
+  const { user } = useAuth();
   const [reason, setReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleConfirm() {
+    if (!user) {
+      setError('No hay una sesión activa.');
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
       await cancelBooking(booking.id, {
         actor: 'parent',
-        actorUserId: mockParentUser.id,
+        actorUserId: user.id,
         reason: reason.trim() || undefined,
       });
       onConfirm(reason.trim());

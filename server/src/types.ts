@@ -74,6 +74,16 @@ export interface BookingWithParticipants extends Booking {
   tournamentVenue: string;
 }
 
+/** Lo que devuelve el listado por padre (BookingHistoryScreen) — nombre del entrenador y del
+ * torneo vienen de JOINs; reviewed sale de un EXISTS contra reviews. */
+export interface BookingForParent extends Booking {
+  coachName: string;
+  playerName: string;
+  tournamentName: string;
+  tournamentVenue: string;
+  reviewed: boolean;
+}
+
 export interface PaymentTransaction {
   id: string;
   bookingId: string;
@@ -126,8 +136,19 @@ export interface Club {
 
 export type CancelActor = 'parent' | 'coach';
 
+export interface Player {
+  id: string;
+  guardianUserId: string;
+  fullName: string;
+  /** DATE column normalizado a YYYY-MM-DD en el repositorio — ver playerRepository.mapPlayerRow. */
+  birthDate: string;
+  ageCategory: AgeCategory;
+  createdAt: string;
+}
+
 export interface CoachProfile {
   userId: string;
+  fullName: string;
   city: string;
   region: string | null;
   photoUrl: string | null;

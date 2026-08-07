@@ -8,7 +8,6 @@ import { colors, radius } from '../../lib/theme';
 import {
   BOOKING_PERIOD_LABELS,
   BookingSlotSelection,
-  mockCarlosMedinaProfile,
   mockFeaturedTournament,
   mockPaymentMethods,
 } from '../../mock/parentFlow';
@@ -17,17 +16,19 @@ export default function BookingPaymentScreen({
   bookingId,
   selection,
   note,
+  trainerName,
+  price,
   onBack,
   onConfirm,
 }: {
   bookingId: string;
   selection: BookingSlotSelection;
   note: string;
+  trainerName: string;
+  price: number;
   onBack: () => void;
   onConfirm: () => void;
 }) {
-  const profile = mockCarlosMedinaProfile;
-  const { trainer } = profile;
   const [methodId, setMethodId] = useState(mockPaymentMethods[0].id);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -64,7 +65,7 @@ export default function BookingPaymentScreen({
             <View style={styles.summaryTopRow}>
               <TrainerAvatarPlaceholder size={48} />
               <View style={styles.summaryInfo}>
-                <Text style={styles.trainerName}>{trainer.name}</Text>
+                <Text style={styles.trainerName}>{trainerName}</Text>
                 <Text style={styles.summaryMeta}>{mockFeaturedTournament.name}</Text>
               </View>
             </View>
@@ -73,7 +74,7 @@ export default function BookingPaymentScreen({
             <SummaryLine label="Sede" value={mockFeaturedTournament.venue} />
             {note ? <SummaryLine label="Nota" value={note} /> : null}
             <View style={styles.summaryDivider} />
-            <SummaryLine label="Total a pagar" value={`$${trainer.price}`} emphasize />
+            <SummaryLine label="Total a pagar" value={`$${price}`} emphasize />
           </View>
         </Section>
 
@@ -100,7 +101,7 @@ export default function BookingPaymentScreen({
           {submitting ? (
             <ActivityIndicator color={colors.courtBlueDeep} />
           ) : (
-            <Text style={styles.confirmLabel}>Confirmar y pagar ${trainer.price}</Text>
+            <Text style={styles.confirmLabel}>Confirmar y pagar ${price}</Text>
           )}
         </Pressable>
       </View>

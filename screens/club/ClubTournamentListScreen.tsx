@@ -4,7 +4,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import TournamentStatusPill from '../../components/club/TournamentStatusPill';
 import { ApiError, listClubTournaments, TournamentSummary } from '../../lib/api';
 import { colors, radius } from '../../lib/theme';
-import { mockClubAdmin } from '../../mock/clubFlow';
 
 function dateRangeLabel(startIso: string, endIso: string): string {
   const start = new Date(startIso).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' });
@@ -13,8 +12,12 @@ function dateRangeLabel(startIso: string, endIso: string): string {
 }
 
 export default function ClubTournamentListScreen({
+  clubId,
+  clubName,
   onSelect,
 }: {
+  clubId: string;
+  clubName: string;
   onSelect: (tournament: TournamentSummary) => void;
 }) {
   const [tournaments, setTournaments] = useState<TournamentSummary[] | null>(null);
@@ -23,7 +26,7 @@ export default function ClubTournamentListScreen({
   useEffect(() => {
     let cancelled = false;
     setError(null);
-    listClubTournaments(mockClubAdmin.id)
+    listClubTournaments(clubId)
       .then((result) => {
         if (!cancelled) setTournaments(result);
       })
@@ -34,13 +37,13 @@ export default function ClubTournamentListScreen({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [clubId]);
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Torneos</Text>
-        <Text style={styles.headerSubtitle}>{mockClubAdmin.name}</Text>
+        <Text style={styles.headerSubtitle}>{clubName}</Text>
       </View>
 
       {error ? (

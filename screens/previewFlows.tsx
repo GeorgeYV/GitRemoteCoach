@@ -1,22 +1,34 @@
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { useAuth } from '../context/AuthContext';
 import { MatchProvider, useMatch } from '../context/MatchContext';
 import { colors } from '../lib/theme';
 import { MatchConfig } from '../lib/types';
 import {
   ApiError,
   BookingWithParticipants,
+  Club,
+  CoachSearchResult,
   createOrGetMatch,
+  getClubForAdmin,
   getCoachProfile,
   listCoachBookings,
+  listPlayers,
   TournamentSummary,
 } from '../lib/api';
 import { isUpcoming, toCoachBooking } from '../lib/coachBookingDisplay';
 import { mockMatchConfig, mockRoundLabel } from '../mock/players';
-import { BookingSlotSelection, mockCarlosMedinaProfile, REAL_COMPLETED_BOOKING_ID, Tournament } from '../mock/parentFlow';
+import {
+  AvailabilityDay,
+  BookingSlotSelection,
+  mockCarlosMedinaProfile,
+  REAL_COMPLETED_BOOKING_ID,
+  Tournament,
+} from '../mock/parentFlow';
 import LiveCaptureView from './LiveCaptureView';
 import MatchSummaryView from './MatchSummaryView';
+import PlayerRegistrationScreen from './parent/PlayerRegistrationScreen';
 import CoachAvailabilityScreen from './coach/CoachAvailabilityScreen';
 import CoachBookingCancelScreen from './coach/CoachBookingCancelScreen';
 import CoachBookingDetailScreen from './coach/CoachBookingDetailScreen';
@@ -67,26 +79,90 @@ export function CoachAvailabilityFlow({ onBack }: { onBack?: () => void } = {}) 
  * Payment requires the booking to already be 'accepted' server-side, so 'status' sits between 'confirm'
  * and 'payment' and polls the real booking until it is — it isn't just a post-payment receipt.
  */
+interface SelectedTrainer {
+  coachId: string;
+  name: string;
+  price: number;
+  availability: AvailabilityDay[];
+}
+
 export function ParentBookingFlow() {
   const router = useRouter();
+  const { token } = useAuth();
   const [step, setStep] = useState<'list' | 'profile' | 'confirm' | 'status' | 'payment'>('list');
+  const [coachId, setCoachId] = useState<string | null>(null);
+  const [selectedTrainer, setSelectedTrainer] = useState<SelectedTrainer | null>(null);
   const [selection, setSelection] = useState<BookingSlotSelection | null>(null);
   const [note, setNote] = useState('');
   const [bookingId, setBookingId] = useState<string | null>(null);
+  // undefined = todavía resolviendo; null = confirmado que el padre no tiene hijos/as todavía.
+  const [playerId, setPlayerId] = useState<string | null | undefined>(undefined);
+
+  useEffect(() => {
+    // Sin token solo pasa en /dev-preview (fuera del guard de auth de app/_layout.tsx) — ahí no
+    // hay sesión con la que pedir GET /players, así que se resuelve directo a "sin hijos/as".
+    if (!token) {
+      setPlayerId(null);
+      return;
+    }
+    listPlayers(token)
+      .then((players) => setPlayerId(players[0]?.id ?? null))
+      .catch(() => setPlayerId(null));
+  }, [token]);
 
   if (step === 'list') {
-    // Todos los trainers mock llevan al mismo perfil (mockCarlosMedinaProfile) hasta que
-    // TrainerListScreen/TrainerProfileScreen se conecten a searchCoaches/getCoachProfile reales.
-    return <TrainerListScreen onBack={() => router.back()} onSelectTrainer={() => setStep('profile')} />;
+    return (
+      <TrainerListScreen
+        onBack={() => router.back()}
+        onSelectTrainer={(coach: CoachSearchResult) => {
+          setCoachId(coach.id);
+          setStep('profile');
+        }}
+      />
+    );
   }
 
   if (step === 'profile') {
-    return <TrainerProfileScreen onBack={() => setStep('list')} onReserve={() => setStep('confirm')} />;
+    if (!coachId) return null;
+    return (
+      <TrainerProfileScreen
+        coachId={coachId}
+        onBack={() => setStep('list')}
+        onReserve={(info) => {
+          setSelectedTrainer(info);
+          setStep('confirm');
+        }}
+      />
+    );
   }
 
   if (step === 'confirm') {
+    if (!selectedTrainer) return null;
+
+    if (playerId === undefined) {
+      return (
+        <View style={[styles.root, styles.centerState]}>
+          <ActivityIndicator color={colors.ballLime} />
+        </View>
+      );
+    }
+
+    if (playerId === null) {
+      return (
+        <PlayerRegistrationScreen
+          onBack={() => setStep('profile')}
+          onSubmit={(player) => setPlayerId(player.id)}
+        />
+      );
+    }
+
     return (
       <BookingConfirmScreen
+        playerId={playerId}
+        coachId={selectedTrainer.coachId}
+        trainerName={selectedTrainer.name}
+        price={selectedTrainer.price}
+        availability={selectedTrainer.availability}
         onBack={() => setStep('profile')}
         onContinue={(nextSelection, nextNote, nextBookingId) => {
           setSelection(nextSelection);
@@ -99,24 +175,28 @@ export function ParentBookingFlow() {
   }
 
   if (step === 'status') {
-    if (!selection || !bookingId) return null;
+    if (!selection || !bookingId || !selectedTrainer) return null;
     return (
       <BookingStatusScreen
         bookingId={bookingId}
         selection={selection}
+        trainerName={selectedTrainer.name}
+        price={selectedTrainer.price}
         onAccepted={() => setStep('payment')}
         onDone={() => setStep('profile')}
       />
     );
   }
 
-  if (!selection || !bookingId) return null;
+  if (!selection || !bookingId || !selectedTrainer) return null;
 
   return (
     <BookingPaymentScreen
       bookingId={bookingId}
       selection={selection}
       note={note}
+      trainerName={selectedTrainer.name}
+      price={selectedTrainer.price}
       onBack={() => setStep('status')}
       onConfirm={() => setStep('status')}
     />
@@ -372,16 +452,23 @@ export function CoachCapturePreview() {
 }
 
 /** Local three-step flow: lista de torneos del club → detalle (roster + liquidar) → invitar entrenador. */
-export function ClubTournamentFlow() {
+export function ClubTournamentFlow({ clubId, clubName, adminUserId }: { clubId: string; clubName: string; adminUserId: string }) {
   const [tournament, setTournament] = useState<TournamentSummary | null>(null);
   const [inviting, setInviting] = useState(false);
 
   if (!tournament) {
-    return <ClubTournamentListScreen onSelect={setTournament} />;
+    return <ClubTournamentListScreen clubId={clubId} clubName={clubName} onSelect={setTournament} />;
   }
 
   if (inviting) {
-    return <ClubInviteCoachScreen tournamentId={tournament.id} onBack={() => setInviting(false)} />;
+    return (
+      <ClubInviteCoachScreen
+        clubId={clubId}
+        invitedByUserId={adminUserId}
+        tournamentId={tournament.id}
+        onBack={() => setInviting(false)}
+      />
+    );
   }
 
   return (
@@ -395,21 +482,59 @@ export function ClubTournamentFlow() {
 
 /**
  * Local three-step flow para el club_admin autenticado: inicio → torneos → liquidaciones.
- * Lifted tal cual del switch inline que tenía ScreenPreviewSwitcher para 'clubHome'.
+ * Lifted tal cual del switch inline que tenía ScreenPreviewSwitcher para 'clubHome'. Primero
+ * resuelve qué club administra este usuario (club_admins no es 1:1 con users — ver
+ * clubService.getClubForAdmin) antes de montar cualquier pantalla.
  */
-export function ClubFlow() {
+export function ClubFlow({ adminUserId }: { adminUserId: string }) {
+  const [club, setClub] = useState<Club | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setError(null);
+    getClubForAdmin(adminUserId)
+      .then((result) => {
+        if (!cancelled) setClub(result);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setError(err instanceof ApiError ? err.message : 'No se pudo cargar tu club.');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [adminUserId]);
+
   const [screen, setScreen] = useState<'home' | 'tournaments' | 'settlements'>('home');
 
+  if (error) {
+    return (
+      <View style={[styles.root, styles.centerState]}>
+        <Text style={styles.centerStateText}>{error}</Text>
+      </View>
+    );
+  }
+
+  if (!club) {
+    return (
+      <View style={[styles.root, styles.centerState]}>
+        <ActivityIndicator color={colors.ballLime} />
+      </View>
+    );
+  }
+
   if (screen === 'tournaments') {
-    return <ClubTournamentFlow />;
+    return <ClubTournamentFlow clubId={club.id} clubName={club.name} adminUserId={adminUserId} />;
   }
 
   if (screen === 'settlements') {
-    return <ClubSettlementsScreen />;
+    return <ClubSettlementsScreen clubId={club.id} clubName={club.name} />;
   }
 
   return (
     <ClubHomeScreen
+      clubId={club.id}
       onOpenTournaments={() => setScreen('tournaments')}
       onOpenSettlements={() => setScreen('settlements')}
     />

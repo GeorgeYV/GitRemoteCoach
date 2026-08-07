@@ -24,3 +24,12 @@ export async function getById(clubId: string, db: Queryable = pool): Promise<Clu
   if (rows.length === 0) throw new NotFoundError('Club', clubId);
   return mapRow(rows[0]);
 }
+
+/** El sentido inverso de club_admins (club_id, user_id): qué club administra este usuario.
+ * Un usuario podría administrar más de un club (sin UNIQUE sobre user_id solo), pero la app
+ * hoy solo muestra uno — igual que ya simplifica mock/clubFlow.ts. */
+export async function getClubIdForAdminUser(userId: string, db: Queryable = pool): Promise<string> {
+  const { rows } = await db.query(`SELECT club_id FROM club_admins WHERE user_id = $1 LIMIT 1`, [userId]);
+  if (rows.length === 0) throw new NotFoundError('ClubAdmin', userId);
+  return rows[0].club_id;
+}

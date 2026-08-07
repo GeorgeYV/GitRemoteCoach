@@ -13,10 +13,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ChatBubble from '../../components/parent/ChatBubble';
 import TrainerAvatarPlaceholder from '../../components/shared/TrainerAvatarPlaceholder';
+import { useAuth } from '../../context/AuthContext';
 import { ApiError, BookingMessage, listBookingMessages, sendBookingMessage } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
 import { ChatMessage, mockChatThread } from '../../mock/coachFlow';
-import { mockCarlosMedinaProfile, mockParentUser, PARENT_QUICK_REPLIES } from '../../mock/parentFlow';
+import { mockCarlosMedinaProfile, PARENT_QUICK_REPLIES } from '../../mock/parentFlow';
 
 function timeLabel(iso: string): string {
   return new Date(iso).toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit' });
@@ -27,6 +28,7 @@ function toChatMessage(message: BookingMessage): ChatMessage {
 }
 
 export default function ParentChatScreen({ bookingId, onBack }: { bookingId: string; onBack?: () => void }) {
+  const { user } = useAuth();
   const thread = mockChatThread;
   const coachName = mockCarlosMedinaProfile.trainer.name;
   const [messages, setMessages] = useState<ChatMessage[] | null>(null);
@@ -55,12 +57,16 @@ export default function ParentChatScreen({ bookingId, onBack }: { bookingId: str
   async function sendMessage(text: string) {
     const trimmed = text.trim();
     if (!trimmed || sending) return;
+    if (!user) {
+      setSendError('No hay una sesión activa.');
+      return;
+    }
     setSending(true);
     setSendError(null);
     try {
       const message = await sendBookingMessage(bookingId, {
         senderType: 'parent',
-        senderId: mockParentUser.id,
+        senderId: user.id,
         body: trimmed,
       });
       setMessages((prev) => [...(prev ?? []), toChatMessage(message)]);

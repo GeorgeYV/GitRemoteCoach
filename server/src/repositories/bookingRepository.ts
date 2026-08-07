@@ -1,7 +1,7 @@
 import type { Pool, PoolClient } from 'pg';
 import { pool } from '../lib/db.js';
 import { ConflictError, NotFoundError } from '../lib/errors.js';
-import type { Booking, BookingStatus, BookingWithParticipants } from '../types.js';
+import type { Booking, BookingForParent, BookingStatus, BookingWithParticipants } from '../types.js';
 
 type Queryable = Pool | PoolClient;
 
@@ -48,6 +48,17 @@ function mapRowWithParticipants(row: any): BookingWithParticipants {
     parentName: row.parent_name,
     tournamentName: row.tournament_name,
     tournamentVenue: row.tournament_venue,
+  };
+}
+
+function mapRowForParent(row: any): BookingForParent {
+  return {
+    ...mapRow(row),
+    coachName: row.coach_name,
+    playerName: row.player_name,
+    tournamentName: row.tournament_name,
+    tournamentVenue: row.tournament_venue,
+    reviewed: row.reviewed,
   };
 }
 
@@ -203,6 +214,31 @@ export async function listBookingsForCoach(
     [coachId],
   );
   return rows.map(mapRowWithParticipants);
+}
+
+/** BookingHistoryScreen: todas las reservas de un padre (a través de sus hijos/as), con nombre
+ * del entrenador y del torneo, más recientes primero. */
+export async function listBookingsForParent(
+  guardianUserId: string,
+  db: Queryable = pool,
+): Promise<BookingForParent[]> {
+  const { rows } = await db.query(
+    // LEFT JOIN en vez de EXISTS(SELECT ...) correlacionado: pg-mem (smoke tests, ver
+    // setupDb.ts) no resuelve una subquery en el SELECT list que referencia una columna
+    // de la consulta externa (b.id) — mismo tipo de limitación ya documentada ahí.
+    `SELECT b.*, cu.full_name AS coach_name, p.full_name AS player_name,
+            t.name AS tournament_name, t.venue AS tournament_venue,
+            (rv.id IS NOT NULL) AS reviewed
+     FROM bookings b
+     JOIN players p ON p.id = b.player_id
+     JOIN users cu ON cu.id = b.coach_id
+     JOIN tournaments t ON t.id = b.tournament_id
+     LEFT JOIN reviews rv ON rv.booking_id = b.id
+     WHERE p.guardian_user_id = $1
+     ORDER BY b.match_datetime DESC`,
+    [guardianUserId],
+  );
+  return rows.map(mapRowForParent);
 }
 
 export async function markBookingsSettled(

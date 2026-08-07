@@ -25,6 +25,42 @@ export async function getCoachProfile(coachId: string): Promise<CoachProfileWith
 }
 
 /**
+ * CoachRegistrationScreen "Enviar para verificación": crea coach_profiles + categorías de edad +
+ * niveles en una sola transacción — un registro a medias (perfil sin training o viceversa) dejaría
+ * al coach en un estado que ninguna pantalla sabe interpretar.
+ */
+export async function registerCoachProfile(
+  userId: string,
+  params: {
+    city: string;
+    region: string | null;
+    yearsExperience: number;
+    specialty: string | null;
+    hourlyRate: number;
+    ageCategories: AgeCategory[];
+    levels: PlayingLevel[];
+  },
+): Promise<CoachProfileWithTraining> {
+  return withTransaction(async (client) => {
+    await coachRepository.create(
+      userId,
+      {
+        city: params.city,
+        region: params.region,
+        yearsExperience: params.yearsExperience,
+        specialty: params.specialty,
+        hourlyRate: params.hourlyRate,
+      },
+      client,
+    );
+    await coachRepository.setCoachAgeCategories(userId, params.ageCategories, client);
+    await coachRepository.setCoachLevels(userId, params.levels, client);
+    const profile = await coachRepository.getCoachProfile(userId, client);
+    return { profile, ageCategories: params.ageCategories, levels: params.levels };
+  });
+}
+
+/**
  * CoachRegistrationScreen guarda categorías de edad y niveles de juego
  * juntos (un solo botón "Enviar para verificación"); se hacen atómicos para
  * no dejar uno sin el otro si algo falla a la mitad.

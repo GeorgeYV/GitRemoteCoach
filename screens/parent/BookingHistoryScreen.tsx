@@ -1,11 +1,14 @@
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import BookingStatusPill from '../../components/parent/BookingStatusPill';
 import InitialAvatar from '../../components/shared/InitialAvatar';
+import { useAuth } from '../../context/AuthContext';
+import { ApiError, listParentBookings } from '../../lib/api';
+import { toBookingHistoryEntry } from '../../lib/parentBookingDisplay';
 import { colors, radius } from '../../lib/theme';
-import { BookingHistoryEntry, mockBookingHistory } from '../../mock/parentFlow';
+import { BookingHistoryEntry } from '../../mock/parentFlow';
 import BookingCancelScreen from './BookingCancelScreen';
 import BookingReviewScreen from './BookingReviewScreen';
 import ParentChatScreen from './ParentChatScreen';
@@ -24,22 +27,44 @@ const CANCELLABLE_STATUSES = ['requested', 'confirmed'];
 
 export default function BookingHistoryScreen() {
   const router = useRouter();
-  const [bookings, setBookings] = useState<BookingHistoryEntry[]>(mockBookingHistory);
+  const { user } = useAuth();
+  const [bookings, setBookings] = useState<BookingHistoryEntry[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [cancelTarget, setCancelTarget] = useState<BookingHistoryEntry | null>(null);
   const [reviewTarget, setReviewTarget] = useState<BookingHistoryEntry | null>(null);
   const [chatTarget, setChatTarget] = useState<BookingHistoryEntry | null>(null);
 
+  useEffect(() => {
+    if (!user) {
+      setError('No hay una sesión activa.');
+      return;
+    }
+    let cancelled = false;
+    setError(null);
+    listParentBookings(user.id)
+      .then((result) => {
+        if (!cancelled) setBookings(result.map(toBookingHistoryEntry));
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setError(err instanceof ApiError ? err.message : 'No se pudieron cargar tus reservas.');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
   function confirmCancel(_reason: string) {
     if (!cancelTarget) return;
     const targetId = cancelTarget.id;
-    setBookings((prev) => prev.map((b) => (b.id === targetId ? { ...b, status: 'cancelled' } : b)));
+    setBookings((prev) => prev?.map((b) => (b.id === targetId ? { ...b, status: 'cancelled' } : b)) ?? null);
     setCancelTarget(null);
   }
 
   function submitReview(_stars: number, _quote: string) {
     if (!reviewTarget) return;
     const targetId = reviewTarget.id;
-    setBookings((prev) => prev.map((b) => (b.id === targetId ? { ...b, reviewed: true } : b)));
+    setBookings((prev) => prev?.map((b) => (b.id === targetId ? { ...b, reviewed: true } : b)) ?? null);
     setReviewTarget(null);
   }
 
@@ -57,6 +82,22 @@ export default function BookingHistoryScreen() {
 
   if (chatTarget) {
     return <ParentChatScreen bookingId={chatTarget.id} onBack={() => setChatTarget(null)} />;
+  }
+
+  if (error) {
+    return (
+      <SafeAreaView style={[styles.container, styles.centerState]} edges={['top', 'bottom']}>
+        <Text style={styles.emptyText}>{error}</Text>
+      </SafeAreaView>
+    );
+  }
+
+  if (!bookings) {
+    return (
+      <SafeAreaView style={[styles.container, styles.centerState]} edges={['top', 'bottom']}>
+        <ActivityIndicator color={colors.ballLime} />
+      </SafeAreaView>
+    );
   }
 
   const upcoming = bookings.filter((b) => CANCELLABLE_STATUSES.includes(b.status));
@@ -316,6 +357,10 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 20,
     textAlign: 'center',
+  },
+  centerState: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   tabBar: {
     flexDirection: 'row',

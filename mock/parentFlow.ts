@@ -1,13 +1,3 @@
-export interface ParentUser {
-  /** UUID real — usado como parentId al enviar una reseña (POST /bookings/:id/review). */
-  id: string;
-  /** UUID real del jugador (childName) — usado como playerId al crear una reserva (POST /bookings). */
-  playerId: string;
-  name: string;
-  initial: string;
-  childName: string;
-}
-
 export interface Tournament {
   id: string;
   name: string;
@@ -203,17 +193,6 @@ export interface TrainerProfile {
   availability: AvailabilityDay[];
   officialClub: string;
 }
-
-export const mockParentUser: ParentUser = {
-  // UUID real — coincide con el padre sembrado en server/test/seed.ts (parentUserId,
-  // full_name "María Guardián") para poder probar POST /bookings/:id/review contra el backend real.
-  id: '00000000-0000-0000-0000-000000000003',
-  // UUID real — coincide con playerId en server/test/seed.ts (full_name "Valentina Guardián").
-  playerId: '00000000-0000-0000-0000-000000000006',
-  name: 'María',
-  initial: 'M',
-  childName: 'Valentina',
-};
 
 export const mockFeaturedTournament: FeaturedTournament = {
   id: 'copa-nacional-juvenil',

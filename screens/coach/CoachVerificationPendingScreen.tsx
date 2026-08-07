@@ -5,7 +5,6 @@ import VerificationRow from '../../components/shared/VerificationRow';
 import { ApiError, CoachProfileWithTraining, getCoachProfile, VerificationStatus } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
 import { mockDocumentChecklist } from '../../mock/coachFlow';
-import { mockCarlosMedinaProfile } from '../../mock/parentFlow';
 
 const STEPS = ['Enviado', 'En revisión', 'Aprobado'];
 
@@ -28,14 +27,14 @@ const SUBTITLE_FOR_STATUS: Record<VerificationStatus, string> = {
   rejected: 'Revisa el mensaje que te enviamos por correo y vuelve a enviar tus documentos.',
 };
 
-export default function CoachVerificationPendingScreen() {
+export default function CoachVerificationPendingScreen({ coachId }: { coachId: string }) {
   const [profile, setProfile] = useState<CoachProfileWithTraining | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     setError(null);
-    getCoachProfile(mockCarlosMedinaProfile.trainer.id)
+    getCoachProfile(coachId)
       .then((result) => {
         if (!cancelled) setProfile(result);
       })
@@ -46,7 +45,7 @@ export default function CoachVerificationPendingScreen() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [coachId]);
 
   const status = profile?.profile.verificationStatus ?? 'pending';
   const currentStepIndex = STEP_INDEX_FOR_STATUS[status];

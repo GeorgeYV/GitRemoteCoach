@@ -1,11 +1,68 @@
-import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
-import { PublicUser } from '../lib/api';
+import { ApiError, getCoachProfile, PublicUser } from '../lib/api';
 import { colors, radius } from '../lib/theme';
 import { ClubFlow, CoachHomeFlow } from '../screens/previewFlows';
+import CoachRegistrationScreen from '../screens/coach/CoachRegistrationScreen';
+import CoachVerificationPendingScreen from '../screens/coach/CoachVerificationPendingScreen';
 import ParentHomeScreen from '../screens/parent/ParentHomeScreen';
+
+/**
+ * Gatea el home del coach en el estado real de su coach_profiles: sin fila todavía → formulario
+ * de alta (POST /coaches lo crea); pending/rejected → pantalla de estado; approved → dashboard.
+ * No hay flujo de aprobación real todavía (ver plan de onboarding) — para probar "approved" hay
+ * que actualizar verification_status a mano en la base.
+ */
+function CoachRoleHome({ user }: { user: PublicUser }) {
+  const [state, setState] = useState<'loading' | 'no-profile' | 'pending' | 'approved' | 'error'>('loading');
+  const [error, setError] = useState<string | null>(null);
+
+  function reload() {
+    setState('loading');
+    getCoachProfile(user.id)
+      .then((result) => {
+        setState(result.profile.verificationStatus === 'approved' ? 'approved' : 'pending');
+      })
+      .catch((err) => {
+        if (err instanceof ApiError && err.status === 404) {
+          setState('no-profile');
+          return;
+        }
+        setError(err instanceof ApiError ? err.message : 'No se pudo cargar tu perfil.');
+        setState('error');
+      });
+  }
+
+  useEffect(reload, [user.id]);
+
+  if (state === 'loading') {
+    return (
+      <View style={styles.placeholder}>
+        <ActivityIndicator color={colors.ballLime} />
+      </View>
+    );
+  }
+
+  if (state === 'no-profile') {
+    return <CoachRegistrationScreen onSubmit={reload} />;
+  }
+
+  if (state === 'pending') {
+    return <CoachVerificationPendingScreen coachId={user.id} />;
+  }
+
+  if (state === 'error') {
+    return (
+      <View style={styles.placeholder}>
+        <Text style={styles.placeholderText}>{error}</Text>
+      </View>
+    );
+  }
+
+  return <CoachHomeFlow coachId={user.id} coachName={user.fullName} />;
+}
 
 /**
  * Ninguno de los flujos por rol está todavía cruzado entre sí (ej. CoachHomeFlow no lleva a
@@ -17,9 +74,9 @@ function RoleHome({ user }: { user: PublicUser }) {
     case 'parent':
       return <ParentHomeScreen />;
     case 'coach':
-      return <CoachHomeFlow coachId={user.id} coachName={user.fullName} />;
+      return <CoachRoleHome user={user} />;
     case 'club_admin':
-      return <ClubFlow />;
+      return <ClubFlow adminUserId={user.id} />;
     default:
       return (
         <View style={styles.placeholder}>

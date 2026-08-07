@@ -177,6 +177,20 @@ export function listCoachBookings(coachId: string): Promise<BookingWithParticipa
   return request(`/coaches/${coachId}/bookings`);
 }
 
+/** Espeja server/src/types.ts#BookingForParent — lo que devuelve el listado por padre. */
+export interface BookingForParent extends Booking {
+  coachName: string;
+  playerName: string;
+  tournamentName: string;
+  tournamentVenue: string;
+  reviewed: boolean;
+}
+
+/** GET /parents/:id/bookings — BookingHistoryScreen. */
+export function listParentBookings(parentUserId: string): Promise<BookingForParent[]> {
+  return request(`/parents/${parentUserId}/bookings`);
+}
+
 /** POST /bookings/:id/accept — CoachRequestInboxScreen. */
 export function acceptBookingRequest(bookingId: string): Promise<Booking> {
   return request(`/bookings/${bookingId}/accept`, { method: 'POST' });
@@ -259,6 +273,7 @@ export type VerificationStatus = 'pending' | 'approved' | 'rejected';
 /** Espeja server/src/types.ts#CoachProfile. */
 export interface CoachProfile {
   userId: string;
+  fullName: string;
   city: string;
   region: string | null;
   photoUrl: string | null;
@@ -303,6 +318,27 @@ export function searchCoaches(params: { query?: string; excludeTournamentId?: st
   return request(`/coaches${suffix ? `?${suffix}` : ''}`);
 }
 
+/** POST /coaches — CoachRegistrationScreen "Enviar para verificación". Crea el perfil del coach
+ * de la sesión (deriva el user_id del token, no de un id que mande el cliente). */
+export function registerCoachProfile(
+  authToken: string,
+  params: {
+    city: string;
+    region?: string;
+    yearsExperience: number;
+    specialty?: string;
+    hourlyRate: number;
+    ageCategories: AgeCategory[];
+    levels: PlayingLevel[];
+  },
+): Promise<CoachProfileWithTraining> {
+  return request('/coaches', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${authToken}` },
+    body: JSON.stringify(params),
+  });
+}
+
 /** PUT /coaches/:id/training — CoachRegistrationScreen. */
 export function updateCoachTraining(
   coachId: string,
@@ -310,6 +346,34 @@ export function updateCoachTraining(
 ): Promise<CoachProfileWithTraining> {
   return request(`/coaches/${coachId}/training`, {
     method: 'PUT',
+    body: JSON.stringify(params),
+  });
+}
+
+/** Espeja server/src/types.ts#Player. */
+export interface Player {
+  id: string;
+  guardianUserId: string;
+  fullName: string;
+  birthDate: string;
+  ageCategory: AgeCategory;
+  createdAt: string;
+}
+
+/** GET /players — BookingConfirmScreen: hijos/as del padre de la sesión. */
+export function listPlayers(authToken: string): Promise<Player[]> {
+  return request('/players', { headers: { Authorization: `Bearer ${authToken}` } });
+}
+
+/** POST /players — PlayerRegistrationScreen. Crea al hijo/a del padre de la sesión (deriva el
+ * guardián del token, no de un id que mande el cliente). */
+export function registerPlayer(
+  authToken: string,
+  params: { fullName: string; birthDate: string; ageCategory: AgeCategory },
+): Promise<Player> {
+  return request('/players', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${authToken}` },
     body: JSON.stringify(params),
   });
 }
@@ -451,6 +515,11 @@ export interface Club {
 /** GET /clubs/:id — ClubHomeScreen. */
 export function getClub(clubId: string): Promise<Club> {
   return request(`/clubs/${clubId}`);
+}
+
+/** GET /club-admins/:userId/club — ClubFlow, para resolver el club del club_admin logueado. */
+export function getClubForAdmin(userId: string): Promise<Club> {
+  return request(`/club-admins/${userId}/club`);
 }
 
 /** GET /clubs/:id/settlements — ClubSettlementsScreen. */

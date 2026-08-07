@@ -3,9 +3,10 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import InitialAvatar from '../../components/shared/InitialAvatar';
 import StarRatingInput from '../../components/parent/StarRatingInput';
+import { useAuth } from '../../context/AuthContext';
 import { ApiError, submitBookingReview } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
-import { BookingHistoryEntry, mockParentUser } from '../../mock/parentFlow';
+import { BookingHistoryEntry } from '../../mock/parentFlow';
 
 const RATING_HINTS: Record<number, string> = {
   1: 'Muy mala experiencia',
@@ -24,6 +25,7 @@ export default function BookingReviewScreen({
   onBack: () => void;
   onSubmit: (stars: number, quote: string) => void;
 }) {
+  const { user } = useAuth();
   const [stars, setStars] = useState(0);
   const [quote, setQuote] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -33,11 +35,15 @@ export default function BookingReviewScreen({
 
   async function handleSubmit() {
     if (stars === 0) return;
+    if (!user) {
+      setError('No hay una sesión activa.');
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
       await submitBookingReview(booking.id, {
-        parentId: mockParentUser.id,
+        parentId: user.id,
         rating: stars,
         comment: quote.trim() || undefined,
       });

@@ -5,25 +5,32 @@ import TrainerAvatarPlaceholder from '../../components/shared/TrainerAvatarPlace
 import { ApiError, requestBooking } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
 import {
+  AvailabilityDay,
   BOOKING_PERIOD_LABELS,
   BookingPeriod,
   BookingSlotSelection,
   buildMatchDatetime,
-  mockCarlosMedinaProfile,
   mockFeaturedTournament,
-  mockParentUser,
   REAL_TOURNAMENT_ID,
 } from '../../mock/parentFlow';
 
 export default function BookingConfirmScreen({
+  playerId,
+  coachId,
+  trainerName,
+  price,
+  availability,
   onBack,
   onContinue,
 }: {
+  playerId: string;
+  coachId: string;
+  trainerName: string;
+  price: number;
+  availability: AvailabilityDay[];
   onBack: () => void;
   onContinue: (selection: BookingSlotSelection, note: string, bookingId: string) => void;
 }) {
-  const profile = mockCarlosMedinaProfile;
-  const { trainer } = profile;
   const [selection, setSelection] = useState<BookingSlotSelection | null>(null);
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -39,11 +46,11 @@ export default function BookingConfirmScreen({
     setError(null);
     try {
       const booking = await requestBooking({
-        playerId: mockParentUser.playerId,
-        coachId: trainer.id,
+        playerId,
+        coachId,
         tournamentId: REAL_TOURNAMENT_ID,
         matchDatetime: buildMatchDatetime(selection),
-        agreedRate: trainer.price,
+        agreedRate: price,
         note: note.trim() || undefined,
       });
       onContinue(selection, note.trim(), booking.id);
@@ -65,7 +72,7 @@ export default function BookingConfirmScreen({
         <TrainerAvatarPlaceholder size={44} />
         <View style={styles.headerText}>
           <Text style={styles.trainerName} numberOfLines={1}>
-            Reservar con {trainer.name}
+            Reservar con {trainerName}
           </Text>
           <Text style={styles.tournamentMeta} numberOfLines={1}>
             {mockFeaturedTournament.name}
@@ -76,7 +83,7 @@ export default function BookingConfirmScreen({
       <ScrollView contentContainerStyle={styles.content}>
         <Section label="Elige día y horario">
           <View style={styles.daysGrid}>
-            {profile.availability.map((day) => (
+            {availability.map((day) => (
               <View key={day.dayLabel} style={styles.dayColumn}>
                 <Text style={styles.dayLabel}>{day.dayLabel}</Text>
                 {(['morning', 'afternoon'] as BookingPeriod[]).map((period) => {
@@ -118,7 +125,7 @@ export default function BookingConfirmScreen({
         <Section label="Nota para el entrenador (opcional)">
           <TextInput
             style={styles.input}
-            placeholder={`Ej. ${trainer.name.split(' ')[0]}, es su primer torneo nacional…`}
+            placeholder={`Ej. ${trainerName.split(' ')[0]}, es su primer torneo nacional…`}
             placeholderTextColor={colors.textDim}
             value={note}
             onChangeText={setNote}
@@ -129,7 +136,7 @@ export default function BookingConfirmScreen({
 
       <View style={styles.footer}>
         {error && <Text style={styles.errorText}>{error}</Text>}
-        <Text style={styles.footerNote}>${trainer.price} · sin costo de viáticos</Text>
+        <Text style={styles.footerNote}>${price} · sin costo de viáticos</Text>
         <Pressable
           style={[styles.continueButton, !canContinue && styles.continueButtonDisabled]}
           disabled={!canContinue}

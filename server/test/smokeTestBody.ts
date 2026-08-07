@@ -229,6 +229,7 @@ console.log('\n=== Escenario 9: reseña del padre tras un partido completado ===
   const coachAfter = await (await app.inject({ method: 'GET', url: `/coaches/${fixtures.coachAUserId}` })).json();
   assertEqual(Number(coachAfter.profile.ratingAvg), 5, 'rating_avg del coach se recalcula a 5');
   assertEqual(coachAfter.profile.ratingCount, 1, 'rating_count del coach pasa a 1');
+  assertEqual(coachAfter.profile.fullName, 'Carlos Medina', 'GET /coaches/:id trae el nombre real (JOIN con users)');
 
   const listRes = await (await app.inject({ method: 'GET', url: `/coaches/${fixtures.coachAUserId}/reviews` })).json();
   assertTrue(
@@ -509,6 +510,141 @@ console.log('\n=== Escenario 14: push notifications (accept/reject de reserva av
   pushState.sent.length = 0;
   await app.inject({ method: 'POST', url: `/bookings/${bookingAfterUnregister.id}/reject` });
   assertEqual(pushState.sent.length, 0, 'sin token registrado, aceptar/rechazar ya no dispara push (y no falla)');
+}
+
+console.log('\n=== Escenario 15: resolver el club de un club_admin logueado ===');
+{
+  const okRes = await app.inject({ method: 'GET', url: `/club-admins/${fixtures.clubAdminUserId}/club` });
+  assertEqual(okRes.statusCode, 200, 'GET /club-admins/:userId/club del admin sembrado devuelve 200');
+  assertEqual(okRes.json().id, fixtures.clubId, 'devuelve el club real que administra ese usuario');
+
+  const notAdminRes = await app.inject({ method: 'GET', url: `/club-admins/${fixtures.parentUserId}/club` });
+  assertEqual(notAdminRes.statusCode, 404, 'un usuario que no administra ningún club devuelve 404');
+}
+
+console.log('\n=== Escenario 16: onboarding de coach (POST /coaches) ===');
+{
+  const registerRes = await app.inject({
+    method: 'POST',
+    url: '/auth/register',
+    payload: {
+      email: 'nuevo.coach@example.com',
+      password: 'super-secreta-123',
+      fullName: 'Nuevo Coach',
+      primaryRole: 'coach',
+    },
+  });
+  const { token: newCoachToken, user: newCoach } = registerRes.json();
+
+  const noAuthRes = await app.inject({
+    method: 'POST',
+    url: '/coaches',
+    payload: { city: 'CDMX', yearsExperience: 5, hourlyRate: 30, ageCategories: ['U12'], levels: ['competitivo'] },
+  });
+  assertEqual(noAuthRes.statusCode, 401, 'POST /coaches sin Bearer token devuelve 401');
+
+  const createRes = await app.inject({
+    method: 'POST',
+    url: '/coaches',
+    headers: { authorization: `Bearer ${newCoachToken}` },
+    payload: {
+      city: 'CDMX',
+      region: 'CDMX',
+      yearsExperience: 5,
+      specialty: 'Saque y volea',
+      hourlyRate: 30,
+      ageCategories: ['U12', 'U14'],
+      levels: ['competitivo'],
+    },
+  });
+  assertEqual(createRes.statusCode, 201, 'POST /coaches con datos válidos devuelve 201');
+  const created = createRes.json();
+  assertEqual(created.profile.userId, newCoach.id, 'el perfil creado pertenece al usuario de la sesión, no a uno del body');
+  assertEqual(created.profile.verificationStatus, 'pending', 'un coach recién registrado queda en pending');
+  assertEqual(created.ageCategories, ['U12', 'U14'], 'guarda las categorías de edad enviadas');
+
+  const duplicateRes = await app.inject({
+    method: 'POST',
+    url: '/coaches',
+    headers: { authorization: `Bearer ${newCoachToken}` },
+    payload: { city: 'CDMX', yearsExperience: 5, hourlyRate: 30, ageCategories: [], levels: [] },
+  });
+  assertEqual(duplicateRes.statusCode, 409, 'un segundo POST /coaches para el mismo usuario devuelve 409');
+
+  const getRes = await app.inject({ method: 'GET', url: `/coaches/${newCoach.id}` });
+  assertEqual(getRes.json().profile.city, 'CDMX', 'GET /coaches/:id ya refleja el perfil recién creado');
+}
+
+console.log('\n=== Escenario 17: hijos/as del padre (GET/POST /players) ===');
+{
+  const registerRes = await app.inject({
+    method: 'POST',
+    url: '/auth/register',
+    payload: {
+      email: 'nuevo.padre@example.com',
+      password: 'super-secreta-123',
+      fullName: 'Nuevo Padre',
+      primaryRole: 'parent',
+    },
+  });
+  const { token: newParentToken } = registerRes.json();
+
+  const noAuthGetRes = await app.inject({ method: 'GET', url: '/players' });
+  assertEqual(noAuthGetRes.statusCode, 401, 'GET /players sin Bearer token devuelve 401');
+
+  const noAuthPostRes = await app.inject({
+    method: 'POST',
+    url: '/players',
+    payload: { fullName: 'Hija', birthDate: '2014-05-01', ageCategory: 'U12' },
+  });
+  assertEqual(noAuthPostRes.statusCode, 401, 'POST /players sin Bearer token devuelve 401');
+
+  const emptyListRes = await app.inject({
+    method: 'GET',
+    url: '/players',
+    headers: { authorization: `Bearer ${newParentToken}` },
+  });
+  assertEqual(emptyListRes.json(), [], 'un padre recién registrado todavía no tiene hijos/as');
+
+  const createRes = await app.inject({
+    method: 'POST',
+    url: '/players',
+    headers: { authorization: `Bearer ${newParentToken}` },
+    payload: { fullName: 'Camila Nuevo', birthDate: '2014-05-01', ageCategory: 'U12' },
+  });
+  assertEqual(createRes.statusCode, 201, 'POST /players con datos válidos devuelve 201');
+  const created = createRes.json();
+  assertEqual(created.fullName, 'Camila Nuevo', 'devuelve el nombre del hijo/a recién creado');
+  assertEqual(created.birthDate, '2014-05-01', 'devuelve la fecha de nacimiento sin desplazamiento de zona horaria');
+
+  const listRes = await app.inject({
+    method: 'GET',
+    url: '/players',
+    headers: { authorization: `Bearer ${newParentToken}` },
+  });
+  const listed = listRes.json();
+  assertEqual(listed.length, 1, 'GET /players ya refleja el hijo/a recién creado');
+  assertEqual(listed[0].id, created.id, 'el hijo/a listado es el mismo que se creó');
+}
+
+console.log('\n=== Escenario 18: listado de reservas de un padre (BookingHistoryScreen) ===');
+{
+  const listRes = await app.inject({ method: 'GET', url: `/parents/${fixtures.parentUserId}/bookings` });
+  assertEqual(listRes.statusCode, 200, 'GET /parents/:id/bookings devuelve 200');
+  const bookings = listRes.json();
+
+  const booking1 = bookings.find((b: any) => b.id === (globalThis as any).__booking1Id);
+  assertTrue(!!booking1, 'incluye la reserva completada del escenario 1/9');
+  assertEqual(booking1.coachName, 'Carlos Medina', 'trae el nombre del entrenador (JOIN con users)');
+  assertEqual(booking1.tournamentName, 'Copa Nacional Juvenil', 'trae el nombre del torneo (JOIN con tournaments)');
+  assertEqual(booking1.reviewed, true, 'una reserva ya reseñada marca reviewed = true');
+
+  const notCompleted = bookings.find((b: any) => b.status === 'accepted' && b.coachName === 'Ana Beltrán');
+  assertTrue(!!notCompleted, 'incluye la reserva "accepted" sin completar del escenario 9');
+  assertEqual(notCompleted.reviewed, false, 'una reserva sin reseña marca reviewed = false');
+
+  const otherParentRes = await app.inject({ method: 'GET', url: '/parents/00000000-0000-0000-0000-000000000099/bookings' });
+  assertEqual(otherParentRes.json(), [], 'un padre sin reservas devuelve lista vacía');
 }
 
 console.log(`\n=== Resultado: ${passed} pasaron, ${failed} fallaron ===`);

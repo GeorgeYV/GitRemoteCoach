@@ -3,7 +3,8 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DocumentRow from '../../components/coach/DocumentRow';
 import TrainerAvatarPlaceholder from '../../components/shared/TrainerAvatarPlaceholder';
-import { AgeCategory, ApiError, PlayingLevel, updateCoachTraining } from '../../lib/api';
+import { useAuth } from '../../context/AuthContext';
+import { AgeCategory, ApiError, PlayingLevel, registerCoachProfile } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
 import { AGE_CATEGORY_OPTIONS, DocumentItem, LEVEL_OPTIONS, mockDocumentChecklist } from '../../mock/coachFlow';
 
@@ -13,17 +14,13 @@ const LEVEL_LABEL_TO_VALUE: Record<string, PlayingLevel> = {
   'Alto rendimiento': 'alto_rendimiento',
 };
 
-export default function CoachRegistrationScreen({
-  coachId,
-  onSubmit,
-}: {
-  coachId: string;
-  onSubmit?: () => void;
-}) {
+export default function CoachRegistrationScreen({ onSubmit }: { onSubmit?: () => void }) {
+  const { token } = useAuth();
   const [name, setName] = useState('');
   const [city, setCity] = useState('');
   const [region, setRegion] = useState('');
   const [experience, setExperience] = useState('');
+  const [hourlyRate, setHourlyRate] = useState('');
   const [categories, setCategories] = useState<string[]>([]);
   const [levels, setLevels] = useState<string[]>([]);
   const [documents, setDocuments] = useState<DocumentItem[]>(mockDocumentChecklist);
@@ -39,10 +36,18 @@ export default function CoachRegistrationScreen({
   }
 
   async function handleSubmit() {
+    if (!token) {
+      setError('No hay una sesión activa.');
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
-      await updateCoachTraining(coachId, {
+      await registerCoachProfile(token, {
+        city,
+        region: region.trim() || undefined,
+        yearsExperience: Number(experience) || 0,
+        hourlyRate: Number(hourlyRate) || 0,
         ageCategories: categories as AgeCategory[],
         levels: levels.map((label) => LEVEL_LABEL_TO_VALUE[label]),
       });
@@ -106,6 +111,14 @@ export default function CoachRegistrationScreen({
             placeholderTextColor={colors.textDim}
             value={experience}
             onChangeText={setExperience}
+            keyboardType="number-pad"
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Tarifa por hora ($)"
+            placeholderTextColor={colors.textDim}
+            value={hourlyRate}
+            onChangeText={setHourlyRate}
             keyboardType="number-pad"
           />
         </Section>

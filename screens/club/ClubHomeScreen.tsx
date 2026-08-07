@@ -12,16 +12,17 @@ import {
   TournamentSummary,
 } from '../../lib/api';
 import { colors, radius } from '../../lib/theme';
-import { mockClubAdmin } from '../../mock/clubFlow';
 
 function money(amount: number): string {
   return `$${amount.toFixed(2)}`;
 }
 
 export default function ClubHomeScreen({
+  clubId,
   onOpenTournaments,
   onOpenSettlements,
 }: {
+  clubId: string;
   onOpenTournaments: () => void;
   onOpenSettlements: () => void;
 }) {
@@ -34,9 +35,9 @@ export default function ClubHomeScreen({
     let cancelled = false;
     setError(null);
     Promise.all([
-      getClub(mockClubAdmin.id),
-      listClubTournaments(mockClubAdmin.id),
-      listClubSettlements(mockClubAdmin.id),
+      getClub(clubId),
+      listClubTournaments(clubId),
+      listClubSettlements(clubId),
     ])
       .then(([clubResult, tournamentsResult, settlementsResult]) => {
         if (cancelled) return;
@@ -51,7 +52,7 @@ export default function ClubHomeScreen({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [clubId]);
 
   if (error) {
     return (

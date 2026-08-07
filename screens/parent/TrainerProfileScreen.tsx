@@ -5,28 +5,95 @@ import AvailabilitySlotPill from '../../components/parent/AvailabilitySlotPill';
 import InitialAvatar from '../../components/shared/InitialAvatar';
 import StatTile from '../../components/shared/StatTile';
 import TrainerAvatarPlaceholder from '../../components/shared/TrainerAvatarPlaceholder';
-import VerificationRow from '../../components/shared/VerificationRow';
-import { ApiError, listCoachReviews, ReviewWithParent } from '../../lib/api';
+import {
+  ApiError,
+  CoachProfileWithTraining,
+  CoachTournamentAvailability,
+  getCoachProfile,
+  getCoachTournamentAvailability,
+  listCoachReviews,
+  PlayingLevel,
+  ReviewWithParent,
+  VerificationStatus,
+} from '../../lib/api';
 import { colors, radius } from '../../lib/theme';
-import { mockCarlosMedinaProfile } from '../../mock/parentFlow';
+import { AvailabilityDay, BOOKING_DAY_LABEL_TO_DATE, REAL_TOURNAMENT_ID } from '../../mock/parentFlow';
+
+/** Contenido de ejemplo, no ligado a ningún coach real — la sección ya se etiqueta como
+ * "anonimizado" en la UI; no hay un endpoint de reporte-promedio del que sacar esto de verdad. */
+const EXAMPLE_REPORT_STATS = [
+  { value: '18', label: 'Winners' },
+  { value: '9', label: 'Errores' },
+  { value: '71%', label: '1er saque' },
+  { value: '4/6', label: 'Quiebres' },
+];
+
+const LEVEL_LABELS: Record<PlayingLevel, string> = {
+  recreativo: 'Recreativo',
+  competitivo: 'Competitivo',
+  alto_rendimiento: 'Alto rendimiento',
+};
+
+const VERIFICATION_LABELS: Record<VerificationStatus, string> = {
+  approved: 'Entrenador verificado',
+  pending: 'Verificación en proceso',
+  rejected: 'Verificación no aprobada',
+};
+
+function toAvailabilityDays(availability: CoachTournamentAvailability[]): AvailabilityDay[] {
+  // slotDate llega como datetime ISO completo (pg serializa DATE como Date → JSON), no como
+  // 'YYYY-MM-DD' — hay que recortarlo antes de matchear contra BOOKING_DAY_LABEL_TO_DATE.
+  const byDate = new Map(availability.map((a) => [a.slotDate.slice(0, 10), a]));
+  return Object.entries(BOOKING_DAY_LABEL_TO_DATE).map(([dayLabel, date]) => {
+    const slot = byDate.get(date);
+    return {
+      dayLabel,
+      morningAvailable: slot?.morning ?? false,
+      afternoonAvailable: slot?.afternoon ?? false,
+    };
+  });
+}
 
 export default function TrainerProfileScreen({
+  coachId,
   onBack,
   onReserve,
 }: {
+  coachId: string;
   onBack?: () => void;
-  onReserve?: () => void;
+  onReserve?: (info: { coachId: string; name: string; price: number; availability: AvailabilityDay[] }) => void;
 }) {
-  const profile = mockCarlosMedinaProfile;
-  const { trainer } = profile;
+  const [profile, setProfile] = useState<CoachProfileWithTraining | null>(null);
+  const [availability, setAvailability] = useState<AvailabilityDay[] | null>(null);
+  const [price, setPrice] = useState<number | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const [reviews, setReviews] = useState<ReviewWithParent[] | null>(null);
   const [reviewsError, setReviewsError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
+    setLoadError(null);
+    Promise.all([getCoachProfile(coachId), getCoachTournamentAvailability(coachId, REAL_TOURNAMENT_ID)])
+      .then(([profileResult, availabilityResult]) => {
+        if (cancelled) return;
+        setProfile(profileResult);
+        setAvailability(toAvailabilityDays(availabilityResult.availability));
+        setPrice(Number(availabilityResult.rate?.amount ?? profileResult.profile.hourlyRate));
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setLoadError(err instanceof ApiError ? err.message : 'No se pudo cargar el perfil del entrenador.');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [coachId]);
+
+  useEffect(() => {
+    let cancelled = false;
     setReviewsError(null);
-    listCoachReviews(trainer.id)
+    listCoachReviews(coachId)
       .then((result) => {
         if (!cancelled) setReviews(result);
       })
@@ -37,7 +104,29 @@ export default function TrainerProfileScreen({
     return () => {
       cancelled = true;
     };
-  }, [trainer.id]);
+  }, [coachId]);
+
+  if (loadError) {
+    return (
+      <SafeAreaView style={[styles.container, styles.centerState]} edges={['top', 'bottom']}>
+        <Text style={styles.reviewsMessage}>{loadError}</Text>
+      </SafeAreaView>
+    );
+  }
+
+  if (!profile || !availability || price === null) {
+    return (
+      <SafeAreaView style={[styles.container, styles.centerState]} edges={['top', 'bottom']}>
+        <ActivityIndicator color={colors.ballLime} />
+      </SafeAreaView>
+    );
+  }
+
+  const name = profile.profile.fullName;
+  const firstName = name.split(' ')[0];
+  const tags = [profile.profile.specialty, ...profile.ageCategories, ...profile.levels.map((l) => LEVEL_LABELS[l])].filter(
+    (t): t is string => !!t,
+  );
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -47,34 +136,34 @@ export default function TrainerProfileScreen({
         </Pressable>
         <TrainerAvatarPlaceholder size={64} />
         <View style={styles.headerInfo}>
-          <Text style={styles.trainerName}>{trainer.name}</Text>
+          <Text style={styles.trainerName}>{name}</Text>
           <Text style={styles.trainerMeta}>
-            ★ {trainer.rating} · {trainer.reviews} reseñas
+            ★ {profile.profile.ratingAvg} · {profile.profile.ratingCount} reseñas
           </Text>
         </View>
         <View style={styles.priceBlock}>
           <Text style={styles.price}>
-            ${trainer.price} <Text style={styles.priceSuffix}>/ partido</Text>
+            ${price} <Text style={styles.priceSuffix}>/ partido</Text>
           </Text>
         </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        <Section label={`Sobre ${trainer.name.split(' ')[0]}`}>
-          <Text style={styles.bio}>{profile.bio}</Text>
-          <View style={styles.tagRow}>
-            {profile.tags.map((tag) => (
-              <View key={tag} style={styles.tagPill}>
-                <Text style={styles.tagLabel}>{tag}</Text>
-              </View>
-            ))}
-          </View>
+        <Section label={`Sobre ${firstName}`}>
+          <Text style={styles.bio}>{profile.profile.bio ?? 'Este entrenador todavía no agregó una biografía.'}</Text>
+          {tags.length > 0 && (
+            <View style={styles.tagRow}>
+              {tags.map((tag) => (
+                <View key={tag} style={styles.tagPill}>
+                  <Text style={styles.tagLabel}>{tag}</Text>
+                </View>
+              ))}
+            </View>
+          )}
         </Section>
 
-        <Section label="Verificaciones">
-          {profile.verifications.map((v) => (
-            <VerificationRow key={v.title} title={v.title} subtitle={v.subtitle} />
-          ))}
+        <Section label="Verificación">
+          <Text style={styles.verificationText}>{VERIFICATION_LABELS[profile.profile.verificationStatus]}</Text>
         </Section>
 
         <Section label="Reseñas de padres">
@@ -83,7 +172,7 @@ export default function TrainerProfileScreen({
           ) : reviews === null ? (
             <ActivityIndicator color={colors.ballLime} />
           ) : reviews.length === 0 ? (
-            <Text style={styles.reviewsMessage}>Todavía no hay reseñas para {trainer.name.split(' ')[0]}.</Text>
+            <Text style={styles.reviewsMessage}>Todavía no hay reseñas para {firstName}.</Text>
           ) : (
             <View style={styles.reviewList}>
               {reviews.map((review) => (
@@ -104,7 +193,7 @@ export default function TrainerProfileScreen({
 
         <Section label="Ejemplo de reporte (anonimizado)">
           <View style={styles.statsGrid}>
-            {profile.reportStats.map((stat) => (
+            {EXAMPLE_REPORT_STATS.map((stat) => (
               <StatTile key={stat.label} value={stat.value} label={stat.label} />
             ))}
           </View>
@@ -112,7 +201,7 @@ export default function TrainerProfileScreen({
 
         <Section label="Disponibilidad para este torneo">
           <View style={styles.availabilityGrid}>
-            {profile.availability.map((day) => (
+            {availability.map((day) => (
               <View key={day.dayLabel} style={styles.availabilityColumn}>
                 <Text style={styles.availabilityDay}>{day.dayLabel}</Text>
                 <AvailabilitySlotPill label="Mañana" available={day.morningAvailable} />
@@ -124,9 +213,12 @@ export default function TrainerProfileScreen({
       </ScrollView>
 
       <View style={styles.footer}>
-        <Text style={styles.footerNote}>${trainer.price} · sin costo de viáticos</Text>
-        <Pressable style={styles.reserveButton} onPress={onReserve}>
-          <Text style={styles.reserveLabel}>Reservar con {trainer.name.split(' ')[0]}</Text>
+        <Text style={styles.footerNote}>${price} · sin costo de viáticos</Text>
+        <Pressable
+          style={styles.reserveButton}
+          onPress={() => onReserve?.({ coachId, name, price, availability })}
+        >
+          <Text style={styles.reserveLabel}>Reservar con {firstName}</Text>
         </Pressable>
       </View>
     </SafeAreaView>
@@ -146,6 +238,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.bg,
+  },
+  centerState: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   header: {
     flexDirection: 'row',
@@ -228,6 +324,11 @@ const styles = StyleSheet.create({
     color: colors.textSoft,
     fontSize: 12,
     fontWeight: '600',
+  },
+  verificationText: {
+    color: colors.textSoft,
+    fontSize: 13,
+    lineHeight: 19,
   },
   reviewsMessage: {
     color: colors.textDim,

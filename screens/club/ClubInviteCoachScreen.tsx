@@ -4,12 +4,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import CoachResultRow from '../../components/club/CoachResultRow';
 import { ApiError, CoachSearchResult, createClubInvitation, searchCoaches } from '../../lib/api';
 import { colors, radius } from '../../lib/theme';
-import { mockClubAdmin } from '../../mock/clubFlow';
 
 export default function ClubInviteCoachScreen({
+  clubId,
+  invitedByUserId,
   tournamentId,
   onBack,
 }: {
+  clubId: string;
+  invitedByUserId: string;
   tournamentId: string;
   onBack: () => void;
 }) {
@@ -47,10 +50,10 @@ export default function ClubInviteCoachScreen({
     setLastInvited(null);
     try {
       await createClubInvitation({
-        clubId: mockClubAdmin.id,
+        clubId,
         tournamentId,
         coachId: coach.id,
-        invitedBy: mockClubAdmin.adminUserId,
+        invitedBy: invitedByUserId,
         message: message.trim() || undefined,
       });
       setResults((prev) => prev?.filter((c) => c.id !== coach.id) ?? null);
