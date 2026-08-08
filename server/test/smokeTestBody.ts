@@ -53,6 +53,7 @@ await app.ready();
 const parentToken = app.jwt.sign({ sub: fixtures.parentUserId, role: 'parent' });
 const coachAToken = app.jwt.sign({ sub: fixtures.coachAUserId, role: 'coach' });
 const coachBToken = app.jwt.sign({ sub: fixtures.coachBUserId, role: 'coach' });
+const clubAdminToken = app.jwt.sign({ sub: fixtures.clubAdminUserId, role: 'club_admin' });
 
 function inFuture(hours: number): string {
   return new Date(Date.now() + hours * 3600_000).toISOString();
@@ -255,7 +256,21 @@ console.log('\n=== Escenario 8: liquidación batch a clubes ===');
   const readyBefore = await findTournamentsReadyForSettlement();
   assertTrue(readyBefore.includes(fixtures.tournamentId), 'torneo aparece listo para liquidar (tiene comisión generated y end_date pasado)');
 
-  const settleRes = await app.inject({ method: 'POST', url: `/tournaments/${fixtures.tournamentId}/settle` });
+  const noAuthSettleRes = await app.inject({ method: 'POST', url: `/tournaments/${fixtures.tournamentId}/settle` });
+  assertEqual(noAuthSettleRes.statusCode, 401, 'settle sin Bearer token devuelve 401');
+
+  const wrongUserSettleRes = await app.inject({
+    method: 'POST',
+    url: `/tournaments/${fixtures.tournamentId}/settle`,
+    headers: { authorization: `Bearer ${coachAToken}` },
+  });
+  assertEqual(wrongUserSettleRes.statusCode, 403, 'settle con el token de alguien que no administra el club devuelve 403');
+
+  const settleRes = await app.inject({
+    method: 'POST',
+    url: `/tournaments/${fixtures.tournamentId}/settle`,
+    headers: { authorization: `Bearer ${clubAdminToken}` },
+  });
   assertEqual(settleRes.statusCode, 201, 'settle devuelve 201');
   const settlement = settleRes.json();
   assertEqual(Number(settlement.totalCommissionAmount), 100, 'total liquidado = comisión del único booking completado (escenario 1)');
@@ -409,18 +424,48 @@ console.log('\n=== Escenario 12: captura en vivo de un partido (matches / match_
     initialServer: 'player1',
     captureMode: 'rapida',
   };
-  const createRes = await app.inject({ method: 'POST', url: '/matches', payload: matchPayload });
+  const noAuthCreateRes = await app.inject({ method: 'POST', url: '/matches', payload: matchPayload });
+  assertEqual(noAuthCreateRes.statusCode, 401, 'POST /matches sin Bearer token devuelve 401');
+
+  const wrongCoachCreateRes = await app.inject({
+    method: 'POST',
+    url: '/matches',
+    headers: { authorization: `Bearer ${coachBToken}` },
+    payload: matchPayload,
+  });
+  assertEqual(wrongCoachCreateRes.statusCode, 403, 'POST /matches con el token de otro entrenador devuelve 403');
+
+  const createRes = await app.inject({
+    method: 'POST',
+    url: '/matches',
+    headers: { authorization: `Bearer ${coachAToken}` },
+    payload: matchPayload,
+  });
   assertEqual(createRes.statusCode, 201, 'POST /matches devuelve 201');
   const match = createRes.json();
   assertEqual(match.player1Id, fixtures.playerId, 'player1_id se deriva de la reserva, no del payload del cliente');
   assertEqual(match.status, 'in_progress', 'estado inicial = in_progress');
 
-  const createAgainRes = await app.inject({ method: 'POST', url: '/matches', payload: matchPayload });
+  const createAgainRes = await app.inject({
+    method: 'POST',
+    url: '/matches',
+    headers: { authorization: `Bearer ${coachAToken}` },
+    payload: matchPayload,
+  });
   assertEqual(createAgainRes.json().id, match.id, 'POST /matches es idempotente por bookingId (booking_id es UNIQUE)');
+
+  const wrongCoachPointRes = await app.inject({
+    method: 'POST',
+    url: `/matches/${match.id}/points`,
+    headers: { authorization: `Bearer ${coachBToken}` },
+    payload: { sequenceNumber: 1, wonBy: 'player1', detail: 'ace', firstServeIn: true },
+  });
+  assertEqual(wrongCoachPointRes.statusCode, 403, 'anotar un punto con el token de otro entrenador devuelve 403');
 
   const point1Res = await app.inject({
     method: 'POST',
     url: `/matches/${match.id}/points`,
+    headers: { authorization: `Bearer ${coachAToken}` },
     payload: { sequenceNumber: 1, wonBy: 'player1', detail: 'ace', firstServeIn: true },
   });
   assertEqual(point1Res.statusCode, 201, 'POST points devuelve 201');
@@ -429,16 +474,22 @@ console.log('\n=== Escenario 12: captura en vivo de un partido (matches / match_
   const point2Res = await app.inject({
     method: 'POST',
     url: `/matches/${match.id}/points`,
+    headers: { authorization: `Bearer ${coachAToken}` },
     payload: { sequenceNumber: 2, wonBy: 'player2', detail: null, firstServeIn: true },
   });
   const point2 = point2Res.json();
 
-  const undoRes = await app.inject({ method: 'DELETE', url: `/matches/${match.id}/points/2` });
+  const undoRes = await app.inject({
+    method: 'DELETE',
+    url: `/matches/${match.id}/points/2`,
+    headers: { authorization: `Bearer ${coachAToken}` },
+  });
   assertEqual(undoRes.statusCode, 204, 'DELETE points/:sequenceNumber (undo) devuelve 204');
 
   const bulkRes = await app.inject({
     method: 'POST',
     url: `/matches/${match.id}/points/bulk`,
+    headers: { authorization: `Bearer ${coachAToken}` },
     payload: {
       points: [
         { sequenceNumber: 1, wonBy: 'player1', detail: 'ace', firstServeIn: true },
@@ -454,6 +505,7 @@ console.log('\n=== Escenario 12: captura en vivo de un partido (matches / match_
   const completeRes = await app.inject({
     method: 'PATCH',
     url: `/matches/${match.id}/status`,
+    headers: { authorization: `Bearer ${coachAToken}` },
     payload: { status: 'completed' },
   });
   assertEqual(completeRes.json().status, 'completed', 'PATCH status = completed');
@@ -462,6 +514,7 @@ console.log('\n=== Escenario 12: captura en vivo de un partido (matches / match_
   const obsRes = await app.inject({
     method: 'PATCH',
     url: `/matches/${match.id}/observations`,
+    headers: { authorization: `Bearer ${coachAToken}` },
     payload: { coachObservations: 'Buen segundo saque, mejorar la volea.' },
   });
   assertEqual(
@@ -473,11 +526,23 @@ console.log('\n=== Escenario 12: captura en vivo de un partido (matches / match_
   const modeRes = await app.inject({
     method: 'PATCH',
     url: `/matches/${match.id}/capture-mode`,
+    headers: { authorization: `Bearer ${coachAToken}` },
     payload: { captureMode: 'detallada' },
   });
   assertEqual(modeRes.json().captureMode, 'detallada', 'PATCH capture-mode cambia el modo de captura');
 
-  const restartRes = await app.inject({ method: 'POST', url: `/matches/${match.id}/restart` });
+  const wrongCoachRestartRes = await app.inject({
+    method: 'POST',
+    url: `/matches/${match.id}/restart`,
+    headers: { authorization: `Bearer ${coachBToken}` },
+  });
+  assertEqual(wrongCoachRestartRes.statusCode, 403, 'restart con el token de otro entrenador devuelve 403');
+
+  const restartRes = await app.inject({
+    method: 'POST',
+    url: `/matches/${match.id}/restart`,
+    headers: { authorization: `Bearer ${coachAToken}` },
+  });
   assertEqual(restartRes.statusCode, 200, 'POST restart ("Nuevo partido") devuelve 200');
   assertEqual(restartRes.json().status, 'in_progress', 'restart vuelve el estado a in_progress');
 
@@ -485,6 +550,7 @@ console.log('\n=== Escenario 12: captura en vivo de un partido (matches / match_
     await app.inject({
       method: 'POST',
       url: `/matches/${match.id}/points/bulk`,
+      headers: { authorization: `Bearer ${coachAToken}` },
       payload: {
         points: [{ sequenceNumber: 1, wonBy: 'player1', detail: 'ace', firstServeIn: true }],
       },

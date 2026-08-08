@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { useAuth } from './AuthContext';
 import { computeMatchState, MatchState } from '../lib/scoringEngine';
 import { computeMatchStats, MatchStats } from '../lib/statsEngine';
 import {
@@ -60,6 +61,7 @@ export function MatchProvider({
   matchId: string;
   children: React.ReactNode;
 }) {
+  const { token } = useAuth();
   const [reducerState, dispatch] = useReducer(matchReducer, initialReducerState);
   const hydrated = useRef(false);
   const [syncError, setSyncError] = useState<string | null>(null);
@@ -68,10 +70,15 @@ export function MatchProvider({
   // seguido de un punto nuevo, por ejemplo). Un fallo no rompe la cadena — solo se reporta.
   const chainRef = useRef<Promise<void>>(Promise.resolve());
 
-  function enqueue(fn: () => Promise<unknown>) {
+  // Sin token solo pasa en /dev-preview (fuera del guard de auth) — la captura sigue funcionando
+  // 100% local (AsyncStorage es la fuente de verdad durante el partido), simplemente no hay con
+  // qué sesión sincronizar todavía, así que enqueue se vuelve un no-op en vez de fallar.
+  function enqueue(fn: (authToken: string) => Promise<unknown>) {
+    if (!token) return;
+    const authToken = token;
     chainRef.current = chainRef.current.then(async () => {
       try {
-        await fn();
+        await fn(authToken);
         setSyncError(null);
       } catch (err) {
         setSyncError(err instanceof ApiError ? err.message : 'No se pudo sincronizar con el servidor');
@@ -81,7 +88,7 @@ export function MatchProvider({
 
   function bulkSync(events: PointEvent[]) {
     if (events.length === 0) return;
-    enqueue(() => createMatchPointsBulk(matchId, events.map(toPointInput)));
+    enqueue((authToken) => createMatchPointsBulk(authToken, matchId, events.map(toPointInput)));
   }
 
   /** Compartido por undoLast y reopenMatch (que también deshace el punto final del partido). */
@@ -89,7 +96,7 @@ export function MatchProvider({
     const sequenceNumber = reducerState.events.length;
     dispatch({ type: 'UNDO_LAST' });
     if (sequenceNumber > 0) {
-      enqueue(() => deleteMatchPoint(matchId, sequenceNumber));
+      enqueue((authToken) => deleteMatchPoint(authToken, matchId, sequenceNumber));
     }
   }
 
@@ -122,7 +129,7 @@ export function MatchProvider({
   useEffect(() => {
     if (!hydrated.current) return;
     const handle = setTimeout(() => {
-      enqueue(() => updateMatchObservations(matchId, reducerState.observations));
+      enqueue((authToken) => updateMatchObservations(authToken, matchId, reducerState.observations));
     }, OBSERVATIONS_DEBOUNCE_MS);
     return () => clearTimeout(handle);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -143,16 +150,16 @@ export function MatchProvider({
       const sequenceNumber = reducerState.events.length + 1;
       const event = createPointEvent(wonBy, detail, firstServeIn);
       dispatch({ type: 'ADD_POINT', payload: event });
-      enqueue(() => createMatchPoint(matchId, toPointInput(event, sequenceNumber)));
+      enqueue((authToken) => createMatchPoint(authToken, matchId, toPointInput(event, sequenceNumber)));
     },
     undoLast: performUndo,
     setMode: (mode) => {
       dispatch({ type: 'SET_MODE', payload: mode });
-      enqueue(() => updateMatchCaptureMode(matchId, mode));
+      enqueue((authToken) => updateMatchCaptureMode(authToken, matchId, mode));
     },
     closeMatch: () => {
       dispatch({ type: 'CLOSE_MATCH' });
-      enqueue(() => updateMatchStatus(matchId, 'completed'));
+      enqueue((authToken) => updateMatchStatus(authToken, matchId, 'completed'));
     },
     reopenMatch: () => {
       // if the match ended on its own, undoing its final point is what actually
@@ -160,13 +167,13 @@ export function MatchProvider({
       // events, not a flag REOPEN_MATCH alone can clear).
       if (matchState.matchEnded) performUndo();
       dispatch({ type: 'REOPEN_MATCH' });
-      enqueue(() => updateMatchStatus(matchId, 'in_progress'));
+      enqueue((authToken) => updateMatchStatus(authToken, matchId, 'in_progress'));
     },
     setObservations: (text) => dispatch({ type: 'SET_OBSERVATIONS', payload: text }),
     resetMatch: () => {
       dispatch({ type: 'RESET' });
       AsyncStorage.removeItem(STORAGE_KEY).catch(() => {});
-      enqueue(() => restartMatch(matchId));
+      enqueue((authToken) => restartMatch(authToken, matchId));
     },
     canUndo: reducerState.events.length > 0,
     syncError,

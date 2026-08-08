@@ -339,6 +339,7 @@ export function CoachHomeFlow({ coachId, coachName }: { coachId: string; coachNa
  * re-wiring their displayed content to the real booking is separate follow-up work.
  */
 export function CoachMatchDayFlow({ bookingId }: { bookingId: string }) {
+  const { token } = useAuth();
   const [step, setStep] = useState<'reminder' | 'setup' | 'loadingMatch' | 'live'>('reminder');
   const [session, setSession] = useState<{ config: MatchConfig; roundLabel: string } | null>(null);
   const [matchId, setMatchId] = useState<string | null>(null);
@@ -346,9 +347,13 @@ export function CoachMatchDayFlow({ bookingId }: { bookingId: string }) {
 
   useEffect(() => {
     if (step !== 'loadingMatch' || !session) return;
+    if (!token) {
+      setMatchError('No hay una sesión activa.');
+      return;
+    }
     let cancelled = false;
     setMatchError(null);
-    createOrGetMatch({
+    createOrGetMatch(token, {
       bookingId,
       player2Label: session.config.player2Name,
       bestOf: String(session.config.bestOf) as '1' | '3',
@@ -368,7 +373,7 @@ export function CoachMatchDayFlow({ bookingId }: { bookingId: string }) {
     return () => {
       cancelled = true;
     };
-  }, [step, session, bookingId]);
+  }, [step, session, bookingId, token]);
 
   if (step === 'reminder') {
     return <CoachPreMatchReminderScreen onStartCapture={() => setStep('setup')} />;
@@ -409,12 +414,17 @@ export function CoachMatchDayFlow({ bookingId }: { bookingId: string }) {
 /** Atajo de previsualización directo a la captura (salta reminder/setup) — misma
  * persistencia real que CoachMatchDayFlow, contra el mismo booking fixture. */
 export function CoachCapturePreview() {
+  const { token } = useAuth();
   const [matchId, setMatchId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!token) {
+      setError('No hay una sesión activa.');
+      return;
+    }
     let cancelled = false;
-    createOrGetMatch({
+    createOrGetMatch(token, {
       bookingId: REAL_COMPLETED_BOOKING_ID,
       player2Label: mockMatchConfig.player2Name,
       bestOf: String(mockMatchConfig.bestOf) as '1' | '3',
@@ -431,7 +441,7 @@ export function CoachCapturePreview() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [token]);
 
   if (error) {
     return (

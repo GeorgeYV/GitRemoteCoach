@@ -592,11 +592,16 @@ export function getTournamentRoster(tournamentId: string): Promise<TournamentRos
   return request(`/tournaments/${tournamentId}/coaches`);
 }
 
-/** POST /tournaments/:id/settle — ClubTournamentDetailScreen "Liquidar". */
+/** POST /tournaments/:id/settle — ClubTournamentDetailScreen "Liquidar". Solo un admin del
+ * club dueño del torneo puede liquidarlo (verificado en el server contra la sesión). */
 export function settleTournament(
+  authToken: string,
   tournamentId: string,
 ): Promise<{ message?: string; settlement: ClubSettlement | null }> {
-  return request(`/tournaments/${tournamentId}/settle`, { method: 'POST' });
+  return request(`/tournaments/${tournamentId}/settle`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${authToken}` },
+  });
 }
 
 export type MatchBestOf = '1' | '3';
@@ -646,25 +651,31 @@ export interface MatchPointInput {
   firstServeIn: boolean;
 }
 
-/** POST /matches — CoachMatchSetupScreen "Comenzar captura en vivo". Idempotente por bookingId. */
-export function createOrGetMatch(params: {
-  bookingId: string;
-  player2Label: string;
-  bestOf: MatchBestOf;
-  noAd: boolean;
-  initialServer: MatchPlayerSlot;
-  captureMode: CaptureMode;
-}): Promise<Match> {
+/** POST /matches — CoachMatchSetupScreen "Comenzar captura en vivo". Idempotente por bookingId.
+ * Solo el entrenador dueño de la reserva puede iniciar la captura (verificado en el server). */
+export function createOrGetMatch(
+  authToken: string,
+  params: {
+    bookingId: string;
+    player2Label: string;
+    bestOf: MatchBestOf;
+    noAd: boolean;
+    initialServer: MatchPlayerSlot;
+    captureMode: CaptureMode;
+  },
+): Promise<Match> {
   return request('/matches', {
     method: 'POST',
+    headers: { Authorization: `Bearer ${authToken}` },
     body: JSON.stringify(params),
   });
 }
 
 /** POST /matches/:id/points — LiveCaptureView, cada punto anotado en vivo. */
-export function createMatchPoint(matchId: string, point: MatchPointInput): Promise<MatchPointEvent> {
+export function createMatchPoint(authToken: string, matchId: string, point: MatchPointInput): Promise<MatchPointEvent> {
   return request(`/matches/${matchId}/points`, {
     method: 'POST',
+    headers: { Authorization: `Bearer ${authToken}` },
     body: JSON.stringify(point),
   });
 }
@@ -672,44 +683,58 @@ export function createMatchPoint(matchId: string, point: MatchPointInput): Promi
 /** POST /matches/:id/points/bulk — LiveCaptureView, catálogo de recuperación (hidratación de
  * AsyncStorage o botón "Reintentar sincronización"). Idempotente: reenviar puntos ya
  * sincronizados no los duplica. */
-export function createMatchPointsBulk(matchId: string, points: MatchPointInput[]): Promise<MatchPointEvent[]> {
+export function createMatchPointsBulk(
+  authToken: string,
+  matchId: string,
+  points: MatchPointInput[],
+): Promise<MatchPointEvent[]> {
   return request(`/matches/${matchId}/points/bulk`, {
     method: 'POST',
+    headers: { Authorization: `Bearer ${authToken}` },
     body: JSON.stringify({ points }),
   });
 }
 
 /** DELETE /matches/:id/points/:sequenceNumber — LiveCaptureView, deshacer último punto. */
-export function deleteMatchPoint(matchId: string, sequenceNumber: number): Promise<void> {
-  return request(`/matches/${matchId}/points/${sequenceNumber}`, { method: 'DELETE' });
+export function deleteMatchPoint(authToken: string, matchId: string, sequenceNumber: number): Promise<void> {
+  return request(`/matches/${matchId}/points/${sequenceNumber}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${authToken}` },
+  });
 }
 
 /** POST /matches/:id/restart — MatchSummaryView "Nuevo partido": reinicia el mismo partido
  * (booking_id es UNIQUE, no se puede crear uno nuevo para la misma reserva). */
-export function restartMatch(matchId: string): Promise<Match> {
-  return request(`/matches/${matchId}/restart`, { method: 'POST' });
+export function restartMatch(authToken: string, matchId: string): Promise<Match> {
+  return request(`/matches/${matchId}/restart`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${authToken}` },
+  });
 }
 
 /** PATCH /matches/:id/status — LiveCaptureView "Finalizar partido" / MatchSummaryView "Deshacer último punto y volver". */
-export function updateMatchStatus(matchId: string, status: MatchStatus): Promise<Match> {
+export function updateMatchStatus(authToken: string, matchId: string, status: MatchStatus): Promise<Match> {
   return request(`/matches/${matchId}/status`, {
     method: 'PATCH',
+    headers: { Authorization: `Bearer ${authToken}` },
     body: JSON.stringify({ status }),
   });
 }
 
 /** PATCH /matches/:id/observations — MatchSummaryView, debounced mientras el entrenador escribe. */
-export function updateMatchObservations(matchId: string, coachObservations: string): Promise<Match> {
+export function updateMatchObservations(authToken: string, matchId: string, coachObservations: string): Promise<Match> {
   return request(`/matches/${matchId}/observations`, {
     method: 'PATCH',
+    headers: { Authorization: `Bearer ${authToken}` },
     body: JSON.stringify({ coachObservations }),
   });
 }
 
 /** PATCH /matches/:id/capture-mode — LiveCaptureView, ModeSwitch (rápida/detallada). */
-export function updateMatchCaptureMode(matchId: string, captureMode: CaptureMode): Promise<Match> {
+export function updateMatchCaptureMode(authToken: string, matchId: string, captureMode: CaptureMode): Promise<Match> {
   return request(`/matches/${matchId}/capture-mode`, {
     method: 'PATCH',
+    headers: { Authorization: `Bearer ${authToken}` },
     body: JSON.stringify({ captureMode }),
   });
 }

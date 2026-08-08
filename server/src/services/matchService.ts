@@ -16,6 +16,13 @@ export interface GetOrCreateMatchParams {
 
 /** player1Id se deriva de la reserva (nunca lo manda el cliente) — evita que el
  * partido quede desincronizado del jugador real de esa reserva. */
+/** Autorización a nivel de ruta: a qué entrenador pertenece este partido (vía la reserva). */
+export async function getCoachIdForMatch(matchId: string): Promise<string> {
+  const match = await matchRepository.getById(matchId);
+  const { coachId } = await bookingRepository.getBookingParticipants(match.bookingId);
+  return coachId;
+}
+
 export async function getOrCreateMatch(params: GetOrCreateMatchParams): Promise<Match> {
   const booking = await bookingRepository.getBookingById(params.bookingId);
   return matchRepository.getOrCreate({

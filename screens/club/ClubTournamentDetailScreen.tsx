@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { SafeAreaView } from 'react-native-safe-area-context';
 import OfficialCoachRow from '../../components/club/OfficialCoachRow';
 import TournamentStatusPill from '../../components/club/TournamentStatusPill';
+import { useAuth } from '../../context/AuthContext';
 import { ApiError, getTournamentRoster, settleTournament, TournamentRoster, TournamentSummary } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
 
@@ -25,6 +26,7 @@ export default function ClubTournamentDetailScreen({
   onBack: () => void;
   onInvite: () => void;
 }) {
+  const { token } = useAuth();
   const [roster, setRoster] = useState<TournamentRoster | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [settling, setSettling] = useState(false);
@@ -48,10 +50,14 @@ export default function ClubTournamentDetailScreen({
   }, [tournament.id]);
 
   async function handleSettle() {
+    if (!token) {
+      setSettleError('No hay una sesión activa.');
+      return;
+    }
     setSettling(true);
     setSettleError(null);
     try {
-      const result = await settleTournament(tournament.id);
+      const result = await settleTournament(token, tournament.id);
       setSettledMessage(
         result.settlement
           ? `Liquidado: ${money(result.settlement.totalCommissionAmount)}`
