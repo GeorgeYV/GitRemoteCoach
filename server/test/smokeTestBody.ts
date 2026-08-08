@@ -44,6 +44,15 @@ setPushSenderForTesting(fakePushSender);
 
 const fixtures = await seedFixtures(testPool);
 const app = buildApp();
+// app.jwt no queda decorado hasta que el plugin @fastify/jwt termina de registrarse — app.inject()
+// espera esto internamente, pero app.jwt.sign() llamado directo (como abajo) no.
+await app.ready();
+
+// Sin pasar por /auth/login — se firman los JWT directo, mismo mecanismo que routes/auth.ts.
+// Reutilizados en casi todos los escenarios ahora que las rutas de bookings exigen sesión.
+const parentToken = app.jwt.sign({ sub: fixtures.parentUserId, role: 'parent' });
+const coachAToken = app.jwt.sign({ sub: fixtures.coachAUserId, role: 'coach' });
+const coachBToken = app.jwt.sign({ sub: fixtures.coachBUserId, role: 'coach' });
 
 function inFuture(hours: number): string {
   return new Date(Date.now() + hours * 3600_000).toISOString();
@@ -53,6 +62,7 @@ async function requestBooking(coachId: string, matchDatetime: string, agreedRate
   return app.inject({
     method: 'POST',
     url: '/bookings',
+    headers: { authorization: `Bearer ${parentToken}` },
     payload: { playerId: fixtures.playerId, coachId, tournamentId: fixtures.tournamentId, matchDatetime, agreedRate },
   });
 }
@@ -64,7 +74,11 @@ console.log('\n=== Escenario 1: flujo feliz (solicitud → aceptación → pago 
   const booking1 = reqRes.json();
   assertEqual(booking1.status, 'requested', 'estado inicial = requested');
 
-  const acceptRes = await app.inject({ method: 'POST', url: `/bookings/${booking1.id}/accept` });
+  const acceptRes = await app.inject({
+    method: 'POST',
+    url: `/bookings/${booking1.id}/accept`,
+    headers: { authorization: `Bearer ${coachAToken}` },
+  });
   assertEqual(acceptRes.statusCode, 200, 'accept devuelve 200');
   assertEqual(acceptRes.json().status, 'accepted', 'estado tras aceptar = accepted');
 
@@ -72,6 +86,7 @@ console.log('\n=== Escenario 1: flujo feliz (solicitud → aceptación → pago 
   const payRes = await app.inject({
     method: 'POST',
     url: `/bookings/${booking1.id}/pay`,
+    headers: { authorization: `Bearer ${parentToken}` },
     payload: { paymentMethodId: 'pm_test_ok' },
   });
   assertEqual(payRes.statusCode, 200, 'pay devuelve 200');
@@ -94,14 +109,24 @@ console.log('\n=== Escenario 2: cancelación tardía del padre (<24h) sobre rese
 {
   const reqRes = await requestBooking(fixtures.coachAUserId, inFuture(10));
   const booking2 = reqRes.json();
-  await app.inject({ method: 'POST', url: `/bookings/${booking2.id}/accept` });
+  await app.inject({
+    method: 'POST',
+    url: `/bookings/${booking2.id}/accept`,
+    headers: { authorization: `Bearer ${coachAToken}` },
+  });
   stripeState.nextChargeOutcome = 'succeed';
-  await app.inject({ method: 'POST', url: `/bookings/${booking2.id}/pay`, payload: { paymentMethodId: 'pm_test_ok' } });
+  await app.inject({
+    method: 'POST',
+    url: `/bookings/${booking2.id}/pay`,
+    headers: { authorization: `Bearer ${parentToken}` },
+    payload: { paymentMethodId: 'pm_test_ok' },
+  });
 
   const cancelRes = await app.inject({
     method: 'POST',
     url: `/bookings/${booking2.id}/cancel`,
-    payload: { actor: 'parent', actorUserId: fixtures.parentUserId, reason: 'Cambio de planes' },
+    headers: { authorization: `Bearer ${parentToken}` },
+    payload: { reason: 'Cambio de planes' },
   });
   assertEqual(cancelRes.statusCode, 200, 'cancel devuelve 200');
   const cancelled = cancelRes.json();
@@ -115,14 +140,24 @@ console.log('\n=== Escenario 3: cancelación del entrenador sobre reserva pagada
 {
   const reqRes = await requestBooking(fixtures.coachAUserId, inFuture(48));
   const booking3 = reqRes.json();
-  await app.inject({ method: 'POST', url: `/bookings/${booking3.id}/accept` });
+  await app.inject({
+    method: 'POST',
+    url: `/bookings/${booking3.id}/accept`,
+    headers: { authorization: `Bearer ${coachAToken}` },
+  });
   stripeState.nextChargeOutcome = 'succeed';
-  await app.inject({ method: 'POST', url: `/bookings/${booking3.id}/pay`, payload: { paymentMethodId: 'pm_test_ok' } });
+  await app.inject({
+    method: 'POST',
+    url: `/bookings/${booking3.id}/pay`,
+    headers: { authorization: `Bearer ${parentToken}` },
+    payload: { paymentMethodId: 'pm_test_ok' },
+  });
 
   const cancelRes = await app.inject({
     method: 'POST',
     url: `/bookings/${booking3.id}/cancel`,
-    payload: { actor: 'coach', actorUserId: fixtures.coachAUserId, reason: 'Lesión' },
+    headers: { authorization: `Bearer ${coachAToken}` },
+    payload: { reason: 'Lesión' },
   });
   const cancelled = cancelRes.json();
   assertEqual(Number(cancelled.refundAmount), 1000, 'reembolso completo cuando cancela el entrenador');
@@ -141,24 +176,34 @@ console.log('\n=== Escenario 5: pago rechazado por la pasarela, luego reintento 
 {
   const reqRes = await requestBooking(fixtures.coachAUserId, inFuture(72));
   const booking5 = reqRes.json();
-  await app.inject({ method: 'POST', url: `/bookings/${booking5.id}/accept` });
+  await app.inject({
+    method: 'POST',
+    url: `/bookings/${booking5.id}/accept`,
+    headers: { authorization: `Bearer ${coachAToken}` },
+  });
 
   stripeState.nextChargeOutcome = 'decline';
   const declineRes = await app.inject({
     method: 'POST',
     url: `/bookings/${booking5.id}/pay`,
+    headers: { authorization: `Bearer ${parentToken}` },
     payload: { paymentMethodId: 'pm_test_decline' },
   });
   assertEqual(declineRes.statusCode, 409, 'pago rechazado devuelve 409');
   assertEqual(declineRes.json().error, 'payment_declined', 'código de error = payment_declined');
 
-  const afterDecline = await app.inject({ method: 'GET', url: `/bookings/${booking5.id}` });
+  const afterDecline = await app.inject({
+    method: 'GET',
+    url: `/bookings/${booking5.id}`,
+    headers: { authorization: `Bearer ${parentToken}` },
+  });
   assertEqual(afterDecline.json().status, 'payment_failed', 'estado tras rechazo = payment_failed');
 
   stripeState.nextChargeOutcome = 'succeed';
   const retryRes = await app.inject({
     method: 'POST',
     url: `/bookings/${booking5.id}/pay`,
+    headers: { authorization: `Bearer ${parentToken}` },
     payload: { paymentMethodId: 'pm_test_ok' },
   });
   assertEqual(retryRes.statusCode, 200, 'reintento de pago exitoso devuelve 200');
@@ -173,14 +218,24 @@ console.log('\n=== Escenario 6: expiración por vencimiento de ventana (sin resp
 
   const reqB = await requestBooking(fixtures.coachBUserId, inFuture(6));
   const bookingB = reqB.json();
-  await app.inject({ method: 'POST', url: `/bookings/${bookingB.id}/accept` });
+  await app.inject({
+    method: 'POST',
+    url: `/bookings/${bookingB.id}/accept`,
+    headers: { authorization: `Bearer ${coachBToken}` },
+  });
   await testPool.query(`UPDATE bookings SET payment_deadline = now() - interval '1 minute' WHERE id = $1`, [bookingB.id]);
 
   const jobResult = await runExpireBookingsJob();
   assertTrue(jobResult.expiredRequests.includes(bookingA.id), 'job expira solicitud sin respuesta del entrenador');
   assertTrue(jobResult.expiredPayments.includes(bookingB.id), 'job expira aceptación sin pago del padre');
 
-  const alternatives = await (await app.inject({ method: 'GET', url: `/bookings/${bookingA.id}/alternatives` })).json();
+  const alternatives = await (
+    await app.inject({
+      method: 'GET',
+      url: `/bookings/${bookingA.id}/alternatives`,
+      headers: { authorization: `Bearer ${parentToken}` },
+    })
+  ).json();
   assertTrue(Array.isArray(alternatives) && alternatives.some((a: any) => a.coachId === fixtures.coachAUserId), 'sugiere al otro entrenador etiquetado en el torneo como alternativa');
 }
 
@@ -189,7 +244,7 @@ console.log('\n=== Escenario 7: condición de carrera — cancelar una reserva y
   const raceRes = await app.inject({
     method: 'POST',
     url: `/bookings/${(globalThis as any).__booking1Id}/cancel`,
-    payload: { actor: 'parent', actorUserId: fixtures.parentUserId },
+    headers: { authorization: `Bearer ${parentToken}` },
   });
   assertEqual(raceRes.statusCode, 409, 'cancelar reserva completada devuelve 409');
   assertEqual(raceRes.json().error, 'already_completed', 'código de error = already_completed');
@@ -206,7 +261,13 @@ console.log('\n=== Escenario 8: liquidación batch a clubes ===');
   assertEqual(Number(settlement.totalCommissionAmount), 100, 'total liquidado = comisión del único booking completado (escenario 1)');
   assertEqual(settlement.status, 'paid', 'liquidación queda marcada paid (simulada, sin transferencia real)');
 
-  const booking1After = await (await app.inject({ method: 'GET', url: `/bookings/${(globalThis as any).__booking1Id}` })).json();
+  const booking1After = await (
+    await app.inject({
+      method: 'GET',
+      url: `/bookings/${(globalThis as any).__booking1Id}`,
+      headers: { authorization: `Bearer ${parentToken}` },
+    })
+  ).json();
   assertEqual(booking1After.clubCommissionStatus, 'settled', 'comisión del booking pasa de generated a settled');
   assertEqual(booking1After.settlementId, settlement.id, 'booking queda enlazado al settlement creado');
 
@@ -219,7 +280,8 @@ console.log('\n=== Escenario 9: reseña del padre tras un partido completado ===
   const reviewRes = await app.inject({
     method: 'POST',
     url: `/bookings/${(globalThis as any).__booking1Id}/review`,
-    payload: { parentId: fixtures.parentUserId, rating: 5, comment: 'Excelente entrenador, muy puntual.' },
+    headers: { authorization: `Bearer ${parentToken}` },
+    payload: { rating: 5, comment: 'Excelente entrenador, muy puntual.' },
   });
   assertEqual(reviewRes.statusCode, 201, 'POST review devuelve 201');
   const review = reviewRes.json();
@@ -241,18 +303,24 @@ console.log('\n=== Escenario 9: reseña del padre tras un partido completado ===
   const dupRes = await app.inject({
     method: 'POST',
     url: `/bookings/${(globalThis as any).__booking1Id}/review`,
-    payload: { parentId: fixtures.parentUserId, rating: 4 },
+    headers: { authorization: `Bearer ${parentToken}` },
+    payload: { rating: 4 },
   });
   assertEqual(dupRes.statusCode, 409, 'segunda reseña sobre la misma reserva devuelve 409');
   assertEqual(dupRes.json().error, 'review_already_exists', 'código de error = review_already_exists');
 
   const reqRes = await requestBooking(fixtures.coachBUserId, inFuture(96));
   const bookingNotCompleted = reqRes.json();
-  await app.inject({ method: 'POST', url: `/bookings/${bookingNotCompleted.id}/accept` });
+  await app.inject({
+    method: 'POST',
+    url: `/bookings/${bookingNotCompleted.id}/accept`,
+    headers: { authorization: `Bearer ${coachBToken}` },
+  });
   const tooEarlyRes = await app.inject({
     method: 'POST',
     url: `/bookings/${bookingNotCompleted.id}/review`,
-    payload: { parentId: fixtures.parentUserId, rating: 3 },
+    headers: { authorization: `Bearer ${parentToken}` },
+    payload: { rating: 3 },
   });
   assertEqual(tooEarlyRes.statusCode, 409, 'reseñar una reserva no completada devuelve 409');
   assertEqual(tooEarlyRes.json().error, 'booking_not_completed', 'código de error = booking_not_completed');
@@ -260,7 +328,11 @@ console.log('\n=== Escenario 9: reseña del padre tras un partido completado ===
 
 console.log('\n=== Escenario 10: listado de reservas de un coach (CoachHomeScreen, etc.) ===');
 {
-  const listRes = await app.inject({ method: 'GET', url: `/coaches/${fixtures.coachAUserId}/bookings` });
+  const listRes = await app.inject({
+    method: 'GET',
+    url: `/coaches/${fixtures.coachAUserId}/bookings`,
+    headers: { authorization: `Bearer ${coachAToken}` },
+  });
   assertEqual(listRes.statusCode, 200, 'GET /coaches/:id/bookings devuelve 200');
   const bookings = listRes.json();
   assertTrue(Array.isArray(bookings) && bookings.length > 0, 'devuelve al menos una reserva del coach A');
@@ -274,7 +346,13 @@ console.log('\n=== Escenario 10: listado de reservas de un coach (CoachHomeScree
   assertEqual(booking1Row.parentName, 'María Guardián', 'trae el nombre del padre (JOIN con players → users)');
   assertEqual(booking1Row.tournamentName, 'Copa Nacional Juvenil', 'trae el nombre del torneo (JOIN con tournaments)');
 
-  const emptyRes = await app.inject({ method: 'GET', url: `/coaches/${fixtures.coachAUserId.slice(0, -1)}9/bookings` });
+  const fakeCoachId = `${fixtures.coachAUserId.slice(0, -1)}9`;
+  const fakeCoachToken = app.jwt.sign({ sub: fakeCoachId, role: 'coach' });
+  const emptyRes = await app.inject({
+    method: 'GET',
+    url: `/coaches/${fakeCoachId}/bookings`,
+    headers: { authorization: `Bearer ${fakeCoachToken}` },
+  });
   assertTrue(Array.isArray(emptyRes.json()), 'un coach sin reservas devuelve un arreglo (vacío), no un error');
 }
 
@@ -468,8 +546,6 @@ console.log('\n=== Escenario 13: auth (registro / login / sesión) ===');
 
 console.log('\n=== Escenario 14: push notifications (accept/reject de reserva avisan al padre) ===');
 {
-  // Sin pasar por /auth/login — se firma el JWT directo, mismo mecanismo que routes/auth.ts.
-  const parentToken = app.jwt.sign({ sub: fixtures.parentUserId, role: 'parent' });
   const deviceToken = 'ExponentPushToken[smoke-test-device]';
 
   const noAuthRes = await app.inject({ method: 'POST', url: '/push-tokens', payload: { token: deviceToken } });
@@ -486,7 +562,11 @@ console.log('\n=== Escenario 14: push notifications (accept/reject de reserva av
   const acceptReq = await requestBooking(fixtures.coachBUserId, inFuture(50));
   const bookingToAccept = acceptReq.json();
   pushState.sent.length = 0; // limpia cualquier push de escenarios anteriores antes de medir
-  await app.inject({ method: 'POST', url: `/bookings/${bookingToAccept.id}/accept` });
+  await app.inject({
+    method: 'POST',
+    url: `/bookings/${bookingToAccept.id}/accept`,
+    headers: { authorization: `Bearer ${coachBToken}` },
+  });
   assertEqual(pushState.sent.length, 1, 'aceptar la reserva dispara exactamente un push');
   assertEqual(pushState.sent[0]?.to, deviceToken, 'el push va al device token del padre');
   assertEqual(pushState.sent[0]?.title, 'Reserva confirmada', 'el título del push de aceptación es el esperado');
@@ -494,7 +574,11 @@ console.log('\n=== Escenario 14: push notifications (accept/reject de reserva av
   const rejectReq = await requestBooking(fixtures.coachBUserId, inFuture(55));
   const bookingToReject = rejectReq.json();
   pushState.sent.length = 0;
-  await app.inject({ method: 'POST', url: `/bookings/${bookingToReject.id}/reject` });
+  await app.inject({
+    method: 'POST',
+    url: `/bookings/${bookingToReject.id}/reject`,
+    headers: { authorization: `Bearer ${coachBToken}` },
+  });
   assertEqual(pushState.sent.length, 1, 'rechazar la reserva también dispara un push');
   assertEqual(pushState.sent[0]?.title, 'Solicitud rechazada', 'el título del push de rechazo es el esperado');
 
@@ -508,7 +592,11 @@ console.log('\n=== Escenario 14: push notifications (accept/reject de reserva av
   const rejectAfterUnregisterReq = await requestBooking(fixtures.coachBUserId, inFuture(60));
   const bookingAfterUnregister = rejectAfterUnregisterReq.json();
   pushState.sent.length = 0;
-  await app.inject({ method: 'POST', url: `/bookings/${bookingAfterUnregister.id}/reject` });
+  await app.inject({
+    method: 'POST',
+    url: `/bookings/${bookingAfterUnregister.id}/reject`,
+    headers: { authorization: `Bearer ${coachBToken}` },
+  });
   assertEqual(pushState.sent.length, 0, 'sin token registrado, aceptar/rechazar ya no dispara push (y no falla)');
 }
 
@@ -629,7 +717,11 @@ console.log('\n=== Escenario 17: hijos/as del padre (GET/POST /players) ===');
 
 console.log('\n=== Escenario 18: listado de reservas de un padre (BookingHistoryScreen) ===');
 {
-  const listRes = await app.inject({ method: 'GET', url: `/parents/${fixtures.parentUserId}/bookings` });
+  const listRes = await app.inject({
+    method: 'GET',
+    url: `/parents/${fixtures.parentUserId}/bookings`,
+    headers: { authorization: `Bearer ${parentToken}` },
+  });
   assertEqual(listRes.statusCode, 200, 'GET /parents/:id/bookings devuelve 200');
   const bookings = listRes.json();
 
@@ -643,8 +735,146 @@ console.log('\n=== Escenario 18: listado de reservas de un padre (BookingHistory
   assertTrue(!!notCompleted, 'incluye la reserva "accepted" sin completar del escenario 9');
   assertEqual(notCompleted.reviewed, false, 'una reserva sin reseña marca reviewed = false');
 
-  const otherParentRes = await app.inject({ method: 'GET', url: '/parents/00000000-0000-0000-0000-000000000099/bookings' });
+  const fakeParentId = '00000000-0000-0000-0000-000000000099';
+  const fakeParentToken = app.jwt.sign({ sub: fakeParentId, role: 'parent' });
+  const otherParentRes = await app.inject({
+    method: 'GET',
+    url: `/parents/${fakeParentId}/bookings`,
+    headers: { authorization: `Bearer ${fakeParentToken}` },
+  });
   assertEqual(otherParentRes.json(), [], 'un padre sin reservas devuelve lista vacía');
+}
+
+console.log('\n=== Escenario 19: chat de una reserva (GET/POST /bookings/:id/messages) ===');
+{
+  const bookingId = (globalThis as any).__booking1Id as string;
+
+  const noAuthGetRes = await app.inject({ method: 'GET', url: `/bookings/${bookingId}/messages` });
+  assertEqual(noAuthGetRes.statusCode, 401, 'GET /bookings/:id/messages sin Bearer token devuelve 401');
+
+  const noAuthPostRes = await app.inject({
+    method: 'POST',
+    url: `/bookings/${bookingId}/messages`,
+    payload: { body: 'Hola' },
+  });
+  assertEqual(noAuthPostRes.statusCode, 401, 'POST /bookings/:id/messages sin Bearer token devuelve 401');
+
+  const parentMsgRes = await app.inject({
+    method: 'POST',
+    url: `/bookings/${bookingId}/messages`,
+    headers: { authorization: `Bearer ${parentToken}` },
+    payload: { body: '¿A qué hora llegamos?' },
+  });
+  assertEqual(parentMsgRes.statusCode, 201, 'POST como el padre de la reserva devuelve 201');
+  const parentMsg = parentMsgRes.json();
+  assertEqual(parentMsg.senderType, 'parent', 'senderType se deriva de la sesión, no del body');
+  assertEqual(parentMsg.senderId, fixtures.parentUserId, 'senderId se deriva de la sesión, no del body');
+
+  const coachMsgRes = await app.inject({
+    method: 'POST',
+    url: `/bookings/${bookingId}/messages`,
+    headers: { authorization: `Bearer ${coachAToken}` },
+    payload: { body: 'Nos vemos en la cancha 3' },
+  });
+  assertEqual(coachMsgRes.statusCode, 201, 'POST como el entrenador de la reserva devuelve 201');
+  assertEqual(coachMsgRes.json().senderType, 'coach', 'senderType = coach cuando el entrenador escribe');
+
+  const getRes = await app.inject({
+    method: 'GET',
+    url: `/bookings/${bookingId}/messages`,
+    headers: { authorization: `Bearer ${parentToken}` },
+  });
+  const messages = getRes.json();
+  assertTrue(
+    Array.isArray(messages) && messages.length >= 2,
+    'GET devuelve los mensajes recién enviados por ambos participantes',
+  );
+
+  const strangerPostRes = await app.inject({
+    method: 'POST',
+    url: `/bookings/${bookingId}/messages`,
+    headers: { authorization: `Bearer ${coachBToken}` },
+    payload: { body: 'Intento de un entrenador ajeno' },
+  });
+  assertEqual(strangerPostRes.statusCode, 403, 'POST de alguien ajeno a la reserva devuelve 403');
+
+  const strangerGetRes = await app.inject({
+    method: 'GET',
+    url: `/bookings/${bookingId}/messages`,
+    headers: { authorization: `Bearer ${coachBToken}` },
+  });
+  assertEqual(strangerGetRes.statusCode, 403, 'GET de alguien ajeno a la reserva devuelve 403');
+}
+
+console.log('\n=== Escenario 20: autorización cruzada — nadie puede actuar por otro usuario ===');
+{
+  const intruderRes = await app.inject({
+    method: 'POST',
+    url: '/auth/register',
+    payload: {
+      email: 'intruso@example.com',
+      password: 'super-secreta-123',
+      fullName: 'Padre Intruso',
+      primaryRole: 'parent',
+    },
+  });
+  const { token: intruderToken } = intruderRes.json();
+
+  // requestBooking() siempre usa parentToken (el padre real, dueño de fixtures.playerId) — esta
+  // es la reserva legítima que las siguientes comprobaciones intentan atacar con otros tokens.
+  const legitBookingRes = await requestBooking(fixtures.coachAUserId, inFuture(200));
+  assertTrue(legitBookingRes.statusCode === 201, 'sanity check: el propio padre sí puede reservar con su hijo/a');
+  const legitBookingId = legitBookingRes.json().id;
+
+  const bookForbiddenRes = await app.inject({
+    method: 'POST',
+    url: '/bookings',
+    headers: { authorization: `Bearer ${intruderToken}` },
+    payload: {
+      playerId: fixtures.playerId,
+      coachId: fixtures.coachAUserId,
+      tournamentId: fixtures.tournamentId,
+      matchDatetime: inFuture(201),
+      agreedRate: 1000,
+    },
+  });
+  assertEqual(bookForbiddenRes.statusCode, 403, 'reservar con el hijo/a de otro padre devuelve 403');
+
+  const acceptWrongCoachRes = await app.inject({
+    method: 'POST',
+    url: `/bookings/${legitBookingId}/accept`,
+    headers: { authorization: `Bearer ${coachBToken}` },
+  });
+  assertEqual(acceptWrongCoachRes.statusCode, 403, 'aceptar con el token de otro entrenador devuelve 403');
+
+  const cancelWrongParentRes = await app.inject({
+    method: 'POST',
+    url: `/bookings/${legitBookingId}/cancel`,
+    headers: { authorization: `Bearer ${intruderToken}` },
+  });
+  assertEqual(cancelWrongParentRes.statusCode, 403, 'cancelar sin ser parte de la reserva devuelve 403');
+
+  const reviewWrongParentRes = await app.inject({
+    method: 'POST',
+    url: `/bookings/${(globalThis as any).__booking1Id}/review`,
+    headers: { authorization: `Bearer ${intruderToken}` },
+    payload: { rating: 5 },
+  });
+  assertEqual(reviewWrongParentRes.statusCode, 403, 'reseñar sin ser el padre de la reserva devuelve 403');
+
+  const coachBookingsWrongCoachRes = await app.inject({
+    method: 'GET',
+    url: `/coaches/${fixtures.coachAUserId}/bookings`,
+    headers: { authorization: `Bearer ${coachBToken}` },
+  });
+  assertEqual(coachBookingsWrongCoachRes.statusCode, 403, 'ver las reservas de otro entrenador devuelve 403');
+
+  const parentBookingsWrongParentRes = await app.inject({
+    method: 'GET',
+    url: `/parents/${fixtures.parentUserId}/bookings`,
+    headers: { authorization: `Bearer ${intruderToken}` },
+  });
+  assertEqual(parentBookingsWrongParentRes.statusCode, 403, 'ver las reservas de otro padre devuelve 403');
 }
 
 console.log(`\n=== Resultado: ${passed} pasaron, ${failed} fallaron ===`);

@@ -105,13 +105,15 @@ export interface ReviewWithParent extends Review {
   parentName: string;
 }
 
-/** POST /bookings/:id/review — BookingReviewScreen. */
+/** POST /bookings/:id/review — BookingReviewScreen. parentId se deriva de la sesión en el server. */
 export function submitBookingReview(
+  authToken: string,
   bookingId: string,
-  params: { parentId: string; rating: number; comment?: string },
+  params: { rating: number; comment?: string },
 ): Promise<Review> {
   return request(`/bookings/${bookingId}/review`, {
     method: 'POST',
+    headers: { Authorization: `Bearer ${authToken}` },
     body: JSON.stringify(params),
   });
 }
@@ -168,13 +170,13 @@ export interface BookingWithParticipants extends Booking {
 }
 
 /** GET /bookings/:id — BookingStatusScreen (poll hasta que el coach acepte). */
-export function getBooking(bookingId: string): Promise<Booking> {
-  return request(`/bookings/${bookingId}`);
+export function getBooking(authToken: string, bookingId: string): Promise<Booking> {
+  return request(`/bookings/${bookingId}`, { headers: { Authorization: `Bearer ${authToken}` } });
 }
 
 /** GET /coaches/:id/bookings — CoachHomeScreen, CoachRequestInboxScreen, CoachSessionHistoryScreen, CoachEarningsScreen. */
-export function listCoachBookings(coachId: string): Promise<BookingWithParticipants[]> {
-  return request(`/coaches/${coachId}/bookings`);
+export function listCoachBookings(authToken: string, coachId: string): Promise<BookingWithParticipants[]> {
+  return request(`/coaches/${coachId}/bookings`, { headers: { Authorization: `Bearer ${authToken}` } });
 }
 
 /** Espeja server/src/types.ts#BookingForParent — lo que devuelve el listado por padre. */
@@ -187,53 +189,68 @@ export interface BookingForParent extends Booking {
 }
 
 /** GET /parents/:id/bookings — BookingHistoryScreen. */
-export function listParentBookings(parentUserId: string): Promise<BookingForParent[]> {
-  return request(`/parents/${parentUserId}/bookings`);
+export function listParentBookings(authToken: string, parentUserId: string): Promise<BookingForParent[]> {
+  return request(`/parents/${parentUserId}/bookings`, { headers: { Authorization: `Bearer ${authToken}` } });
 }
 
 /** POST /bookings/:id/accept — CoachRequestInboxScreen. */
-export function acceptBookingRequest(bookingId: string): Promise<Booking> {
-  return request(`/bookings/${bookingId}/accept`, { method: 'POST' });
+export function acceptBookingRequest(authToken: string, bookingId: string): Promise<Booking> {
+  return request(`/bookings/${bookingId}/accept`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${authToken}` },
+  });
 }
 
 /** POST /bookings/:id/reject — CoachRequestInboxScreen. */
-export function rejectBookingRequest(bookingId: string): Promise<Booking> {
-  return request(`/bookings/${bookingId}/reject`, { method: 'POST' });
+export function rejectBookingRequest(authToken: string, bookingId: string): Promise<Booking> {
+  return request(`/bookings/${bookingId}/reject`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${authToken}` },
+  });
 }
 
-/** POST /bookings/:id/cancel — BookingCancelScreen (parent) y CoachBookingCancelScreen. */
+/** POST /bookings/:id/cancel — BookingCancelScreen (parent) y CoachBookingCancelScreen. actor/actorUserId
+ * se derivan de la sesión en el server (no del cliente). */
 export function cancelBooking(
+  authToken: string,
   bookingId: string,
-  params: { actor: 'parent' | 'coach'; actorUserId: string; reason?: string },
+  params: { reason?: string },
 ): Promise<Booking> {
   return request(`/bookings/${bookingId}/cancel`, {
     method: 'POST',
+    headers: { Authorization: `Bearer ${authToken}` },
     body: JSON.stringify(params),
   });
 }
 
 /** POST /bookings — BookingConfirmScreen. Crea la reserva en estado 'requested'. */
-export function requestBooking(params: {
-  playerId: string;
-  coachId: string;
-  tournamentId: string;
-  matchDatetime: string;
-  agreedRate: number;
-  note?: string;
-}): Promise<Booking> {
+export function requestBooking(
+  authToken: string,
+  params: {
+    playerId: string;
+    coachId: string;
+    tournamentId: string;
+    matchDatetime: string;
+    agreedRate: number;
+    note?: string;
+  },
+): Promise<Booking> {
   return request('/bookings', {
     method: 'POST',
+    headers: { Authorization: `Bearer ${authToken}` },
     body: JSON.stringify(params),
   });
 }
 
 /** POST /bookings/:id/pay — BookingPaymentScreen. Solo funciona si el coach ya aceptó la reserva. */
 export function payBooking(
+  authToken: string,
   bookingId: string,
   paymentMethodId: string,
 ): Promise<{ booking: Booking; requiresAction?: { clientSecret: string } }> {
   return request(`/bookings/${bookingId}/pay`, {
     method: 'POST',
+    headers: { Authorization: `Bearer ${authToken}` },
     body: JSON.stringify({ paymentMethodId }),
   });
 }
@@ -251,17 +268,20 @@ export interface BookingMessage {
 }
 
 /** GET /bookings/:id/messages — ParentChatScreen. */
-export function listBookingMessages(bookingId: string): Promise<BookingMessage[]> {
-  return request(`/bookings/${bookingId}/messages`);
+export function listBookingMessages(authToken: string, bookingId: string): Promise<BookingMessage[]> {
+  return request(`/bookings/${bookingId}/messages`, { headers: { Authorization: `Bearer ${authToken}` } });
 }
 
-/** POST /bookings/:id/messages — ParentChatScreen, CoachChatScreen. Rechazado con 409 si la reserva ya no está activa. */
+/** POST /bookings/:id/messages — ParentChatScreen, CoachChatScreen. Rechazado con 409 si la reserva ya no
+ * está activa. senderType/senderId se derivan de la sesión en el server. */
 export function sendBookingMessage(
+  authToken: string,
   bookingId: string,
-  params: { senderType: MessageSenderType; senderId?: string; body: string },
+  params: { body: string },
 ): Promise<BookingMessage> {
   return request(`/bookings/${bookingId}/messages`, {
     method: 'POST',
+    headers: { Authorization: `Bearer ${authToken}` },
     body: JSON.stringify(params),
   });
 }

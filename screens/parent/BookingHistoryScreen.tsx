@@ -27,7 +27,7 @@ const CANCELLABLE_STATUSES = ['requested', 'confirmed'];
 
 export default function BookingHistoryScreen() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const [bookings, setBookings] = useState<BookingHistoryEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [cancelTarget, setCancelTarget] = useState<BookingHistoryEntry | null>(null);
@@ -35,13 +35,13 @@ export default function BookingHistoryScreen() {
   const [chatTarget, setChatTarget] = useState<BookingHistoryEntry | null>(null);
 
   useEffect(() => {
-    if (!user) {
+    if (!user || !token) {
       setError('No hay una sesión activa.');
       return;
     }
     let cancelled = false;
     setError(null);
-    listParentBookings(user.id)
+    listParentBookings(token, user.id)
       .then((result) => {
         if (!cancelled) setBookings(result.map(toBookingHistoryEntry));
       })
@@ -52,7 +52,7 @@ export default function BookingHistoryScreen() {
     return () => {
       cancelled = true;
     };
-  }, [user]);
+  }, [user, token]);
 
   function confirmCancel(_reason: string) {
     if (!cancelTarget) return;

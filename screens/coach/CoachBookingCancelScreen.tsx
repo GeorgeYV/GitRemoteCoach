@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import InitialAvatar from '../../components/shared/InitialAvatar';
+import { useAuth } from '../../context/AuthContext';
 import { ApiError, cancelBooking } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
 import { CoachBooking } from '../../mock/coachFlow';
-import { mockCarlosMedinaProfile } from '../../mock/parentFlow';
 
 export default function CoachBookingCancelScreen({
   booking,
@@ -16,19 +16,20 @@ export default function CoachBookingCancelScreen({
   onBack: () => void;
   onConfirm: (reason: string) => void;
 }) {
+  const { token } = useAuth();
   const [reason, setReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleConfirm() {
+    if (!token) {
+      setError('No hay una sesión activa.');
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
-      await cancelBooking(booking.id, {
-        actor: 'coach',
-        actorUserId: mockCarlosMedinaProfile.trainer.id,
-        reason: reason.trim() || undefined,
-      });
+      await cancelBooking(token, booking.id, { reason: reason.trim() || undefined });
       onConfirm(reason.trim());
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'No se pudo cancelar la sesión. Intenta de nuevo.');

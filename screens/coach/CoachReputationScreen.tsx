@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import ReviewCard from '../../components/coach/ReviewCard';
 import StatTile from '../../components/shared/StatTile';
 import TrainerAvatarPlaceholder from '../../components/shared/TrainerAvatarPlaceholder';
+import { useAuth } from '../../context/AuthContext';
 import { ApiError, CoachProfile, getCoachProfile, listCoachBookings, listCoachReviews, ReviewWithParent } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
 import { CoachReview, mockOfficialClubTaggings } from '../../mock/coachFlow';
@@ -36,6 +37,7 @@ export default function CoachReputationScreen({
   onBack?: () => void;
 }) {
   const taggings = mockOfficialClubTaggings;
+  const { token } = useAuth();
 
   const [profile, setProfile] = useState<CoachProfile | null>(null);
   const [reviews, setReviews] = useState<CoachReview[] | null>(null);
@@ -43,9 +45,13 @@ export default function CoachReputationScreen({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!token) {
+      setError('No hay una sesión activa.');
+      return;
+    }
     let cancelled = false;
     setError(null);
-    Promise.all([getCoachProfile(coachId), listCoachReviews(coachId), listCoachBookings(coachId)])
+    Promise.all([getCoachProfile(coachId), listCoachReviews(coachId), listCoachBookings(token, coachId)])
       .then(([profileResult, reviewsResult, bookings]) => {
         if (cancelled) return;
         setProfile(profileResult.profile);
@@ -72,7 +78,7 @@ export default function CoachReputationScreen({
     return () => {
       cancelled = true;
     };
-  }, [coachId]);
+  }, [coachId, token]);
 
   if (error) {
     return (

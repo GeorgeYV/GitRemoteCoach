@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { SafeAreaView } from 'react-native-safe-area-context';
 import PaymentMethodRow from '../../components/parent/PaymentMethodRow';
 import TrainerAvatarPlaceholder from '../../components/shared/TrainerAvatarPlaceholder';
+import { useAuth } from '../../context/AuthContext';
 import { ApiError, payBooking } from '../../lib/api';
 import { colors, radius } from '../../lib/theme';
 import {
@@ -29,15 +30,20 @@ export default function BookingPaymentScreen({
   onBack: () => void;
   onConfirm: () => void;
 }) {
+  const { token } = useAuth();
   const [methodId, setMethodId] = useState(mockPaymentMethods[0].id);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleConfirm() {
+    if (!token) {
+      setError('No hay una sesión activa.');
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
-      const result = await payBooking(bookingId, methodId);
+      const result = await payBooking(token, bookingId, methodId);
       if (result.requiresAction) {
         setError('El pago requiere verificación adicional (3DS), no soportada en este demo.');
         return;

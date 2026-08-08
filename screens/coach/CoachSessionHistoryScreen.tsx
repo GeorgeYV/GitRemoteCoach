@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { SafeAreaView } from 'react-native-safe-area-context';
 import CoachBookingStatusPill from '../../components/coach/CoachBookingStatusPill';
 import InitialAvatar from '../../components/shared/InitialAvatar';
+import { useAuth } from '../../context/AuthContext';
 import { ApiError, BookingWithParticipants, listCoachBookings } from '../../lib/api';
 import { toCoachBooking } from '../../lib/coachBookingDisplay';
 import { colors, radius } from '../../lib/theme';
@@ -20,14 +21,19 @@ const DECIDED_STATUSES: BookingWithParticipants['status'][] = [
 ];
 
 export default function CoachSessionHistoryScreen({ coachId, onBack }: { coachId: string; onBack?: () => void }) {
+  const { token } = useAuth();
   const [bookings, setBookings] = useState<CoachBooking[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [cancelTarget, setCancelTarget] = useState<CoachBooking | null>(null);
 
   useEffect(() => {
+    if (!token) {
+      setError('No hay una sesión activa.');
+      return;
+    }
     let cancelled = false;
     setError(null);
-    listCoachBookings(coachId)
+    listCoachBookings(token, coachId)
       .then((result) => {
         if (!cancelled) setBookings(result.filter((b) => DECIDED_STATUSES.includes(b.status)).map(toCoachBooking));
       })
@@ -38,7 +44,7 @@ export default function CoachSessionHistoryScreen({ coachId, onBack }: { coachId
     return () => {
       cancelled = true;
     };
-  }, [coachId]);
+  }, [coachId, token]);
 
   function confirmCancel(_reason: string) {
     if (!cancelTarget) return;

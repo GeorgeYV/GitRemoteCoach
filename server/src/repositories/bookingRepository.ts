@@ -117,6 +117,23 @@ export async function getBookingByIdForUpdate(id: string, client: PoolClient): P
   return mapRow(rows[0]);
 }
 
+/** Autorización a nivel de ruta: quién puede actuar sobre esta reserva (el entrenador o el
+ * padre/guardián del jugador) — un único JOIN reutilizado por todas las rutas de bookings. */
+export async function getBookingParticipants(
+  id: string,
+  db: Queryable = pool,
+): Promise<{ coachId: string; guardianUserId: string }> {
+  const { rows } = await db.query(
+    `SELECT b.coach_id, p.guardian_user_id
+     FROM bookings b
+     JOIN players p ON p.id = b.player_id
+     WHERE b.id = $1`,
+    [id],
+  );
+  if (rows.length === 0) throw new NotFoundError('Booking', id);
+  return { coachId: rows[0].coach_id, guardianUserId: rows[0].guardian_user_id };
+}
+
 /** Fija la logística de encuentro (cancha, punto de encuentro) mostrada en CoachPreMatchReminderScreen. */
 export async function setMeetingDetails(
   id: string,

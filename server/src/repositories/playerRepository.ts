@@ -1,5 +1,6 @@
 import type { Pool, PoolClient } from 'pg';
 import { pool } from '../lib/db.js';
+import { NotFoundError } from '../lib/errors.js';
 import type { AgeCategory, Player } from '../types.js';
 
 type Queryable = Pool | PoolClient;
@@ -27,6 +28,13 @@ export async function listForGuardian(guardianUserId: string, db: Queryable = po
     [guardianUserId],
   );
   return rows.map(mapPlayerRow);
+}
+
+/** POST /bookings: verifica que el playerId del body pertenezca al padre de la sesión. */
+export async function getById(playerId: string, db: Queryable = pool): Promise<Player> {
+  const { rows } = await db.query(`SELECT * FROM players WHERE id = $1`, [playerId]);
+  if (rows.length === 0) throw new NotFoundError('Player', playerId);
+  return mapPlayerRow(rows[0]);
 }
 
 /** PlayerRegistrationScreen: crea al hijo/a del padre logueado. */

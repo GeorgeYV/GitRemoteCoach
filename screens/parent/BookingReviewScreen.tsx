@@ -25,7 +25,7 @@ export default function BookingReviewScreen({
   onBack: () => void;
   onSubmit: (stars: number, quote: string) => void;
 }) {
-  const { user } = useAuth();
+  const { token } = useAuth();
   const [stars, setStars] = useState(0);
   const [quote, setQuote] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -35,15 +35,14 @@ export default function BookingReviewScreen({
 
   async function handleSubmit() {
     if (stars === 0) return;
-    if (!user) {
+    if (!token) {
       setError('No hay una sesión activa.');
       return;
     }
     setSubmitting(true);
     setError(null);
     try {
-      await submitBookingReview(booking.id, {
-        parentId: user.id,
+      await submitBookingReview(token, booking.id, {
         rating: stars,
         comment: quote.trim() || undefined,
       });

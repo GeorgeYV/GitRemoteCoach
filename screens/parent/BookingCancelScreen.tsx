@@ -16,24 +16,20 @@ export default function BookingCancelScreen({
   onBack: () => void;
   onConfirm: (reason: string) => void;
 }) {
-  const { user } = useAuth();
+  const { token } = useAuth();
   const [reason, setReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleConfirm() {
-    if (!user) {
+    if (!token) {
       setError('No hay una sesión activa.');
       return;
     }
     setSubmitting(true);
     setError(null);
     try {
-      await cancelBooking(booking.id, {
-        actor: 'parent',
-        actorUserId: user.id,
-        reason: reason.trim() || undefined,
-      });
+      await cancelBooking(token, booking.id, { reason: reason.trim() || undefined });
       onConfirm(reason.trim());
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'No se pudo cancelar la reserva. Intenta de nuevo.');

@@ -28,7 +28,7 @@ function toChatMessage(message: BookingMessage): ChatMessage {
 }
 
 export default function ParentChatScreen({ bookingId, onBack }: { bookingId: string; onBack?: () => void }) {
-  const { user } = useAuth();
+  const { token } = useAuth();
   const thread = mockChatThread;
   const coachName = mockCarlosMedinaProfile.trainer.name;
   const [messages, setMessages] = useState<ChatMessage[] | null>(null);
@@ -39,9 +39,13 @@ export default function ParentChatScreen({ bookingId, onBack }: { bookingId: str
   const scrollRef = useRef<ScrollView>(null);
 
   useEffect(() => {
+    if (!token) {
+      setLoadError('No hay una sesión activa.');
+      return;
+    }
     let cancelled = false;
     setLoadError(null);
-    listBookingMessages(bookingId)
+    listBookingMessages(token, bookingId)
       .then((result) => {
         if (!cancelled) setMessages(result.map(toChatMessage));
       })
@@ -52,23 +56,19 @@ export default function ParentChatScreen({ bookingId, onBack }: { bookingId: str
     return () => {
       cancelled = true;
     };
-  }, [bookingId]);
+  }, [bookingId, token]);
 
   async function sendMessage(text: string) {
     const trimmed = text.trim();
     if (!trimmed || sending) return;
-    if (!user) {
+    if (!token) {
       setSendError('No hay una sesión activa.');
       return;
     }
     setSending(true);
     setSendError(null);
     try {
-      const message = await sendBookingMessage(bookingId, {
-        senderType: 'parent',
-        senderId: user.id,
-        body: trimmed,
-      });
+      const message = await sendBookingMessage(token, bookingId, { body: trimmed });
       setMessages((prev) => [...(prev ?? []), toChatMessage(message)]);
       setDraft('');
     } catch (err) {

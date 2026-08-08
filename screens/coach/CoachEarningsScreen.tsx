@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import EarningsRow from '../../components/coach/EarningsRow';
+import { useAuth } from '../../context/AuthContext';
 import { ApiError, BookingWithParticipants, listCoachBookings } from '../../lib/api';
 import { colors, radius } from '../../lib/theme';
 import { EarningsEntry, PLATFORM_COMMISSION_RATE } from '../../mock/coachFlow';
@@ -26,13 +27,18 @@ function toEarningsEntry(booking: BookingWithParticipants): EarningsEntry {
 }
 
 export default function CoachEarningsScreen({ coachId, onBack }: { coachId: string; onBack?: () => void }) {
+  const { token } = useAuth();
   const [entries, setEntries] = useState<EarningsEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!token) {
+      setError('No hay una sesión activa.');
+      return;
+    }
     let cancelled = false;
     setError(null);
-    listCoachBookings(coachId)
+    listCoachBookings(token, coachId)
       .then((result) => {
         if (!cancelled) {
           setEntries(
@@ -47,7 +53,7 @@ export default function CoachEarningsScreen({ coachId, onBack }: { coachId: stri
     return () => {
       cancelled = true;
     };
-  }, [coachId]);
+  }, [coachId, token]);
 
   if (error) {
     return (

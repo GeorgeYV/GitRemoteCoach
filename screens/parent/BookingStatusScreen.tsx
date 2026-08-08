@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import TrainerAvatarPlaceholder from '../../components/shared/TrainerAvatarPlaceholder';
+import { useAuth } from '../../context/AuthContext';
 import { ApiError, Booking, getBooking } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
 import { BOOKING_PERIOD_LABELS, BookingSlotSelection, mockFeaturedTournament } from '../../mock/parentFlow';
@@ -27,16 +28,21 @@ export default function BookingStatusScreen({
   onAccepted: () => void;
   onDone: () => void;
 }) {
+  const { token } = useAuth();
   const [booking, setBooking] = useState<Booking | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!token) {
+      setError('No hay una sesión activa.');
+      return;
+    }
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout>;
 
     async function poll() {
       try {
-        const result = await getBooking(bookingId);
+        const result = await getBooking(token!, bookingId);
         if (cancelled) return;
         setBooking(result);
         setError(null);

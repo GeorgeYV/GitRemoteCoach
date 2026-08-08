@@ -13,10 +13,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ChatBubble from '../../components/coach/ChatBubble';
 import InitialAvatar from '../../components/shared/InitialAvatar';
+import { useAuth } from '../../context/AuthContext';
 import { ApiError, BookingMessage, listBookingMessages, sendBookingMessage } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
 import { ChatMessage, mockChatThread, QUICK_REPLIES } from '../../mock/coachFlow';
-import { mockCarlosMedinaProfile } from '../../mock/parentFlow';
 
 function timeLabel(iso: string): string {
   return new Date(iso).toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit' });
@@ -27,6 +27,7 @@ function toChatMessage(message: BookingMessage): ChatMessage {
 }
 
 export default function CoachChatScreen({ bookingId, onBack }: { bookingId: string; onBack?: () => void }) {
+  const { token } = useAuth();
   const thread = mockChatThread;
   const [messages, setMessages] = useState<ChatMessage[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -36,9 +37,13 @@ export default function CoachChatScreen({ bookingId, onBack }: { bookingId: stri
   const scrollRef = useRef<ScrollView>(null);
 
   useEffect(() => {
+    if (!token) {
+      setLoadError('No hay una sesión activa.');
+      return;
+    }
     let cancelled = false;
     setLoadError(null);
-    listBookingMessages(bookingId)
+    listBookingMessages(token, bookingId)
       .then((result) => {
         if (!cancelled) setMessages(result.map(toChatMessage));
       })
@@ -49,19 +54,19 @@ export default function CoachChatScreen({ bookingId, onBack }: { bookingId: stri
     return () => {
       cancelled = true;
     };
-  }, [bookingId]);
+  }, [bookingId, token]);
 
   async function sendMessage(text: string) {
     const trimmed = text.trim();
     if (!trimmed || sending) return;
+    if (!token) {
+      setSendError('No hay una sesión activa.');
+      return;
+    }
     setSending(true);
     setSendError(null);
     try {
-      const message = await sendBookingMessage(bookingId, {
-        senderType: 'coach',
-        senderId: mockCarlosMedinaProfile.trainer.id,
-        body: trimmed,
-      });
+      const message = await sendBookingMessage(token, bookingId, { body: trimmed });
       setMessages((prev) => [...(prev ?? []), toChatMessage(message)]);
       setDraft('');
     } catch (err) {

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import RequestCard from '../../components/coach/RequestCard';
+import { useAuth } from '../../context/AuthContext';
 import { acceptBookingRequest, ApiError, BookingWithParticipants, listCoachBookings, rejectBookingRequest } from '../../lib/api';
 import { colors } from '../../lib/theme';
 import { BookingRequest } from '../../mock/coachFlow';
@@ -23,14 +24,19 @@ function toBookingRequest(booking: BookingWithParticipants): BookingRequest {
 }
 
 export default function CoachRequestInboxScreen({ coachId, onBack }: { coachId: string; onBack?: () => void }) {
+  const { token } = useAuth();
   const [requests, setRequests] = useState<BookingRequest[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!token) {
+      setLoadError('No hay una sesión activa.');
+      return;
+    }
     let cancelled = false;
     setLoadError(null);
-    listCoachBookings(coachId)
+    listCoachBookings(token, coachId)
       .then((result) => {
         if (!cancelled) setRequests(result.filter((b) => b.status === 'requested').map(toBookingRequest));
       })
@@ -41,12 +47,16 @@ export default function CoachRequestInboxScreen({ coachId, onBack }: { coachId: 
     return () => {
       cancelled = true;
     };
-  }, [coachId]);
+  }, [coachId, token]);
 
   async function respond(id: string, action: 'accept' | 'reject') {
+    if (!token) {
+      setActionError('No hay una sesión activa.');
+      return;
+    }
     setActionError(null);
     try {
-      await (action === 'accept' ? acceptBookingRequest(id) : rejectBookingRequest(id));
+      await (action === 'accept' ? acceptBookingRequest(token, id) : rejectBookingRequest(token, id));
       setRequests((prev) => prev?.filter((r) => r.id !== id) ?? null);
     } catch (err) {
       setActionError(err instanceof ApiError ? err.message : 'No se pudo procesar tu respuesta. Intenta de nuevo.');

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import TrainerAvatarPlaceholder from '../../components/shared/TrainerAvatarPlaceholder';
+import { useAuth } from '../../context/AuthContext';
 import { ApiError, requestBooking } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
 import {
@@ -31,6 +32,7 @@ export default function BookingConfirmScreen({
   onBack: () => void;
   onContinue: (selection: BookingSlotSelection, note: string, bookingId: string) => void;
 }) {
+  const { token } = useAuth();
   const [selection, setSelection] = useState<BookingSlotSelection | null>(null);
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -42,10 +44,14 @@ export default function BookingConfirmScreen({
 
   async function handleContinue() {
     if (!selection) return;
+    if (!token) {
+      setError('No hay una sesión activa.');
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
-      const booking = await requestBooking({
+      const booking = await requestBooking(token, {
         playerId,
         coachId,
         tournamentId: REAL_TOURNAMENT_ID,

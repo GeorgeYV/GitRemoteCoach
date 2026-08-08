@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import * as coachProfileService from '../services/coachProfileService.js';
 import * as bookingService from '../services/bookingService.js';
-import { ValidationError } from '../lib/errors.js';
+import { ForbiddenError, ValidationError } from '../lib/errors.js';
 
 const AGE_CATEGORIES = ['U10', 'U12', 'U14', 'U16', 'U18'] as const;
 const PLAYING_LEVELS = ['recreativo', 'competitivo', 'alto_rendimiento'] as const;
@@ -63,8 +63,10 @@ export async function coachRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // CoachHomeScreen, CoachRequestInboxScreen, CoachSessionHistoryScreen, CoachEarningsScreen.
-  app.get('/coaches/:id/bookings', async (req) => {
+  app.get('/coaches/:id/bookings', { preHandler: app.authenticate }, async (req) => {
     const { id } = req.params as { id: string };
+    const { sub } = req.user as { sub: string };
+    if (sub !== id) throw new ForbiddenError('No puedes ver las reservas de otro entrenador');
     return bookingService.listBookingsForCoach(id);
   });
 }

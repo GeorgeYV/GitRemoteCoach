@@ -205,6 +205,7 @@ export function ParentBookingFlow() {
 
 /** Local three-step flow: home dashboard → booking detail → cancel, all sharing one local booking list. */
 export function CoachHomeFlow({ coachId, coachName }: { coachId: string; coachName: string }) {
+  const { token } = useAuth();
   const [bookings, setBookings] = useState<BookingWithParticipants[] | null>(null);
   const [rating, setRating] = useState('—');
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -213,9 +214,13 @@ export function CoachHomeFlow({ coachId, coachName }: { coachId: string; coachNa
   >('home');
 
   useEffect(() => {
+    if (!token) {
+      setLoadError('No hay una sesión activa.');
+      return;
+    }
     let cancelled = false;
     setLoadError(null);
-    Promise.all([listCoachBookings(coachId), getCoachProfile(coachId)])
+    Promise.all([listCoachBookings(token, coachId), getCoachProfile(coachId)])
       .then(([bookingList, profile]) => {
         if (cancelled) return;
         setBookings(bookingList);
@@ -228,7 +233,7 @@ export function CoachHomeFlow({ coachId, coachName }: { coachId: string; coachNa
     return () => {
       cancelled = true;
     };
-  }, [coachId]);
+  }, [coachId, token]);
 
   const nextBookingRaw =
     bookings
