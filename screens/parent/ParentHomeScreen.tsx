@@ -3,20 +3,12 @@ import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import ParentTabBar from '../../components/parent/ParentTabBar';
 import InitialAvatar from '../../components/shared/InitialAvatar';
 import { useAuth } from '../../context/AuthContext';
 import { listPlayers } from '../../lib/api';
 import { colors, radius } from '../../lib/theme';
 import { mockActiveTournaments, mockFeaturedTournament, Tournament } from '../../mock/parentFlow';
-
-type TabKey = 'inicio' | 'reservas' | 'reportes' | 'perfil';
-
-const TABS: { key: TabKey; label: string }[] = [
-  { key: 'inicio', label: 'Inicio' },
-  { key: 'reservas', label: 'Reservas' },
-  { key: 'reportes', label: 'Reportes' },
-  { key: 'perfil', label: 'Perfil' },
-];
 
 export default function ParentHomeScreen() {
   const router = useRouter();
@@ -32,11 +24,6 @@ export default function ParentHomeScreen() {
 
   function goToTrainers() {
     router.push('/trainers');
-  }
-
-  function handleTabPress(tab: TabKey) {
-    if (tab === 'reservas') router.push('/bookings');
-    // 'reportes'/'perfil' no tienen pantalla todavía; 'inicio' ya es esta pantalla.
   }
 
   const firstName = user?.fullName.split(' ')[0] ?? '';
@@ -84,14 +71,7 @@ export default function ParentHomeScreen() {
         </View>
       </ScrollView>
 
-      <View style={styles.tabBar}>
-        {TABS.map((tab) => (
-          <Pressable key={tab.key} style={styles.tabItem} onPress={() => handleTabPress(tab.key)}>
-            <View style={[styles.tabDot, tab.key === 'inicio' && styles.tabDotActive]} />
-            <Text style={[styles.tabLabel, tab.key === 'inicio' && styles.tabLabelActive]}>{tab.label}</Text>
-          </Pressable>
-        ))}
-      </View>
+      <ParentTabBar active="inicio" />
     </SafeAreaView>
   );
 }
@@ -245,35 +225,5 @@ const styles = StyleSheet.create({
     color: colors.textDim,
     fontSize: 20,
     fontWeight: '700',
-  },
-  tabBar: {
-    flexDirection: 'row',
-    borderTopWidth: 1,
-    borderTopColor: colors.borderSoft,
-    backgroundColor: colors.courtBlueDeep,
-    paddingTop: 10,
-    paddingBottom: 6,
-  },
-  tabItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  tabDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: colors.textDim,
-    marginBottom: 5,
-  },
-  tabDotActive: {
-    backgroundColor: colors.ballLime,
-  },
-  tabLabel: {
-    color: colors.textDim,
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  tabLabelActive: {
-    color: colors.ballLime,
   },
 });

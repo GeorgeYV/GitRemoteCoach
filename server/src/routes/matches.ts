@@ -58,6 +58,18 @@ async function assertOwnsMatch(matchId: string, sub: string): Promise<void> {
 }
 
 export async function matchRoutes(app: FastifyInstance): Promise<void> {
+  // ParentReportsScreen: el padre o el entrenador de la reserva pueden leer el resultado y los
+  // puntos — null si la reserva nunca tuvo una captura en vivo (no es un error).
+  app.get('/bookings/:id/match', { preHandler: app.authenticate }, async (req) => {
+    const { id } = req.params as { id: string };
+    const { sub } = req.user as { sub: string };
+    const { coachId, guardianUserId } = await bookingRepository.getBookingParticipants(id);
+    if (sub !== coachId && sub !== guardianUserId) {
+      throw new ForbiddenError('No tienes acceso a esta reserva');
+    }
+    return matchService.getMatchReport(id);
+  });
+
   // LiveCaptureView: "Comenzar captura en vivo" (CoachMatchSetupScreen). Idempotente por booking_id.
   app.post('/matches', { preHandler: app.authenticate }, async (req, reply) => {
     const parsed = getOrCreateMatchSchema.safeParse(req.body);

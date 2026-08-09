@@ -43,6 +43,8 @@ function RootNavigator() {
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="trainers" options={{ headerShown: false }} />
         <Stack.Screen name="bookings" options={{ headerShown: false }} />
+        <Stack.Screen name="reports" options={{ headerShown: false }} />
+        <Stack.Screen name="profile" options={{ headerShown: false }} />
       </Stack.Protected>
 
       <Stack.Protected guard={!user}>

@@ -696,6 +696,19 @@ export interface MatchPointInput {
   firstServeIn: boolean;
 }
 
+export interface MatchReport {
+  match: Match;
+  points: MatchPointEvent[];
+}
+
+/** GET /bookings/:id/match — ParentReportsScreen. El padre o el entrenador de la reserva pueden
+ * leerlo; null si la reserva nunca tuvo una captura en vivo (no es un error). */
+export function getBookingMatch(authToken: string, bookingId: string): Promise<MatchReport | null> {
+  return request(`/bookings/${bookingId}/match`, {
+    headers: { Authorization: `Bearer ${authToken}` },
+  });
+}
+
 /** POST /matches — CoachMatchSetupScreen "Comenzar captura en vivo". Idempotente por bookingId.
  * Solo el entrenador dueño de la reserva puede iniciar la captura (verificado en el server). */
 export function createOrGetMatch(

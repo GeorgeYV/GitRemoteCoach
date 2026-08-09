@@ -54,6 +54,17 @@ export async function createBulk(matchId: string, points: PointInput[], db: Quer
   return results;
 }
 
+/** ParentReportsScreen: todos los puntos de un partido, en orden, para recomputar el resultado
+ * y las estadísticas del lado del cliente (mismo lib/scoringEngine + lib/statsEngine que usa
+ * el entrenador en vivo). */
+export async function listByMatch(matchId: string, db: Queryable = pool): Promise<MatchPointEvent[]> {
+  const { rows } = await db.query(
+    `SELECT * FROM match_point_events WHERE match_id = $1 ORDER BY sequence_number ASC`,
+    [matchId],
+  );
+  return rows.map(mapRow);
+}
+
 /** Undo de un punto (LiveCaptureView). No es un error si ese punto nunca llegó a sincronizarse. */
 export async function deleteBySequence(matchId: string, sequenceNumber: number, db: Queryable = pool): Promise<void> {
   await db.query(`DELETE FROM match_point_events WHERE match_id = $1 AND sequence_number = $2`, [

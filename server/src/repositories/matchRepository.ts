@@ -66,6 +66,13 @@ export async function getById(id: string, db: Queryable = pool): Promise<Match> 
   return mapRow(rows[0]);
 }
 
+/** ParentReportsScreen: a diferencia de getOrCreate, no crea nada — la mayoría de las reservas
+ * nunca tuvieron una captura en vivo, así que "sin partido todavía" es un resultado válido, no un error. */
+export async function findByBookingId(bookingId: string, db: Queryable = pool): Promise<Match | null> {
+  const { rows } = await db.query(`SELECT * FROM matches WHERE booking_id = $1`, [bookingId]);
+  return rows.length > 0 ? mapRow(rows[0]) : null;
+}
+
 /** Fija completed_at explícitamente (no depende del trigger, que pg-mem no ejecuta) —
  * mismo patrón que paymentService.completeBooking con bookings.completed_at. */
 export async function updateStatus(id: string, status: MatchStatus, db: Queryable = pool): Promise<Match> {

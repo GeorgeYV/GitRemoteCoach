@@ -70,3 +70,17 @@ export async function setObservations(matchId: string, coachObservations: string
 export async function setCaptureMode(matchId: string, captureMode: CaptureMode): Promise<Match> {
   return matchRepository.updateCaptureMode(matchId, captureMode);
 }
+
+export interface MatchReport {
+  match: Match;
+  points: MatchPointEvent[];
+}
+
+/** ParentReportsScreen: null cuando la reserva nunca tuvo una captura en vivo (no es un error —
+ * la mayoría de las reservas quedan así hasta que el entrenador arranca el partido). */
+export async function getMatchReport(bookingId: string): Promise<MatchReport | null> {
+  const match = await matchRepository.findByBookingId(bookingId);
+  if (!match) return null;
+  const points = await matchPointEventRepository.listByMatch(match.id);
+  return { match, points };
+}
