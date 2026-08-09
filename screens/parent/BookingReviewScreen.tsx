@@ -1,6 +1,8 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import React, { useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import IconTextInput from '../../components/shared/IconTextInput';
 import InitialAvatar from '../../components/shared/InitialAvatar';
 import StarRatingInput from '../../components/parent/StarRatingInput';
 import { useAuth } from '../../context/AuthContext';
@@ -82,10 +84,10 @@ export default function BookingReviewScreen({
         </Section>
 
         <Section label="Cuéntanos más (opcional)">
-          <TextInput
-            style={styles.input}
+          <IconTextInput
+            icon="create-outline"
+            style={styles.quoteInput}
             placeholder={`¿Cómo fue la experiencia de tu hija con ${booking.trainerName.split(' ')[0]}?`}
-            placeholderTextColor={colors.textDim}
             value={quote}
             onChangeText={setQuote}
             multiline
@@ -103,7 +105,10 @@ export default function BookingReviewScreen({
           {submitting ? (
             <ActivityIndicator color={colors.courtBlueDeep} />
           ) : (
-            <Text style={styles.submitLabel}>Enviar reseña</Text>
+            <View style={styles.submitContent}>
+              <Text style={styles.submitLabel}>Enviar reseña</Text>
+              <Ionicons name="paper-plane-outline" size={17} color={colors.courtBlueDeep} />
+            </View>
           )}
         </Pressable>
       </View>
@@ -197,15 +202,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginTop: 14,
   },
-  input: {
-    backgroundColor: colors.panel,
-    borderRadius: radius,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    color: colors.lineWhite,
-    fontSize: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
+  quoteInput: {
     minHeight: 90,
     textAlignVertical: 'top',
   },
@@ -229,6 +226,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
     marginBottom: 10,
+  },
+  submitContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   submitLabel: {
     color: colors.courtBlueDeep,

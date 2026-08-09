@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -7,15 +8,15 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ChatBubble from '../../components/coach/ChatBubble';
+import IconTextInput from '../../components/shared/IconTextInput';
 import InitialAvatar from '../../components/shared/InitialAvatar';
 import { useAuth } from '../../context/AuthContext';
 import { ApiError, BookingMessage, listBookingMessages, sendBookingMessage } from '../../lib/api';
-import { colors, radius, withOpacity } from '../../lib/theme';
+import { colors, withOpacity } from '../../lib/theme';
 import { ChatMessage, CoachBooking, QUICK_REPLIES } from '../../mock/coachFlow';
 
 function timeLabel(iso: string): string {
@@ -141,10 +142,11 @@ export default function CoachChatScreen({ booking, onBack }: { booking: CoachBoo
 
         {sendError && <Text style={styles.sendErrorText}>{sendError}</Text>}
         <View style={styles.inputBar}>
-          <TextInput
-            style={styles.input}
+          <IconTextInput
+            icon="chatbubble-outline"
+            containerStyle={styles.inputWrapper}
+            style={styles.inputField}
             placeholder="Escribe un mensaje…"
-            placeholderTextColor={colors.textDim}
             value={draft}
             onChangeText={setDraft}
             multiline
@@ -154,7 +156,11 @@ export default function CoachChatScreen({ booking, onBack }: { booking: CoachBoo
             disabled={draft.trim().length === 0 || sending}
             onPress={() => sendMessage(draft)}
           >
-            {sending ? <ActivityIndicator color={colors.courtBlueDeep} /> : <Text style={styles.sendIcon}>➤</Text>}
+            {sending ? (
+              <ActivityIndicator color={colors.courtBlueDeep} />
+            ) : (
+              <Ionicons name="send" size={18} color={colors.courtBlueDeep} />
+            )}
           </Pressable>
         </View>
       </KeyboardAvoidingView>
@@ -265,16 +271,11 @@ const styles = StyleSheet.create({
     gap: 10,
     backgroundColor: colors.courtBlueDeep,
   },
-  input: {
+  inputWrapper: {
     flex: 1,
-    backgroundColor: colors.panel,
-    borderRadius: radius,
-    borderWidth: 1,
-    borderColor: colors.border,
-    color: colors.lineWhite,
-    fontSize: 14,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    marginBottom: 0,
+  },
+  inputField: {
     maxHeight: 100,
   },
   sendButton: {
@@ -287,10 +288,5 @@ const styles = StyleSheet.create({
   },
   sendButtonDisabled: {
     backgroundColor: withOpacity(colors.ballLime, 0.3),
-  },
-  sendIcon: {
-    color: colors.courtBlueDeep,
-    fontSize: 18,
-    fontWeight: '800',
   },
 });

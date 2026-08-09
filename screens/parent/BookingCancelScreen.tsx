@@ -1,6 +1,8 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import React, { useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import IconTextInput from '../../components/shared/IconTextInput';
 import InitialAvatar from '../../components/shared/InitialAvatar';
 import { useAuth } from '../../context/AuthContext';
 import { ApiError, cancelBooking } from '../../lib/api';
@@ -77,10 +79,10 @@ export default function BookingCancelScreen({
         </Section>
 
         <Section label="Motivo (opcional)">
-          <TextInput
-            style={styles.input}
+          <IconTextInput
+            icon="chatbubble-ellipses-outline"
+            style={styles.reasonInput}
             placeholder="Cuéntanos por qué cancelas…"
-            placeholderTextColor={colors.textDim}
             value={reason}
             onChangeText={setReason}
             multiline
@@ -91,10 +93,20 @@ export default function BookingCancelScreen({
       <View style={styles.footer}>
         {error && <Text style={styles.errorText}>{error}</Text>}
         <Pressable style={styles.keepButton} onPress={onBack} disabled={submitting}>
-          <Text style={styles.keepLabel}>Mantener reserva</Text>
+          <View style={styles.buttonContent}>
+            <Ionicons name="arrow-undo-outline" size={17} color={colors.lineWhite} />
+            <Text style={styles.keepLabel}>Mantener reserva</Text>
+          </View>
         </Pressable>
         <Pressable style={[styles.cancelButton, submitting && styles.cancelButtonDisabled]} onPress={handleConfirm} disabled={submitting}>
-          {submitting ? <ActivityIndicator color={colors.lineWhite} /> : <Text style={styles.cancelLabel}>Cancelar reserva</Text>}
+          {submitting ? (
+            <ActivityIndicator color={colors.lineWhite} />
+          ) : (
+            <View style={styles.buttonContent}>
+              <Ionicons name="close-circle-outline" size={17} color={colors.lineWhite} />
+              <Text style={styles.cancelLabel}>Cancelar reserva</Text>
+            </View>
+          )}
         </Pressable>
       </View>
     </SafeAreaView>
@@ -203,15 +215,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
   },
-  input: {
-    backgroundColor: colors.panel,
-    borderRadius: radius,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    color: colors.lineWhite,
-    fontSize: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
+  reasonInput: {
     minHeight: 70,
     textAlignVertical: 'top',
   },
@@ -228,6 +232,11 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     paddingVertical: 15,
     alignItems: 'center',
+  },
+  buttonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   keepLabel: {
     color: colors.lineWhite,

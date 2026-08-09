@@ -1,6 +1,8 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import IconTextInput from '../../components/shared/IconTextInput';
 import { colors, radius, withOpacity } from '../../lib/theme';
 import { MatchConfig, PlayerId } from '../../lib/types';
 import { mockPreMatchReminder } from '../../mock/coachFlow';
@@ -49,20 +51,13 @@ export default function CoachMatchSetupScreen({
         </Section>
 
         <Section label="Rival">
-          <TextInput
-            style={styles.input}
-            placeholder="Nombre de la rival"
-            placeholderTextColor={colors.textDim}
-            value={opponentName}
-            onChangeText={setOpponentName}
-          />
+          <IconTextInput icon="person-outline" placeholder="Nombre de la rival" value={opponentName} onChangeText={setOpponentName} />
         </Section>
 
         <Section label="Ronda (opcional)">
-          <TextInput
-            style={styles.input}
+          <IconTextInput
+            icon="flag-outline"
             placeholder={`Ej. ${reminder.category}`}
-            placeholderTextColor={colors.textDim}
             value={roundLabel}
             onChangeText={setRoundLabel}
           />
@@ -131,7 +126,10 @@ export default function CoachMatchSetupScreen({
       <View style={styles.footer}>
         {!canStart && <Text style={styles.footerHint}>Escribe el nombre de la rival para continuar</Text>}
         <Pressable style={[styles.startButton, !canStart && styles.startButtonDisabled]} disabled={!canStart} onPress={handleStart}>
-          <Text style={styles.startLabel}>Comenzar captura en vivo</Text>
+          <View style={styles.startContent}>
+            <Ionicons name="play-outline" size={18} color={colors.courtBlueDeep} />
+            <Text style={styles.startLabel}>Comenzar captura en vivo</Text>
+          </View>
         </Pressable>
       </View>
     </SafeAreaView>
@@ -203,16 +201,6 @@ const styles = StyleSheet.create({
     color: colors.ballLime,
     fontSize: 12,
     fontWeight: '600',
-  },
-  input: {
-    backgroundColor: colors.panel,
-    borderRadius: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    color: colors.lineWhite,
-    fontSize: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
   },
   chipRow: {
     flexDirection: 'row',
@@ -286,6 +274,11 @@ const styles = StyleSheet.create({
   },
   startButtonDisabled: {
     backgroundColor: withOpacity(colors.ballLime, 0.3),
+  },
+  startContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   startLabel: {
     color: colors.courtBlueDeep,

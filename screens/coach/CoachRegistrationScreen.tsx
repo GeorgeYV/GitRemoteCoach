@@ -1,7 +1,9 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import React, { useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DocumentRow from '../../components/coach/DocumentRow';
+import IconTextInput from '../../components/shared/IconTextInput';
 import TrainerAvatarPlaceholder from '../../components/shared/TrainerAvatarPlaceholder';
 import { useAuth } from '../../context/AuthContext';
 import { AgeCategory, ApiError, PlayingLevel, registerCoachProfile } from '../../lib/api';
@@ -82,41 +84,33 @@ export default function CoachRegistrationScreen({ onSubmit }: { onSubmit?: () =>
         </View>
 
         <Section label="Datos personales">
-          <TextInput
-            style={styles.input}
-            placeholder="Nombre completo"
-            placeholderTextColor={colors.textDim}
-            value={name}
-            onChangeText={setName}
-          />
+          <IconTextInput icon="person-outline" placeholder="Nombre completo" value={name} onChangeText={setName} />
           <View style={styles.row2}>
-            <TextInput
-              style={[styles.input, styles.inputHalf]}
+            <IconTextInput
+              icon="location-outline"
+              containerStyle={styles.inputHalf}
               placeholder="Ciudad"
-              placeholderTextColor={colors.textDim}
               value={city}
               onChangeText={setCity}
             />
-            <TextInput
-              style={[styles.input, styles.inputHalf]}
+            <IconTextInput
+              icon="map-outline"
+              containerStyle={styles.inputHalf}
               placeholder="Región / Estado"
-              placeholderTextColor={colors.textDim}
               value={region}
               onChangeText={setRegion}
             />
           </View>
-          <TextInput
-            style={styles.input}
+          <IconTextInput
+            icon="time-outline"
             placeholder="Años de experiencia entrenando"
-            placeholderTextColor={colors.textDim}
             value={experience}
             onChangeText={setExperience}
             keyboardType="number-pad"
           />
-          <TextInput
-            style={styles.input}
+          <IconTextInput
+            icon="cash-outline"
             placeholder="Tarifa por hora ($)"
-            placeholderTextColor={colors.textDim}
             value={hourlyRate}
             onChangeText={setHourlyRate}
             keyboardType="number-pad"
@@ -156,7 +150,10 @@ export default function CoachRegistrationScreen({ onSubmit }: { onSubmit?: () =>
           {submitting ? (
             <ActivityIndicator color={colors.courtBlueDeep} />
           ) : (
-            <Text style={styles.submitLabel}>Enviar para verificación</Text>
+            <View style={styles.submitContent}>
+              <Ionicons name="shield-checkmark-outline" size={18} color={colors.courtBlueDeep} />
+              <Text style={styles.submitLabel}>Enviar para verificación</Text>
+            </View>
           )}
         </Pressable>
       </View>
@@ -265,17 +262,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
     marginBottom: 12,
   },
-  input: {
-    backgroundColor: colors.panel,
-    borderRadius: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    color: colors.lineWhite,
-    fontSize: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginBottom: 10,
-  },
   row2: {
     flexDirection: 'row',
     gap: 10,
@@ -340,6 +326,11 @@ const styles = StyleSheet.create({
   },
   submitButtonDisabled: {
     backgroundColor: withOpacity(colors.ballLime, 0.3),
+  },
+  submitContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   submitLabel: {
     color: colors.courtBlueDeep,

@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import React, { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -206,7 +207,10 @@ export default function CoachAvailabilityScreen({
           {submitting ? (
             <ActivityIndicator color={colors.courtBlueDeep} />
           ) : (
-            <Text style={styles.saveLabel}>Guardar disponibilidad</Text>
+            <View style={styles.saveContent}>
+              <Ionicons name="checkmark-circle-outline" size={18} color={colors.courtBlueDeep} />
+              <Text style={styles.saveLabel}>Guardar disponibilidad</Text>
+            </View>
           )}
         </Pressable>
       </View>
@@ -391,6 +395,11 @@ const styles = StyleSheet.create({
   },
   saveButtonDisabled: {
     backgroundColor: withOpacity(colors.ballLime, 0.3),
+  },
+  saveContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   saveLabel: {
     color: colors.courtBlueDeep,

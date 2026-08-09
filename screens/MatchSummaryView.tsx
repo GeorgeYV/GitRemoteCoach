@@ -1,6 +1,8 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import React from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import IconTextInput from '../components/shared/IconTextInput';
 import { useMatch } from '../context/MatchContext';
 import { colors, radius } from '../lib/theme';
 
@@ -42,14 +44,15 @@ export default function MatchSummaryView() {
               Alert.alert('Dictado por voz', 'Próximamente: dictado por voz para agregar observaciones más rápido.')
             }
           >
-            <Text style={styles.micIcon}>●</Text>
+            <Ionicons name="mic-outline" size={13} color={colors.courtBlueDeep} />
           </Pressable>
         </View>
-        <TextInput
-          style={styles.obsBox}
+        <IconTextInput
+          icon="create-outline"
+          containerStyle={styles.obsWrapper}
+          style={styles.obsInput}
           multiline
           placeholder="Ej: mejoró el segundo saque en el 2do set, sigue rompiendo el revés bajo presión..."
-          placeholderTextColor={colors.textDim}
           value={reducerState.observations}
           onChangeText={setObservations}
           textAlignVertical="top"
@@ -62,7 +65,10 @@ export default function MatchSummaryView() {
         </Pressable>
 
         <Pressable style={styles.finishButton} onPress={resetMatch}>
-          <Text style={styles.finishLabel}>Nuevo partido</Text>
+          <View style={styles.finishContent}>
+            <Ionicons name="refresh-outline" size={18} color={colors.courtBlueDeep} />
+            <Text style={styles.finishLabel}>Nuevo partido</Text>
+          </View>
         </Pressable>
       </ScrollView>
     </SafeAreaView>
@@ -143,19 +149,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  micIcon: {
-    color: colors.courtBlueDeep,
-    fontSize: 11,
-  },
-  obsBox: {
-    backgroundColor: colors.panel,
-    borderRadius: 14,
-    padding: 14,
-    fontSize: 13,
-    color: colors.textSoft,
-    lineHeight: 19,
-    minHeight: 110,
+  obsWrapper: {
     marginBottom: 20,
+  },
+  obsInput: {
+    minHeight: 110,
   },
   backButton: {
     paddingVertical: 12,
@@ -172,6 +170,11 @@ const styles = StyleSheet.create({
     borderRadius: radius,
     paddingVertical: 16,
     alignItems: 'center',
+  },
+  finishContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   finishLabel: {
     color: colors.courtBlueDeep,

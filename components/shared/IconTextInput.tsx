@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import React from 'react';
-import { StyleSheet, TextInput, TextInputProps, View } from 'react-native';
+import { StyleProp, StyleSheet, TextInput, TextInputProps, View, ViewStyle } from 'react-native';
 import { colors } from '../../lib/theme';
 
 /** Text input with a leading icon, same visual treatment (pill, panel background)
@@ -8,10 +8,11 @@ import { colors } from '../../lib/theme';
 export default function IconTextInput({
   icon,
   style,
+  containerStyle,
   ...props
-}: TextInputProps & { icon: React.ComponentProps<typeof Ionicons>['name'] }) {
+}: TextInputProps & { icon: React.ComponentProps<typeof Ionicons>['name']; containerStyle?: StyleProp<ViewStyle> }) {
   return (
-    <View style={styles.wrapper}>
+    <View style={[styles.wrapper, containerStyle]}>
       <Ionicons name={icon} size={18} color={colors.textDim} style={styles.icon} />
       <TextInput style={[styles.input, style]} placeholderTextColor={colors.textDim} {...props} />
     </View>
