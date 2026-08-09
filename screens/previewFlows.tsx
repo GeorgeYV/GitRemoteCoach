@@ -52,6 +52,7 @@ import ClubSettlementsScreen from './club/ClubSettlementsScreen';
 import ClubTournamentListScreen from './club/ClubTournamentListScreen';
 import ClubTournamentDetailScreen from './club/ClubTournamentDetailScreen';
 import ClubInviteCoachScreen from './club/ClubInviteCoachScreen';
+import ClubCreateTournamentScreen from './club/ClubCreateTournamentScreen';
 
 /** UUID real de Carlos Medina — coincide con coachAUserId en server/test/seed.ts. Toda la previsualización
  * del lado coach opera como este entrenador hasta que exista una sesión/login real. */
@@ -466,13 +467,37 @@ export function CoachCapturePreview() {
   );
 }
 
-/** Local three-step flow: lista de torneos del club → detalle (roster + liquidar) → invitar entrenador. */
+/** Local flow: lista de torneos del club (con opción de crear uno nuevo) → detalle (roster +
+ * liquidar) → invitar entrenador. */
 export function ClubTournamentFlow({ clubId, clubName }: { clubId: string; clubName: string }) {
   const [tournament, setTournament] = useState<TournamentSummary | null>(null);
   const [inviting, setInviting] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  if (creating) {
+    return (
+      <ClubCreateTournamentScreen
+        clubId={clubId}
+        onBack={() => setCreating(false)}
+        onCreated={() => {
+          setCreating(false);
+          setRefreshKey((k) => k + 1);
+        }}
+      />
+    );
+  }
 
   if (!tournament) {
-    return <ClubTournamentListScreen clubId={clubId} clubName={clubName} onSelect={setTournament} />;
+    return (
+      <ClubTournamentListScreen
+        clubId={clubId}
+        clubName={clubName}
+        refreshKey={refreshKey}
+        onSelect={setTournament}
+        onCreate={() => setCreating(true)}
+      />
+    );
   }
 
   if (inviting) {

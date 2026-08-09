@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -14,11 +15,16 @@ function dateRangeLabel(startIso: string, endIso: string): string {
 export default function ClubTournamentListScreen({
   clubId,
   clubName,
+  refreshKey,
   onSelect,
+  onCreate,
 }: {
   clubId: string;
   clubName: string;
+  /** Cambiarlo (p. ej. incrementarlo) fuerza un refetch — usado tras crear un torneo nuevo. */
+  refreshKey?: number;
   onSelect: (tournament: TournamentSummary) => void;
+  onCreate: () => void;
 }) {
   const [tournaments, setTournaments] = useState<TournamentSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -37,13 +43,17 @@ export default function ClubTournamentListScreen({
     return () => {
       cancelled = true;
     };
-  }, [clubId]);
+  }, [clubId, refreshKey]);
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Torneos</Text>
         <Text style={styles.headerSubtitle}>{clubName}</Text>
+        <Pressable style={styles.createButton} onPress={onCreate}>
+          <Ionicons name="add" size={16} color={colors.courtBlueDeep} />
+          <Text style={styles.createLabel}>Crear torneo</Text>
+        </Pressable>
       </View>
 
       {error ? (
@@ -116,6 +126,23 @@ const styles = StyleSheet.create({
   headerSubtitle: {
     color: colors.textDim,
     fontSize: 13,
+    marginBottom: 14,
+  },
+  createButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+    backgroundColor: colors.ballLime,
+    borderRadius: 16,
+    paddingVertical: 9,
+    paddingHorizontal: 14,
+  },
+  createLabel: {
+    color: colors.courtBlueDeep,
+    fontSize: 12,
+    fontWeight: '800',
   },
   list: {
     paddingHorizontal: 20,

@@ -20,3 +20,12 @@ export async function listSettlementsForClub(clubId: string): Promise<ClubSettle
 export async function listTournamentsForClub(clubId: string): Promise<TournamentSummary[]> {
   return tournamentRepository.listByClub(clubId);
 }
+
+/** ClubCreateTournamentScreen: el club registra un torneo nuevo — a partir de acá ya puede
+ * invitar coaches y (una vez 'scheduled') aparece en el descubrimiento público (GET /tournaments). */
+export async function createTournamentForClub(
+  clubId: string,
+  input: { name: string; venue: string; startDate: string; endDate: string },
+): Promise<TournamentSummary> {
+  return tournamentRepository.create({ clubId, ...input });
+}

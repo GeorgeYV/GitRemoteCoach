@@ -126,6 +126,33 @@ export async function getPendingCommissionAmount(tournamentId: string, db: Query
   return rows[0].amount;
 }
 
+/** ClubCreateTournamentScreen: un torneo nuevo siempre arranca 'scheduled' y sin coaches oficiales
+ * ni comisión pendiente todavía, así que no hace falta ir a buscarlos con las subqueries de
+ * listByClub. */
+export async function create(
+  params: { clubId: string; name: string; venue: string; startDate: string; endDate: string },
+  db: Queryable = pool,
+): Promise<TournamentSummary> {
+  const { rows } = await db.query(
+    `INSERT INTO tournaments (club_id, name, venue, start_date, end_date, status)
+     VALUES ($1, $2, $3, $4, $5, 'scheduled')
+     RETURNING id, club_id, name, venue, start_date, end_date, status`,
+    [params.clubId, params.name, params.venue, params.startDate, params.endDate],
+  );
+  const row = rows[0];
+  return {
+    id: row.id,
+    clubId: row.club_id,
+    name: row.name,
+    venue: row.venue,
+    startDate: row.start_date,
+    endDate: row.end_date,
+    status: row.status,
+    officialCoachCount: 0,
+    pendingCommissionAmount: '0',
+  };
+}
+
 export async function findTournamentsEndedWithoutFullSettlement(db: Queryable = pool): Promise<string[]> {
   const { rows } = await db.query(
     `SELECT DISTINCT t.id

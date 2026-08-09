@@ -580,6 +580,20 @@ export function listClubTournaments(clubId: string): Promise<TournamentSummary[]
   return request(`/clubs/${clubId}/tournaments`);
 }
 
+/** POST /clubs/:id/tournaments — ClubCreateTournamentScreen. Solo un admin del club (derivado de
+ * la sesión en el server) puede crear torneos para ese club. */
+export function createTournament(
+  authToken: string,
+  clubId: string,
+  params: { name: string; venue: string; startDate: string; endDate: string },
+): Promise<TournamentSummary> {
+  return request(`/clubs/${clubId}/tournaments`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${authToken}` },
+    body: JSON.stringify(params),
+  });
+}
+
 /** Espeja server/src/types.ts#TournamentSearchResult — descubrimiento público de torneos activos. */
 export interface TournamentSearchResult {
   id: string;
