@@ -2,20 +2,20 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import CoachResultRow from '../../components/club/CoachResultRow';
+import { useAuth } from '../../context/AuthContext';
 import { ApiError, CoachSearchResult, createClubInvitation, searchCoaches } from '../../lib/api';
 import { colors, radius } from '../../lib/theme';
 
 export default function ClubInviteCoachScreen({
   clubId,
-  invitedByUserId,
   tournamentId,
   onBack,
 }: {
   clubId: string;
-  invitedByUserId: string;
   tournamentId: string;
   onBack: () => void;
 }) {
+  const { token } = useAuth();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<CoachSearchResult[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -45,15 +45,18 @@ export default function ClubInviteCoachScreen({
   }, [query, tournamentId]);
 
   async function invite(coach: CoachSearchResult) {
+    if (!token) {
+      setActionError('No hay una sesión activa.');
+      return;
+    }
     setInvitingId(coach.id);
     setActionError(null);
     setLastInvited(null);
     try {
-      await createClubInvitation({
+      await createClubInvitation(token, {
         clubId,
         tournamentId,
         coachId: coach.id,
-        invitedBy: invitedByUserId,
         message: message.trim() || undefined,
       });
       setResults((prev) => prev?.filter((c) => c.id !== coach.id) ?? null);

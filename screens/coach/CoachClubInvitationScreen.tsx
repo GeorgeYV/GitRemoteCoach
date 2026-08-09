@@ -2,12 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ClubTagBadge from '../../components/coach/ClubTagBadge';
+import { useAuth } from '../../context/AuthContext';
 import { ApiError, ClubCoachInvitationWithNames, listClubInvitations, respondClubInvitation } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
 
 type Decision = 'pending' | 'accepted' | 'declined';
 
 export default function CoachClubInvitationScreen({ coachId, onBack }: { coachId: string; onBack?: () => void }) {
+  const { token } = useAuth();
   const [invitation, setInvitation] = useState<ClubCoachInvitationWithNames | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [decision, setDecision] = useState<Decision>('pending');
@@ -15,9 +17,13 @@ export default function CoachClubInvitationScreen({ coachId, onBack }: { coachId
   const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!token) {
+      setLoadError('No hay una sesión activa.');
+      return;
+    }
     let cancelled = false;
     setLoadError(null);
-    listClubInvitations(coachId)
+    listClubInvitations(token, coachId)
       .then((result) => {
         if (!cancelled) setInvitation(result[0] ?? null);
       })
@@ -28,14 +34,14 @@ export default function CoachClubInvitationScreen({ coachId, onBack }: { coachId
     return () => {
       cancelled = true;
     };
-  }, [coachId]);
+  }, [coachId, token]);
 
   async function respond(decisionValue: Extract<Decision, 'accepted' | 'declined'>) {
-    if (!invitation) return;
+    if (!invitation || !token) return;
     setSubmitting(true);
     setActionError(null);
     try {
-      await respondClubInvitation(invitation.id, decisionValue);
+      await respondClubInvitation(token, invitation.id, decisionValue);
       setDecision(decisionValue);
     } catch (err) {
       setActionError(err instanceof ApiError ? err.message : 'No se pudo enviar tu respuesta. Intenta de nuevo.');

@@ -467,7 +467,7 @@ export function CoachCapturePreview() {
 }
 
 /** Local three-step flow: lista de torneos del club → detalle (roster + liquidar) → invitar entrenador. */
-export function ClubTournamentFlow({ clubId, clubName, adminUserId }: { clubId: string; clubName: string; adminUserId: string }) {
+export function ClubTournamentFlow({ clubId, clubName }: { clubId: string; clubName: string }) {
   const [tournament, setTournament] = useState<TournamentSummary | null>(null);
   const [inviting, setInviting] = useState(false);
 
@@ -479,7 +479,6 @@ export function ClubTournamentFlow({ clubId, clubName, adminUserId }: { clubId: 
     return (
       <ClubInviteCoachScreen
         clubId={clubId}
-        invitedByUserId={adminUserId}
         tournamentId={tournament.id}
         onBack={() => setInviting(false)}
       />
@@ -540,7 +539,7 @@ export function ClubFlow({ adminUserId }: { adminUserId: string }) {
   }
 
   if (screen === 'tournaments') {
-    return <ClubTournamentFlow clubId={club.id} clubName={club.name} adminUserId={adminUserId} />;
+    return <ClubTournamentFlow clubId={club.id} clubName={club.name} />;
   }
 
   if (screen === 'settlements') {

@@ -128,11 +128,7 @@ export default function DevPreviewSwitcher() {
         ) : screen === 'clubSettlements' ? (
           <ClubSettlementsScreen clubId={mockClubAdmin.id} clubName={mockClubAdmin.name} />
         ) : screen === 'clubTournaments' ? (
-          <ClubTournamentFlow
-            clubId={mockClubAdmin.id}
-            clubName={mockClubAdmin.name}
-            adminUserId={mockClubAdmin.adminUserId}
-          />
+          <ClubTournamentFlow clubId={mockClubAdmin.id} clubName={mockClubAdmin.name} />
         ) : screen === 'clubHome' ? (
           <ClubHomeScreen
             clubId={mockClubAdmin.id}

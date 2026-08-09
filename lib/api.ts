@@ -428,24 +428,28 @@ export function getCoachTournamentAvailability(
 
 /** PUT /coaches/:coachId/tournaments/:tournamentId/availability — CoachAvailabilityScreen "Guardar disponibilidad". */
 export function setCoachTournamentAvailability(
+  authToken: string,
   coachId: string,
   tournamentId: string,
   days: Array<{ slotDate: string; morning: boolean; afternoon: boolean }>,
 ): Promise<CoachTournamentAvailability[]> {
   return request(`/coaches/${coachId}/tournaments/${tournamentId}/availability`, {
     method: 'PUT',
+    headers: { Authorization: `Bearer ${authToken}` },
     body: JSON.stringify({ days }),
   });
 }
 
 /** PUT /coaches/:coachId/tournaments/:tournamentId/rate — CoachAvailabilityScreen. */
 export function setCoachTournamentRate(
+  authToken: string,
   coachId: string,
   tournamentId: string,
   params: { rateMode: RateMode; amount: number },
 ): Promise<CoachTournamentRate> {
   return request(`/coaches/${coachId}/tournaments/${tournamentId}/rate`, {
     method: 'PUT',
+    headers: { Authorization: `Bearer ${authToken}` },
     body: JSON.stringify(params),
   });
 }
@@ -472,31 +476,37 @@ export interface ClubCoachInvitationWithNames extends ClubCoachInvitation {
 }
 
 /** GET /coaches/:id/club-invitations — CoachClubInvitationScreen. */
-export function listClubInvitations(coachId: string): Promise<ClubCoachInvitationWithNames[]> {
-  return request(`/coaches/${coachId}/club-invitations`);
+export function listClubInvitations(authToken: string, coachId: string): Promise<ClubCoachInvitationWithNames[]> {
+  return request(`/coaches/${coachId}/club-invitations`, { headers: { Authorization: `Bearer ${authToken}` } });
 }
 
-/** POST /club-invitations — ClubInviteCoachScreen. Club/federación invita a un entrenador a ser oficial en un torneo. */
-export function createClubInvitation(params: {
-  clubId: string;
-  tournamentId: string;
-  coachId: string;
-  invitedBy: string;
-  message?: string;
-}): Promise<ClubCoachInvitation> {
+/** POST /club-invitations — ClubInviteCoachScreen. Club/federación invita a un entrenador a ser oficial en un
+ * torneo. invitedBy se deriva de la sesión en el server (no del cliente). */
+export function createClubInvitation(
+  authToken: string,
+  params: {
+    clubId: string;
+    tournamentId: string;
+    coachId: string;
+    message?: string;
+  },
+): Promise<ClubCoachInvitation> {
   return request('/club-invitations', {
     method: 'POST',
+    headers: { Authorization: `Bearer ${authToken}` },
     body: JSON.stringify(params),
   });
 }
 
 /** POST /club-invitations/:id/respond — CoachClubInvitationScreen. */
 export function respondClubInvitation(
+  authToken: string,
   invitationId: string,
   decision: 'accepted' | 'declined',
 ): Promise<ClubCoachInvitation> {
   return request(`/club-invitations/${invitationId}/respond`, {
     method: 'POST',
+    headers: { Authorization: `Bearer ${authToken}` },
     body: JSON.stringify({ decision }),
   });
 }

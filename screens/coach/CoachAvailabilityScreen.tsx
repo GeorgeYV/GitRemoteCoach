@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ClubTagBadge from '../../components/coach/ClubTagBadge';
 import TogglePill from '../../components/coach/TogglePill';
+import { useAuth } from '../../context/AuthContext';
 import { ApiError, RateMode as ApiRateMode, setCoachTournamentAvailability, setCoachTournamentRate } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
 import {
@@ -13,7 +14,7 @@ import {
   RATE_MODE_LABELS,
   RateMode,
 } from '../../mock/coachFlow';
-import { BOOKING_DAY_LABEL_TO_DATE, mockCarlosMedinaProfile, REAL_TOURNAMENT_ID, Tournament } from '../../mock/parentFlow';
+import { BOOKING_DAY_LABEL_TO_DATE, REAL_TOURNAMENT_ID, Tournament } from '../../mock/parentFlow';
 
 /** Solo 'copa-nacional-juvenil' tiene un torneo real sembrado (server/test/seed.ts) — los otros dos
  * torneos del buscador siguen siendo mock puro y "Guardar" se queda local, como antes de esta wiring. */
@@ -28,6 +29,7 @@ const RATE_MODE_TO_API: Record<RateMode, ApiRateMode> = {
 };
 
 export default function CoachAvailabilityScreen({ tournament, onBack }: { tournament: Tournament; onBack: () => void }) {
+  const { user, token } = useAuth();
   const tagging = mockOfficialClubTaggings.find((t) => t.tournamentId === tournament.id);
   const realTournamentId = TOURNAMENT_SLUG_TO_REAL_ID[tournament.id];
   const [days, setDays] = useState<DaySlot[]>(() => buildInitialDaySlots(tournament.id));
@@ -58,17 +60,22 @@ export default function CoachAvailabilityScreen({ tournament, onBack }: { tourna
       setSaved(true);
       return;
     }
+    if (!user || !token) {
+      setError('No hay una sesión activa.');
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
       await setCoachTournamentAvailability(
-        mockCarlosMedinaProfile.trainer.id,
+        token,
+        user.id,
         realTournamentId,
         days
           .filter((d) => BOOKING_DAY_LABEL_TO_DATE[d.dayLabel])
           .map((d) => ({ slotDate: BOOKING_DAY_LABEL_TO_DATE[d.dayLabel], morning: d.morning, afternoon: d.afternoon })),
       );
-      await setCoachTournamentRate(mockCarlosMedinaProfile.trainer.id, realTournamentId, {
+      await setCoachTournamentRate(token, user.id, realTournamentId, {
         rateMode: RATE_MODE_TO_API[rateMode],
         amount: Number(rateAmount),
       });

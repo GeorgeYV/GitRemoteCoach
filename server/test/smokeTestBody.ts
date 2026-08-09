@@ -373,21 +373,59 @@ console.log('\n=== Escenario 10: listado de reservas de un coach (CoachHomeScree
 
 console.log('\n=== Escenario 11: invitación de club (CoachClubInvitationScreen) ===');
 {
-  const inviteRes = await app.inject({
+  const unauthInviteRes = await app.inject({
     method: 'POST',
     url: '/club-invitations',
     payload: {
       clubId: fixtures.clubId,
       tournamentId: fixtures.tournamentId,
       coachId: fixtures.coachBUserId,
-      invitedBy: fixtures.clubAdminUserId,
       message: 'Nos gustaría que fueras entrenador oficial.',
     },
   });
-  assertEqual(inviteRes.statusCode, 201, 'POST /club-invitations devuelve 201');
+  assertEqual(unauthInviteRes.statusCode, 401, 'POST /club-invitations sin token devuelve 401');
+
+  const wrongActorInviteRes = await app.inject({
+    method: 'POST',
+    url: '/club-invitations',
+    headers: { authorization: `Bearer ${coachAToken}` },
+    payload: {
+      clubId: fixtures.clubId,
+      tournamentId: fixtures.tournamentId,
+      coachId: fixtures.coachBUserId,
+      message: 'Nos gustaría que fueras entrenador oficial.',
+    },
+  });
+  assertEqual(wrongActorInviteRes.statusCode, 403, 'un coach (no admin del club) no puede invitar → 403');
+
+  const inviteRes = await app.inject({
+    method: 'POST',
+    url: '/club-invitations',
+    headers: { authorization: `Bearer ${clubAdminToken}` },
+    payload: {
+      clubId: fixtures.clubId,
+      tournamentId: fixtures.tournamentId,
+      coachId: fixtures.coachBUserId,
+      message: 'Nos gustaría que fueras entrenador oficial.',
+    },
+  });
+  assertEqual(inviteRes.statusCode, 201, 'POST /club-invitations (admin del club) devuelve 201');
   const invitation = inviteRes.json();
 
-  const listRes = await (await app.inject({ method: 'GET', url: `/coaches/${fixtures.coachBUserId}/club-invitations` })).json();
+  const wrongCoachListRes = await app.inject({
+    method: 'GET',
+    url: `/coaches/${fixtures.coachBUserId}/club-invitations`,
+    headers: { authorization: `Bearer ${coachAToken}` },
+  });
+  assertEqual(wrongCoachListRes.statusCode, 403, 'un coach no puede ver las invitaciones de otro coach → 403');
+
+  const listRes = await (
+    await app.inject({
+      method: 'GET',
+      url: `/coaches/${fixtures.coachBUserId}/club-invitations`,
+      headers: { authorization: `Bearer ${coachBToken}` },
+    })
+  ).json();
   assertTrue(
     Array.isArray(listRes) && listRes.some((i: any) => i.id === invitation.id),
     'GET /coaches/:id/club-invitations devuelve la invitación recién creada',
@@ -396,19 +434,94 @@ console.log('\n=== Escenario 11: invitación de club (CoachClubInvitationScreen)
   assertEqual(listed.clubName, 'Club Deportivo Bosques', 'trae el nombre del club (JOIN con clubs)');
   assertEqual(listed.tournamentName, 'Copa Nacional Juvenil', 'trae el nombre del torneo (JOIN con tournaments)');
 
+  const wrongCoachRespondRes = await app.inject({
+    method: 'POST',
+    url: `/club-invitations/${invitation.id}/respond`,
+    headers: { authorization: `Bearer ${coachAToken}` },
+    payload: { decision: 'accepted' },
+  });
+  assertEqual(wrongCoachRespondRes.statusCode, 403, 'un coach no puede responder la invitación de otro coach → 403');
+
   const respondRes = await app.inject({
     method: 'POST',
     url: `/club-invitations/${invitation.id}/respond`,
+    headers: { authorization: `Bearer ${coachBToken}` },
     payload: { decision: 'accepted' },
   });
   assertEqual(respondRes.statusCode, 200, 'respond devuelve 200');
   assertEqual(respondRes.json().status, 'accepted', 'la invitación queda accepted');
 
-  const listAfter = await (await app.inject({ method: 'GET', url: `/coaches/${fixtures.coachBUserId}/club-invitations` })).json();
+  const listAfter = await (
+    await app.inject({
+      method: 'GET',
+      url: `/coaches/${fixtures.coachBUserId}/club-invitations`,
+      headers: { authorization: `Bearer ${coachBToken}` },
+    })
+  ).json();
   assertTrue(
     !listAfter.some((i: any) => i.id === invitation.id),
     'la invitación ya respondida deja de aparecer en el listado de pendientes',
   );
+}
+
+console.log('\n=== Escenario 11b: disponibilidad y tarifa de torneo (CoachAvailabilityScreen) ===');
+{
+  const availabilityPayload = {
+    days: [{ slotDate: '2026-09-10', morning: true, afternoon: false }],
+  };
+  const ratePayload = { rateMode: 'per_day', amount: 45 };
+
+  const unauthAvailRes = await app.inject({
+    method: 'PUT',
+    url: `/coaches/${fixtures.coachAUserId}/tournaments/${fixtures.tournamentId}/availability`,
+    payload: availabilityPayload,
+  });
+  assertEqual(unauthAvailRes.statusCode, 401, 'PUT availability sin token devuelve 401');
+
+  const wrongCoachAvailRes = await app.inject({
+    method: 'PUT',
+    url: `/coaches/${fixtures.coachAUserId}/tournaments/${fixtures.tournamentId}/availability`,
+    headers: { authorization: `Bearer ${coachBToken}` },
+    payload: availabilityPayload,
+  });
+  assertEqual(wrongCoachAvailRes.statusCode, 403, 'un coach no puede fijar la disponibilidad de otro coach → 403');
+
+  const availRes = await app.inject({
+    method: 'PUT',
+    url: `/coaches/${fixtures.coachAUserId}/tournaments/${fixtures.tournamentId}/availability`,
+    headers: { authorization: `Bearer ${coachAToken}` },
+    payload: availabilityPayload,
+  });
+  assertEqual(availRes.statusCode, 200, 'el propio coach puede fijar su disponibilidad → 200');
+
+  const wrongCoachRateRes = await app.inject({
+    method: 'PUT',
+    url: `/coaches/${fixtures.coachAUserId}/tournaments/${fixtures.tournamentId}/rate`,
+    headers: { authorization: `Bearer ${coachBToken}` },
+    payload: ratePayload,
+  });
+  assertEqual(wrongCoachRateRes.statusCode, 403, 'un coach no puede fijar la tarifa de otro coach → 403');
+
+  const rateRes = await app.inject({
+    method: 'PUT',
+    url: `/coaches/${fixtures.coachAUserId}/tournaments/${fixtures.tournamentId}/rate`,
+    headers: { authorization: `Bearer ${coachAToken}` },
+    payload: ratePayload,
+  });
+  assertEqual(rateRes.statusCode, 200, 'el propio coach puede fijar su tarifa → 200');
+
+  const getRes = await app.inject({
+    method: 'GET',
+    url: `/coaches/${fixtures.coachAUserId}/tournaments/${fixtures.tournamentId}/availability`,
+  });
+  assertEqual(getRes.statusCode, 200, 'GET availability sigue siendo público (sin token) → 200');
+  const availabilityAndRate = getRes.json();
+  assertTrue(
+    Array.isArray(availabilityAndRate.availability) &&
+      availabilityAndRate.availability.some((d: any) => String(d.slotDate).startsWith('2026-09-10')),
+    'la disponibilidad guardada aparece en la lectura pública',
+  );
+  assertEqual(availabilityAndRate.rate?.rateMode, 'per_day', 'la tarifa guardada aparece en la lectura pública');
 }
 
 console.log('\n=== Escenario 12: captura en vivo de un partido (matches / match_point_events) ===');
