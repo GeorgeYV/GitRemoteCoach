@@ -60,11 +60,11 @@ export const REAL_COMPLETED_BOOKING_ID = '44444444-4444-4444-8444-444444444444';
 /** Compartido con CoachAvailabilityScreen (mock/coachFlow.ts usa las mismas etiquetas de día para
  * 'copa-nacional-juvenil') para que ambos lados del torneo hablen de las mismas fechas reales. */
 export const BOOKING_DAY_LABEL_TO_DATE: Record<string, string> = {
-  'Vie 5': '2026-08-05',
-  'Sáb 6': '2026-08-06',
-  'Dom 7': '2026-08-07',
-  'Lun 8': '2026-08-08',
-  'Mar 9': '2026-08-09',
+  'Vie 5': '2026-08-10',
+  'Sáb 6': '2026-08-11',
+  'Dom 7': '2026-08-12',
+  'Lun 8': '2026-08-13',
+  'Mar 9': '2026-08-14',
 };
 
 const BOOKING_PERIOD_TO_TIME: Record<BookingPeriod, string> = {
