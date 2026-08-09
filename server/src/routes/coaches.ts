@@ -54,9 +54,11 @@ export async function coachRoutes(app: FastifyInstance): Promise<void> {
     return coachProfileService.getCoachProfile(id);
   });
 
-  // CoachRegistrationScreen: guarda categorías de edad + niveles de juego seleccionados.
-  app.put('/coaches/:id/training', async (req) => {
+  // Guarda categorías de edad + niveles de juego del propio entrenador logueado.
+  app.put('/coaches/:id/training', { preHandler: app.authenticate }, async (req) => {
     const { id } = req.params as { id: string };
+    const { sub } = req.user as { sub: string };
+    if (sub !== id) throw new ForbiddenError('No puedes modificar el perfil de otro entrenador');
     const parsed = updateTrainingSchema.safeParse(req.body);
     if (!parsed.success) throw new ValidationError(parsed.error.message);
     return coachProfileService.updateCoachTraining(id, parsed.data);

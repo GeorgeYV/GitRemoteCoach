@@ -98,8 +98,22 @@ console.log('\n=== Escenario 1: flujo feliz (solicitud → aceptación → pago 
   assertEqual(Number(paid.clubCommissionAmount), 100, 'club_commission_amount = 10% de 1000');
   assertEqual(Number(paid.coachNetAmount), 750, 'coach_net_amount = 1000 - 150 - 100');
 
-  const completeRes = await app.inject({ method: 'POST', url: `/bookings/${booking1.id}/complete` });
-  assertEqual(completeRes.statusCode, 200, 'complete devuelve 200');
+  const unauthCompleteRes = await app.inject({ method: 'POST', url: `/bookings/${booking1.id}/complete` });
+  assertEqual(unauthCompleteRes.statusCode, 401, 'complete sin Bearer token devuelve 401');
+
+  const wrongActorCompleteRes = await app.inject({
+    method: 'POST',
+    url: `/bookings/${booking1.id}/complete`,
+    headers: { authorization: `Bearer ${coachBToken}` },
+  });
+  assertEqual(wrongActorCompleteRes.statusCode, 403, 'completar con el token de otro entrenador devuelve 403');
+
+  const completeRes = await app.inject({
+    method: 'POST',
+    url: `/bookings/${booking1.id}/complete`,
+    headers: { authorization: `Bearer ${coachAToken}` },
+  });
+  assertEqual(completeRes.statusCode, 200, 'complete (con el propio entrenador) devuelve 200');
   assertEqual(completeRes.json().status, 'completed', 'estado final = completed');
 
   (globalThis as any).__booking1Id = booking1.id;
@@ -840,6 +854,32 @@ console.log('\n=== Escenario 16: onboarding de coach (POST /coaches) ===');
 
   const getRes = await app.inject({ method: 'GET', url: `/coaches/${newCoach.id}` });
   assertEqual(getRes.json().profile.city, 'CDMX', 'GET /coaches/:id ya refleja el perfil recién creado');
+
+  const trainingPayload = { ageCategories: ['U16'], levels: ['alto_rendimiento'] };
+
+  const unauthTrainingRes = await app.inject({
+    method: 'PUT',
+    url: `/coaches/${newCoach.id}/training`,
+    payload: trainingPayload,
+  });
+  assertEqual(unauthTrainingRes.statusCode, 401, 'PUT /coaches/:id/training sin Bearer token devuelve 401');
+
+  const wrongActorTrainingRes = await app.inject({
+    method: 'PUT',
+    url: `/coaches/${newCoach.id}/training`,
+    headers: { authorization: `Bearer ${coachBToken}` },
+    payload: trainingPayload,
+  });
+  assertEqual(wrongActorTrainingRes.statusCode, 403, 'PUT /coaches/:id/training con el token de otro entrenador devuelve 403');
+
+  const trainingRes = await app.inject({
+    method: 'PUT',
+    url: `/coaches/${newCoach.id}/training`,
+    headers: { authorization: `Bearer ${newCoachToken}` },
+    payload: trainingPayload,
+  });
+  assertEqual(trainingRes.statusCode, 200, 'PUT /coaches/:id/training (el propio entrenador) devuelve 200');
+  assertEqual(trainingRes.json().ageCategories, ['U16'], 'guarda las nuevas categorías de edad enviadas');
 }
 
 console.log('\n=== Escenario 17: hijos/as del padre (GET/POST /players) ===');

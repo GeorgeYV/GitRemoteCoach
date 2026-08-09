@@ -361,11 +361,13 @@ export function registerCoachProfile(
 
 /** PUT /coaches/:id/training — CoachRegistrationScreen. */
 export function updateCoachTraining(
+  authToken: string,
   coachId: string,
   params: { ageCategories: AgeCategory[]; levels: PlayingLevel[] },
 ): Promise<CoachProfileWithTraining> {
   return request(`/coaches/${coachId}/training`, {
     method: 'PUT',
+    headers: { Authorization: `Bearer ${authToken}` },
     body: JSON.stringify(params),
   });
 }

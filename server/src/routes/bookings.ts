@@ -97,8 +97,13 @@ export async function bookingRoutes(app: FastifyInstance): Promise<void> {
     return paymentService.initiatePayment(id, parsed.data.paymentMethodId);
   });
 
-  app.post('/bookings/:id/complete', async (req) => {
+  // Libera los fondos retenidos al entrenador — solo el propio entrenador de la reserva puede
+  // disparar su propio pago.
+  app.post('/bookings/:id/complete', { preHandler: app.authenticate }, async (req) => {
     const { id } = req.params as { id: string };
+    const { sub } = req.user as { sub: string };
+    const { coachId } = await bookingRepository.getBookingParticipants(id);
+    if (sub !== coachId) throw new ForbiddenError('Solo el entrenador de la reserva puede marcarla como completada');
     return paymentService.completeBooking(id);
   });
 
