@@ -1,30 +1,46 @@
-import React, { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ClubTagBadge from '../../components/coach/ClubTagBadge';
+import { ApiError, searchTournaments, TournamentSearchResult } from '../../lib/api';
 import { colors, radius } from '../../lib/theme';
 import { mockOfficialClubTaggings } from '../../mock/coachFlow';
-import { mockActiveTournaments, Tournament } from '../../mock/parentFlow';
+
+function dateRangeLabel(startIso: string, endIso: string): string {
+  const start = new Date(startIso).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' });
+  const end = new Date(endIso).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' });
+  return `${start} – ${end}`;
+}
 
 export default function CoachTournamentSearchScreen({
   onSelect,
   onBack,
 }: {
-  onSelect: (tournament: Tournament) => void;
+  onSelect: (tournament: TournamentSearchResult) => void;
   onBack?: () => void;
 }) {
   const [query, setQuery] = useState('');
+  const [results, setResults] = useState<TournamentSearchResult[] | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const results = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return mockActiveTournaments;
-    return mockActiveTournaments.filter(
-      (t) =>
-        t.name.toLowerCase().includes(q) ||
-        t.venue.toLowerCase().includes(q) ||
-        t.city.toLowerCase().includes(q) ||
-        t.dates.toLowerCase().includes(q)
-    );
+  useEffect(() => {
+    let cancelled = false;
+    setLoadError(null);
+    // Debounce: espera a que el usuario deje de escribir antes de pegarle al backend en cada tecla.
+    const handle = setTimeout(() => {
+      searchTournaments(query.trim() || undefined)
+        .then((result) => {
+          if (!cancelled) setResults(result);
+        })
+        .catch((err) => {
+          if (cancelled) return;
+          setLoadError(err instanceof ApiError ? err.message : 'No se pudieron cargar los torneos.');
+        });
+    }, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(handle);
+    };
   }, [query]);
 
   return (
@@ -37,7 +53,7 @@ export default function CoachTournamentSearchScreen({
           <Text style={styles.headerTitle}>¿En qué torneo vas a estar?</Text>
         </View>
         <Text style={styles.headerSubtitle}>
-          Busca por nombre, sede o fecha para configurar tu disponibilidad y tarifa ahí.
+          Busca por nombre, sede o ciudad para configurar tu disponibilidad y tarifa ahí.
         </Text>
       </View>
 
@@ -52,20 +68,30 @@ export default function CoachTournamentSearchScreen({
         />
       </View>
 
-      <ScrollView contentContainerStyle={styles.list}>
-        {results.map((tournament) => (
-          <TournamentCard key={tournament.id} tournament={tournament} onPress={() => onSelect(tournament)} />
-        ))}
+      {loadError ? (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyText}>{loadError}</Text>
+        </View>
+      ) : !results ? (
+        <View style={styles.emptyState}>
+          <ActivityIndicator color={colors.ballLime} />
+        </View>
+      ) : (
+        <ScrollView contentContainerStyle={styles.list}>
+          {results.map((tournament) => (
+            <TournamentCard key={tournament.id} tournament={tournament} onPress={() => onSelect(tournament)} />
+          ))}
 
-        {results.length === 0 && (
-          <Text style={styles.emptyText}>No encontramos torneos con ese nombre, sede o fecha.</Text>
-        )}
-      </ScrollView>
+          {results.length === 0 && (
+            <Text style={styles.emptyText}>No encontramos torneos con ese nombre, sede o ciudad.</Text>
+          )}
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 }
 
-function TournamentCard({ tournament, onPress }: { tournament: Tournament; onPress: () => void }) {
+function TournamentCard({ tournament, onPress }: { tournament: TournamentSearchResult; onPress: () => void }) {
   const tagging = mockOfficialClubTaggings.find((t) => t.tournamentId === tournament.id);
 
   return (
@@ -77,7 +103,7 @@ function TournamentCard({ tournament, onPress }: { tournament: Tournament; onPre
       <Text style={styles.tournamentMeta}>
         {tournament.venue} · {tournament.city}
       </Text>
-      <Text style={styles.tournamentMeta}>{tournament.dates}</Text>
+      <Text style={styles.tournamentMeta}>{dateRangeLabel(tournament.startDate, tournament.endDate)}</Text>
       <View style={styles.selectRow}>
         <Text style={styles.selectLabel}>Configurar disponibilidad</Text>
         <Text style={styles.chevron}>›</Text>
@@ -189,6 +215,10 @@ const styles = StyleSheet.create({
     color: colors.textDim,
     fontSize: 18,
     fontWeight: '700',
+  },
+  emptyState: {
+    paddingTop: 40,
+    paddingHorizontal: 20,
   },
   emptyText: {
     color: colors.textDim,

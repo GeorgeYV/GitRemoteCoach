@@ -20,6 +20,8 @@ export function toBookingHistoryEntry(booking: BookingForParent): BookingHistory
     id: booking.id,
     trainerName: booking.coachName,
     trainerInitial: booking.coachName[0] ?? '?',
+    playerName: booking.playerName,
+    ageCategory: booking.ageCategory,
     tournamentName: booking.tournamentName,
     date: matchDate.toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric', month: 'short' }),
     time: matchDate.toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit' }),

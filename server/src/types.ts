@@ -79,6 +79,7 @@ export interface BookingWithParticipants extends Booking {
 export interface BookingForParent extends Booking {
   coachName: string;
   playerName: string;
+  ageCategory: AgeCategory;
   tournamentName: string;
   tournamentVenue: string;
   reviewed: boolean;
@@ -193,6 +194,17 @@ export interface TournamentSummary {
   status: TournamentStatus;
   officialCoachCount: number;
   pendingCommissionAmount: string;
+}
+
+/** Descubrimiento público de torneos activos (CoachTournamentSearchScreen) — ciudad viene de un
+ * JOIN con clubs, a diferencia de TournamentSummary que ya trae clubId directo. */
+export interface TournamentSearchResult {
+  id: string;
+  name: string;
+  venue: string;
+  city: string;
+  startDate: string;
+  endDate: string;
 }
 
 /** Entrenador etiquetado como oficial en un torneo (ClubTournamentDetailScreen) — nombre/ciudad/rating vienen de un JOIN. */

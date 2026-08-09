@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors } from '../lib/theme';
 import { mockClubAdmin } from '../mock/clubFlow';
-import { mockCarlosMedinaProfile, REAL_COMPLETED_BOOKING_ID } from '../mock/parentFlow';
+import { CoachBooking } from '../mock/coachFlow';
+import { BookingHistoryEntry, mockCarlosMedinaProfile, REAL_COMPLETED_BOOKING_ID } from '../mock/parentFlow';
 import LoginScreen from './auth/LoginScreen';
 import RegisterScreen from './auth/RegisterScreen';
 import CoachChatScreen from './coach/CoachChatScreen';
@@ -80,6 +81,41 @@ const PREVIEW_OPTIONS: { key: PreviewScreen; label: string }[] = [
 ];
 
 /**
+ * Fixtures livianos solo para estas dos vistas previas independientes de chat: usan el id real
+ * (REAL_COMPLETED_BOOKING_ID) para que los mensajes carguen contra el backend real, pero como no
+ * hay una sesión de ese padre/entrenador específico disponible aquí, el resto del encabezado son
+ * placeholders genéricos en vez de datos inventados que aparenten ser reales.
+ */
+const PREVIEW_COACH_CHAT_BOOKING: CoachBooking = {
+  id: REAL_COMPLETED_BOOKING_ID,
+  parentName: 'Vista previa',
+  parentInitial: '?',
+  playerName: 'Vista previa',
+  playerInitial: '?',
+  category: '—',
+  tournamentName: '—',
+  date: '—',
+  time: '—',
+  venue: '—',
+  agreedRate: 0,
+  status: 'completed',
+};
+
+const PREVIEW_PARENT_CHAT_BOOKING: BookingHistoryEntry = {
+  id: REAL_COMPLETED_BOOKING_ID,
+  trainerName: 'Vista previa',
+  trainerInitial: '?',
+  playerName: 'Vista previa',
+  ageCategory: '—',
+  tournamentName: '—',
+  date: '—',
+  time: '—',
+  venue: '—',
+  price: 0,
+  status: 'completed',
+};
+
+/**
  * Selector de desarrollo para previsualizar cualquier pantalla sin pasar por
  * login — vive en /dev-preview, fuera del gate de auth de app/_layout.tsx.
  */
@@ -106,7 +142,7 @@ export default function DevPreviewSwitcher() {
         ) : screen === 'coachInbox' ? (
           <CoachRequestInboxScreen coachId={COACH_ID} />
         ) : screen === 'coachChat' ? (
-          <CoachChatScreen bookingId={REAL_COMPLETED_BOOKING_ID} />
+          <CoachChatScreen booking={PREVIEW_COACH_CHAT_BOOKING} />
         ) : screen === 'coachPreMatch' ? (
           <CoachMatchDayFlow bookingId={REAL_COMPLETED_BOOKING_ID} />
         ) : screen === 'coachSessions' ? (
@@ -122,7 +158,7 @@ export default function DevPreviewSwitcher() {
         ) : screen === 'parentList' ? (
           <TrainerListScreen />
         ) : screen === 'parentChat' ? (
-          <ParentChatScreen bookingId={REAL_COMPLETED_BOOKING_ID} />
+          <ParentChatScreen booking={PREVIEW_PARENT_CHAT_BOOKING} />
         ) : screen === 'parentHistory' ? (
           <BookingHistoryScreen />
         ) : screen === 'clubSettlements' ? (

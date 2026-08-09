@@ -15,6 +15,7 @@ import {
   getCoachProfile,
   listCoachBookings,
   listPlayers,
+  TournamentSearchResult,
   TournamentSummary,
 } from '../lib/api';
 import { isUpcoming, toCoachBooking } from '../lib/coachBookingDisplay';
@@ -24,7 +25,6 @@ import {
   BookingSlotSelection,
   mockCarlosMedinaProfile,
   REAL_COMPLETED_BOOKING_ID,
-  Tournament,
 } from '../mock/parentFlow';
 import LiveCaptureView from './LiveCaptureView';
 import MatchSummaryView from './MatchSummaryView';
@@ -65,7 +65,7 @@ export function CoachFlow({ roundLabel = mockRoundLabel }: { roundLabel?: string
 
 /** Local two-step flow: pick a tournament, then configure days/rate within it. */
 export function CoachAvailabilityFlow({ onBack }: { onBack?: () => void } = {}) {
-  const [tournament, setTournament] = useState<Tournament | null>(null);
+  const [tournament, setTournament] = useState<TournamentSearchResult | null>(null);
 
   if (!tournament) {
     return <CoachTournamentSearchScreen onSelect={setTournament} onBack={onBack} />;
@@ -269,8 +269,8 @@ export function CoachHomeFlow({ coachId, coachName }: { coachId: string; coachNa
     );
   }
 
-  if (step === 'chat' && nextBookingRaw) {
-    return <CoachChatScreen bookingId={nextBookingRaw.id} onBack={() => setStep('detail')} />;
+  if (step === 'chat' && nextBooking) {
+    return <CoachChatScreen booking={nextBooking} onBack={() => setStep('detail')} />;
   }
 
   if (step === 'match' && nextBookingRaw) {

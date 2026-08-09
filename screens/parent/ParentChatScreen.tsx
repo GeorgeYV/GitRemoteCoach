@@ -16,8 +16,8 @@ import TrainerAvatarPlaceholder from '../../components/shared/TrainerAvatarPlace
 import { useAuth } from '../../context/AuthContext';
 import { ApiError, BookingMessage, listBookingMessages, sendBookingMessage } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
-import { ChatMessage, mockChatThread } from '../../mock/coachFlow';
-import { mockCarlosMedinaProfile, PARENT_QUICK_REPLIES } from '../../mock/parentFlow';
+import { ChatMessage } from '../../mock/coachFlow';
+import { BookingHistoryEntry, PARENT_QUICK_REPLIES } from '../../mock/parentFlow';
 
 function timeLabel(iso: string): string {
   return new Date(iso).toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit' });
@@ -27,10 +27,9 @@ function toChatMessage(message: BookingMessage): ChatMessage {
   return { id: message.id, sender: message.senderType, text: message.body, time: timeLabel(message.createdAt) };
 }
 
-export default function ParentChatScreen({ bookingId, onBack }: { bookingId: string; onBack?: () => void }) {
+export default function ParentChatScreen({ booking, onBack }: { booking: BookingHistoryEntry; onBack?: () => void }) {
   const { token } = useAuth();
-  const thread = mockChatThread;
-  const coachName = mockCarlosMedinaProfile.trainer.name;
+  const bookingId = booking.id;
   const [messages, setMessages] = useState<ChatMessage[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
@@ -87,17 +86,17 @@ export default function ParentChatScreen({ bookingId, onBack }: { bookingId: str
         <TrainerAvatarPlaceholder size={40} />
         <View style={styles.headerText}>
           <Text style={styles.coachName} numberOfLines={1}>
-            {coachName}
+            {booking.trainerName}
           </Text>
           <Text style={styles.playerMeta} numberOfLines={1}>
-            {thread.playerName} · {thread.category}
+            {booking.playerName} · {booking.ageCategory}
           </Text>
         </View>
       </View>
 
       <View style={styles.meetingBar}>
         <Text style={styles.meetingText} numberOfLines={1}>
-          {thread.date} · {thread.time} · {thread.venue}
+          {booking.date} · {booking.time} · {booking.venue}
         </Text>
       </View>
 

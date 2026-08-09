@@ -947,6 +947,7 @@ console.log('\n=== Escenario 18: listado de reservas de un padre (BookingHistory
   const booking1 = bookings.find((b: any) => b.id === (globalThis as any).__booking1Id);
   assertTrue(!!booking1, 'incluye la reserva completada del escenario 1/9');
   assertEqual(booking1.coachName, 'Carlos Medina', 'trae el nombre del entrenador (JOIN con users)');
+  assertEqual(booking1.ageCategory, 'U14', 'trae la categoría de edad del hijo/a (JOIN con players)');
   assertEqual(booking1.tournamentName, 'Copa Nacional Juvenil', 'trae el nombre del torneo (JOIN con tournaments)');
   assertEqual(booking1.reviewed, true, 'una reserva ya reseñada marca reviewed = true');
 
@@ -1094,6 +1095,42 @@ console.log('\n=== Escenario 20: autorización cruzada — nadie puede actuar po
     headers: { authorization: `Bearer ${intruderToken}` },
   });
   assertEqual(parentBookingsWrongParentRes.statusCode, 403, 'ver las reservas de otro padre devuelve 403');
+}
+
+console.log('\n=== Escenario 21: descubrimiento de torneos (CoachTournamentSearchScreen) ===');
+{
+  const allRes = await app.inject({ method: 'GET', url: '/tournaments' });
+  assertEqual(allRes.statusCode, 200, 'GET /tournaments sin query devuelve 200');
+  const all = allRes.json();
+  assertTrue(
+    all.some((t: any) => t.id === fixtures.activeTournamentId),
+    'incluye el torneo activo (scheduled, fechas futuras)',
+  );
+  assertTrue(
+    !all.some((t: any) => t.id === fixtures.tournamentId),
+    'excluye el torneo ya completado (status filter)',
+  );
+
+  const active = all.find((t: any) => t.id === fixtures.activeTournamentId);
+  assertEqual(active.name, 'Abierto Regional Sub-16', 'trae el nombre del torneo');
+  assertEqual(active.city, 'Guadalajara', 'trae la ciudad (JOIN con clubs)');
+
+  const byNameRes = await app.inject({ method: 'GET', url: '/tournaments?search=Abierto' });
+  const byName = byNameRes.json();
+  assertTrue(
+    byName.length === 1 && byName[0].id === fixtures.activeTournamentId,
+    'la búsqueda por nombre filtra correctamente',
+  );
+
+  const byCityRes = await app.inject({ method: 'GET', url: '/tournaments?search=Guadalajara' });
+  const byCity = byCityRes.json();
+  assertTrue(
+    byCity.length === 1 && byCity[0].id === fixtures.activeTournamentId,
+    'la búsqueda por ciudad filtra correctamente',
+  );
+
+  const noMatchRes = await app.inject({ method: 'GET', url: '/tournaments?search=Inexistente123' });
+  assertEqual(noMatchRes.json(), [], 'una búsqueda sin coincidencias devuelve lista vacía');
 }
 
 console.log(`\n=== Resultado: ${passed} pasaron, ${failed} fallaron ===`);

@@ -1,9 +1,44 @@
 import type { Pool, PoolClient } from 'pg';
 import { pool } from '../lib/db.js';
 import { NotFoundError } from '../lib/errors.js';
-import type { TournamentSummary } from '../types.js';
+import type { TournamentSearchResult, TournamentSummary } from '../types.js';
 
 type Queryable = Pool | PoolClient;
+
+function mapSearchRow(row: any): TournamentSearchResult {
+  return {
+    id: row.id,
+    name: row.name,
+    venue: row.venue,
+    city: row.city,
+    startDate: row.start_date,
+    endDate: row.end_date,
+  };
+}
+
+/** CoachTournamentSearchScreen: descubrimiento público de torneos activos — mismo patrón de
+ * condiciones ILIKE que coachRepository.search. Solo 'scheduled'/'in_progress' (idx_tournaments_active),
+ * así un torneo ya completado no aparece como opción para ofrecerse. */
+export async function search(params: { query?: string }, db: Queryable = pool): Promise<TournamentSearchResult[]> {
+  const conditions: string[] = [`t.status IN ('scheduled', 'in_progress')`];
+  const values: unknown[] = [];
+
+  if (params.query) {
+    values.push(`%${params.query}%`);
+    conditions.push(`(t.name ILIKE $${values.length} OR t.venue ILIKE $${values.length} OR c.city ILIKE $${values.length})`);
+  }
+
+  const { rows } = await db.query(
+    `SELECT t.id, t.name, t.venue, c.city, t.start_date, t.end_date
+     FROM tournaments t
+     JOIN clubs c ON c.id = t.club_id
+     WHERE ${conditions.join(' AND ')}
+     ORDER BY t.start_date
+     LIMIT 25`,
+    values,
+  );
+  return rows.map(mapSearchRow);
+}
 
 function mapSummaryRow(row: any): TournamentSummary {
   return {

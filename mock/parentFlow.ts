@@ -112,6 +112,8 @@ export interface BookingHistoryEntry {
   id: string;
   trainerName: string;
   trainerInitial: string;
+  playerName: string;
+  ageCategory: string;
   tournamentName: string;
   date: string;
   time: string;
@@ -121,68 +123,6 @@ export interface BookingHistoryEntry {
   /** Only meaningful once status is 'completed' — whether the parent already left a review. */
   reviewed?: boolean;
 }
-
-export const mockBookingHistory: BookingHistoryEntry[] = [
-  {
-    // UUID real — booking pagada de prueba manual contra el backend real (cancelar dispara reembolso).
-    id: '55555555-5555-4555-8555-555555555555',
-    trainerName: 'Carlos Medina',
-    trainerInitial: 'C',
-    tournamentName: 'Copa Nacional Juvenil',
-    date: 'Vie 5 Ago',
-    time: '10:00 AM',
-    venue: 'Club Deportivo Bosques · Cancha 3',
-    price: 35,
-    status: 'confirmed',
-  },
-  {
-    // UUID real — booking 'requested' de prueba manual (cancelar es directo, sin reembolso).
-    id: '66666666-6666-4666-8666-666666666666',
-    trainerName: 'Ana Beltrán',
-    trainerInitial: 'A',
-    tournamentName: 'Abierto Regional Sub-16',
-    date: 'Jue 20 Ago',
-    time: '9:00 AM',
-    venue: 'Club Guadalajara Tenis',
-    price: 28,
-    status: 'requested',
-  },
-  {
-    id: 'book-3',
-    trainerName: 'Marcela Ruiz',
-    trainerInitial: 'M',
-    tournamentName: 'Copa Nacional Juvenil',
-    date: 'Dom 7 Ago',
-    time: '4:00 PM',
-    venue: 'Club Deportivo Bosques · Cancha 2',
-    price: 40,
-    status: 'cancelled',
-  },
-  {
-    id: REAL_COMPLETED_BOOKING_ID,
-    trainerName: 'Carlos Medina',
-    trainerInitial: 'C',
-    tournamentName: 'Copa de Verano U14',
-    date: '3 Sep 2025',
-    time: '11:00 AM',
-    venue: 'Club Puebla Racquet',
-    price: 35,
-    status: 'completed',
-    reviewed: false,
-  },
-  {
-    id: 'book-5',
-    trainerName: 'Ana Beltrán',
-    trainerInitial: 'A',
-    tournamentName: 'Copa Nacional Juvenil',
-    date: '8 Ago 2025',
-    time: '5:30 PM',
-    venue: 'Club Deportivo Bosques · Cancha 1',
-    price: 28,
-    status: 'completed',
-    reviewed: true,
-  },
-];
 
 export interface TrainerProfile {
   trainer: Trainer;

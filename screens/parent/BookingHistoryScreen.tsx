@@ -81,7 +81,7 @@ export default function BookingHistoryScreen() {
   }
 
   if (chatTarget) {
-    return <ParentChatScreen bookingId={chatTarget.id} onBack={() => setChatTarget(null)} />;
+    return <ParentChatScreen booking={chatTarget} onBack={() => setChatTarget(null)} />;
   }
 
   if (error) {

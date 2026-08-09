@@ -183,6 +183,7 @@ export function listCoachBookings(authToken: string, coachId: string): Promise<B
 export interface BookingForParent extends Booking {
   coachName: string;
   playerName: string;
+  ageCategory: AgeCategory;
   tournamentName: string;
   tournamentVenue: string;
   reviewed: boolean;
@@ -577,6 +578,24 @@ export interface TournamentSummary {
 /** GET /clubs/:id/tournaments — ClubTournamentListScreen. */
 export function listClubTournaments(clubId: string): Promise<TournamentSummary[]> {
   return request(`/clubs/${clubId}/tournaments`);
+}
+
+/** Espeja server/src/types.ts#TournamentSearchResult — descubrimiento público de torneos activos. */
+export interface TournamentSearchResult {
+  id: string;
+  name: string;
+  venue: string;
+  city: string;
+  startDate: string;
+  endDate: string;
+}
+
+/** GET /tournaments?search= — CoachTournamentSearchScreen. */
+export function searchTournaments(query?: string): Promise<TournamentSearchResult[]> {
+  const qs = new URLSearchParams();
+  if (query) qs.set('search', query);
+  const suffix = qs.toString();
+  return request(`/tournaments${suffix ? `?${suffix}` : ''}`);
 }
 
 /** Espeja server/src/types.ts#TournamentCoachTagWithProfile. */

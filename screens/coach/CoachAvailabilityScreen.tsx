@@ -4,23 +4,54 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import ClubTagBadge from '../../components/coach/ClubTagBadge';
 import TogglePill from '../../components/coach/TogglePill';
 import { useAuth } from '../../context/AuthContext';
-import { ApiError, RateMode as ApiRateMode, setCoachTournamentAvailability, setCoachTournamentRate } from '../../lib/api';
-import { colors, radius, withOpacity } from '../../lib/theme';
 import {
-  buildInitialDaySlots,
-  DaySlot,
-  DEFAULT_RATE_AMOUNT,
-  mockOfficialClubTaggings,
-  RATE_MODE_LABELS,
-  RateMode,
-} from '../../mock/coachFlow';
-import { BOOKING_DAY_LABEL_TO_DATE, REAL_TOURNAMENT_ID, Tournament } from '../../mock/parentFlow';
+  ApiError,
+  RateMode as ApiRateMode,
+  setCoachTournamentAvailability,
+  setCoachTournamentRate,
+  TournamentSearchResult,
+} from '../../lib/api';
+import { colors, radius, withOpacity } from '../../lib/theme';
+import { DEFAULT_RATE_AMOUNT, mockOfficialClubTaggings, PRESET_AVAILABILITY, RATE_MODE_LABELS, RateMode } from '../../mock/coachFlow';
 
-/** Solo 'copa-nacional-juvenil' tiene un torneo real sembrado (server/test/seed.ts) — los otros dos
- * torneos del buscador siguen siendo mock puro y "Guardar" se queda local, como antes de esta wiring. */
-const TOURNAMENT_SLUG_TO_REAL_ID: Record<string, string> = {
-  'copa-nacional-juvenil': REAL_TOURNAMENT_ID,
-};
+interface DaySlot {
+  dayLabel: string;
+  isoDate: string;
+  morning: boolean;
+  afternoon: boolean;
+}
+
+function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/** Un DaySlot por cada día calendario entre el inicio y el fin del torneo (inclusive), con su
+ * fecha ISO real para guardar y una etiqueta corta en español para mostrar (p. ej. "Vie 5"). Todo
+ * en UTC a propósito: startDate/endDate llegan como columnas DATE serializadas por pg como
+ * datetime ISO (p. ej. "2026-08-22T05:00:00.000Z", no "2026-08-22" plano), así que hacer aritmética
+ * de fechas en hora local podría correr el día según la zona horaria del navegador. */
+function buildDaySlotsFromRange(startDate: string, endDate: string): DaySlot[] {
+  const days: DaySlot[] = [];
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  const cursor = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate()));
+  const endUtc = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate()));
+  while (cursor <= endUtc) {
+    const isoDate = cursor.toISOString().slice(0, 10);
+    const dayLabel = capitalize(
+      cursor.toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric', timeZone: 'UTC' }),
+    );
+    days.push({ dayLabel, isoDate, morning: false, afternoon: false });
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return days;
+}
+
+function dateRangeLabel(startIso: string, endIso: string): string {
+  const start = new Date(startIso).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' });
+  const end = new Date(endIso).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' });
+  return `${start} – ${end}`;
+}
 
 const RATE_MODE_TO_API: Record<RateMode, ApiRateMode> = {
   partido: 'per_match',
@@ -28,11 +59,23 @@ const RATE_MODE_TO_API: Record<RateMode, ApiRateMode> = {
   torneo: 'per_tournament',
 };
 
-export default function CoachAvailabilityScreen({ tournament, onBack }: { tournament: Tournament; onBack: () => void }) {
+export default function CoachAvailabilityScreen({
+  tournament,
+  onBack,
+}: {
+  tournament: TournamentSearchResult;
+  onBack: () => void;
+}) {
   const { user, token } = useAuth();
   const tagging = mockOfficialClubTaggings.find((t) => t.tournamentId === tournament.id);
-  const realTournamentId = TOURNAMENT_SLUG_TO_REAL_ID[tournament.id];
-  const [days, setDays] = useState<DaySlot[]>(() => buildInitialDaySlots(tournament.id));
+  const [days, setDays] = useState<DaySlot[]>(() => {
+    const preset = PRESET_AVAILABILITY[tournament.id];
+    return buildDaySlotsFromRange(tournament.startDate, tournament.endDate).map((day, i) => ({
+      ...day,
+      morning: preset?.[i]?.morning ?? false,
+      afternoon: preset?.[i]?.afternoon ?? false,
+    }));
+  });
   const [rateMode, setRateMode] = useState<RateMode>('partido');
   const [rateAmount, setRateAmount] = useState(String(DEFAULT_RATE_AMOUNT[tournament.id] ?? ''));
   const [saved, setSaved] = useState(false);
@@ -55,11 +98,6 @@ export default function CoachAvailabilityScreen({ tournament, onBack }: { tourna
   }
 
   async function handleSave() {
-    if (!realTournamentId) {
-      // Torneo sin contraparte real en el backend — se queda como maqueta local, igual que antes.
-      setSaved(true);
-      return;
-    }
     if (!user || !token) {
       setError('No hay una sesión activa.');
       return;
@@ -70,12 +108,10 @@ export default function CoachAvailabilityScreen({ tournament, onBack }: { tourna
       await setCoachTournamentAvailability(
         token,
         user.id,
-        realTournamentId,
-        days
-          .filter((d) => BOOKING_DAY_LABEL_TO_DATE[d.dayLabel])
-          .map((d) => ({ slotDate: BOOKING_DAY_LABEL_TO_DATE[d.dayLabel], morning: d.morning, afternoon: d.afternoon })),
+        tournament.id,
+        days.map((d) => ({ slotDate: d.isoDate, morning: d.morning, afternoon: d.afternoon })),
       );
-      await setCoachTournamentRate(token, user.id, realTournamentId, {
+      await setCoachTournamentRate(token, user.id, tournament.id, {
         rateMode: RATE_MODE_TO_API[rateMode],
         amount: Number(rateAmount),
       });
@@ -101,7 +137,7 @@ export default function CoachAvailabilityScreen({ tournament, onBack }: { tourna
             {tournament.name}
           </Text>
           <Text style={styles.tournamentMeta} numberOfLines={1}>
-            {tournament.venue} · {tournament.dates}
+            {tournament.venue} · {dateRangeLabel(tournament.startDate, tournament.endDate)}
           </Text>
         </View>
       </View>

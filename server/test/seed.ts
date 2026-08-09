@@ -8,6 +8,9 @@ export interface Fixtures {
   coachAUserId: string;
   coachBUserId: string;
   playerId: string;
+  /** Torneo activo (status scheduled, fechas futuras) — a diferencia de tournamentId, que es
+   * 'completed' a propósito para probar liquidación. Usado por el escenario de GET /tournaments. */
+  activeTournamentId: string;
 }
 
 const CLUB_ID = '00000000-0000-0000-0000-000000000001';
@@ -17,6 +20,8 @@ const COACH_A_ID = '00000000-0000-0000-0000-000000000004';
 const COACH_B_ID = '00000000-0000-0000-0000-000000000005';
 const PLAYER_ID = '00000000-0000-0000-0000-000000000006';
 const CLUB_ADMIN_ID = '00000000-0000-0000-0000-000000000007';
+const CLUB_2_ID = '00000000-0000-0000-0000-000000000008';
+const ACTIVE_TOURNAMENT_ID = '00000000-0000-0000-0000-000000000009';
 
 export async function seedFixtures(pool: Pool): Promise<Fixtures> {
   await pool.query(
@@ -63,6 +68,20 @@ export async function seedFixtures(pool: Pool): Promise<Fixtures> {
     [PLAYER_ID, PARENT_ID],
   );
 
+  // Segundo club/torneo, activo y en el futuro — a diferencia de TOURNAMENT_ID (completed, en el
+  // pasado). Prueba el descubrimiento de torneos (GET /tournaments): que el filtro de status
+  // excluye al ya completado y que la búsqueda por ciudad funciona (Guadalajara vs CDMX).
+  await pool.query(
+    `INSERT INTO clubs (id, name, type, city, default_commission_rate) VALUES
+     ($1, 'Club Guadalajara Tenis', 'club', 'Guadalajara', 0.10)`,
+    [CLUB_2_ID],
+  );
+  await pool.query(
+    `INSERT INTO tournaments (id, club_id, name, venue, start_date, end_date, status) VALUES
+     ($1, $2, 'Abierto Regional Sub-16', 'Club Guadalajara Tenis', CURRENT_DATE + INTERVAL '14 days', CURRENT_DATE + INTERVAL '18 days', 'scheduled')`,
+    [ACTIVE_TOURNAMENT_ID, CLUB_2_ID],
+  );
+
   return {
     clubId: CLUB_ID,
     clubAdminUserId: CLUB_ADMIN_ID,
@@ -71,5 +90,6 @@ export async function seedFixtures(pool: Pool): Promise<Fixtures> {
     coachAUserId: COACH_A_ID,
     coachBUserId: COACH_B_ID,
     playerId: PLAYER_ID,
+    activeTournamentId: ACTIVE_TOURNAMENT_ID,
   };
 }

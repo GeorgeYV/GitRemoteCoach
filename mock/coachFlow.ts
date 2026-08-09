@@ -1,3 +1,5 @@
+import { REAL_TOURNAMENT_ID } from './parentFlow';
+
 export interface DocumentItem {
   id: string;
   title: string;
@@ -37,12 +39,6 @@ export const mockDocumentChecklist: DocumentItem[] = [
   },
 ];
 
-export interface DaySlot {
-  dayLabel: string;
-  morning: boolean;
-  afternoon: boolean;
-}
-
 export type RateMode = 'partido' | 'dia' | 'torneo';
 
 export const RATE_MODE_LABELS: Record<RateMode, string> = {
@@ -51,15 +47,11 @@ export const RATE_MODE_LABELS: Record<RateMode, string> = {
   torneo: 'Torneo completo',
 };
 
-const TOURNAMENT_DAY_LABELS: Record<string, string[]> = {
-  'copa-nacional-juvenil': ['Vie 5', 'Sáb 6', 'Dom 7', 'Lun 8', 'Mar 9'],
-  'abierto-regional-sub16': ['Jue 20', 'Vie 21', 'Sáb 22', 'Dom 23', 'Lun 24'],
-  'copa-verano-u14': ['Mié 2', 'Jue 3', 'Vie 4', 'Sáb 5'],
-};
-
-/** Matches the availability already shown on Carlos Medina's public profile in the parent flow. */
-const PRESET_AVAILABILITY: Record<string, { morning: boolean; afternoon: boolean }[]> = {
-  'copa-nacional-juvenil': [
+/** Matches the availability already shown on Carlos Medina's public profile in the parent flow —
+ * keyed by REAL_TOURNAMENT_ID (mock/parentFlow.ts) since CoachAvailabilityScreen now always gets a
+ * real tournament UUID from search, not a mock slug. Indexed by day position within the range. */
+export const PRESET_AVAILABILITY: Record<string, { morning: boolean; afternoon: boolean }[]> = {
+  [REAL_TOURNAMENT_ID]: [
     { morning: true, afternoon: false },
     { morning: true, afternoon: true },
     { morning: false, afternoon: true },
@@ -69,18 +61,8 @@ const PRESET_AVAILABILITY: Record<string, { morning: boolean; afternoon: boolean
 };
 
 export const DEFAULT_RATE_AMOUNT: Record<string, number> = {
-  'copa-nacional-juvenil': 35,
+  [REAL_TOURNAMENT_ID]: 35,
 };
-
-export function buildInitialDaySlots(tournamentId: string): DaySlot[] {
-  const labels = TOURNAMENT_DAY_LABELS[tournamentId] ?? ['Día 1', 'Día 2', 'Día 3'];
-  const preset = PRESET_AVAILABILITY[tournamentId];
-  return labels.map((dayLabel, i) => ({
-    dayLabel,
-    morning: preset?.[i]?.morning ?? false,
-    afternoon: preset?.[i]?.afternoon ?? false,
-  }));
-}
 
 export interface BookingRequest {
   id: string;
@@ -133,62 +115,12 @@ export interface ChatMessage {
   time: string;
 }
 
-export interface ChatThread {
-  bookingId: string;
-  parentName: string;
-  parentInitial: string;
-  playerName: string;
-  category: string;
-  date: string;
-  time: string;
-  venue: string;
-  messages: ChatMessage[];
-}
-
 export const QUICK_REPLIES = [
   'Ya llegué a la cancha',
   '¿Punto de encuentro?',
   'Llego en 10 minutos',
   'Todo listo para el partido',
 ];
-
-export const mockChatThread: ChatThread = {
-  bookingId: 'req-1',
-  parentName: 'María Torres',
-  parentInitial: 'M',
-  playerName: 'Valentina Torres',
-  category: 'U14 · Individual femenil',
-  date: 'Vie 5 Ago',
-  time: '10:00 AM',
-  venue: 'Club Deportivo Bosques · Cancha 3',
-  messages: [
-    {
-      id: 'm0',
-      sender: 'system',
-      text: 'Reserva confirmada · usa este chat para coordinar el punto de encuentro',
-      time: '',
-    },
-    {
-      id: 'm1',
-      sender: 'parent',
-      text: 'Hola Carlos, gracias por aceptar la solicitud para Valentina.',
-      time: '9:12 AM',
-    },
-    { id: 'm2', sender: 'coach', text: 'Con gusto, María. Ahí estaré antes de las 10.', time: '9:15 AM' },
-    {
-      id: 'm3',
-      sender: 'parent',
-      text: '¿Nos vemos directo en la cancha 3 o hay un punto de encuentro?',
-      time: '9:20 AM',
-    },
-    {
-      id: 'm4',
-      sender: 'coach',
-      text: 'Directo en la cancha 3, junto a las gradas. Voy a traer gorra azul para que me reconozcan.',
-      time: '9:22 AM',
-    },
-  ],
-};
 
 export type PayoutStatus = 'pendiente' | 'liberado';
 

@@ -56,6 +56,7 @@ function mapRowForParent(row: any): BookingForParent {
     ...mapRow(row),
     coachName: row.coach_name,
     playerName: row.player_name,
+    ageCategory: row.age_category,
     tournamentName: row.tournament_name,
     tournamentVenue: row.tournament_venue,
     reviewed: row.reviewed,
@@ -243,7 +244,7 @@ export async function listBookingsForParent(
     // LEFT JOIN en vez de EXISTS(SELECT ...) correlacionado: pg-mem (smoke tests, ver
     // setupDb.ts) no resuelve una subquery en el SELECT list que referencia una columna
     // de la consulta externa (b.id) — mismo tipo de limitación ya documentada ahí.
-    `SELECT b.*, cu.full_name AS coach_name, p.full_name AS player_name,
+    `SELECT b.*, cu.full_name AS coach_name, p.full_name AS player_name, p.age_category,
             t.name AS tournament_name, t.venue AS tournament_venue,
             (rv.id IS NOT NULL) AS reviewed
      FROM bookings b
