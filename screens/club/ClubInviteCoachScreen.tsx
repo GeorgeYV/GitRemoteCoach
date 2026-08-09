@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -79,7 +80,7 @@ export default function ClubInviteCoachScreen({
       </View>
 
       <View style={styles.searchBar}>
-        <Text style={styles.searchIcon}>⌕</Text>
+        <Ionicons name="search-outline" size={16} color={colors.textDim} />
         <TextInput
           style={styles.searchInput}
           placeholder="Nombre o ciudad del entrenador"
@@ -168,10 +169,6 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
     marginBottom: 10,
     gap: 8,
-  },
-  searchIcon: {
-    color: colors.textDim,
-    fontSize: 15,
   },
   searchInput: {
     flex: 1,

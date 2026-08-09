@@ -1,6 +1,9 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import React, { useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import BrandLogo from '../../components/shared/BrandLogo';
+import IconTextInput from '../../components/shared/IconTextInput';
 import { useAuth } from '../../context/AuthContext';
 import { colors, radius, withOpacity } from '../../lib/theme';
 
@@ -51,24 +54,23 @@ export default function LoginScreen({
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.header}>
+        <BrandLogo />
         <Text style={styles.headerTitle}>Iniciar sesión</Text>
         <Text style={styles.headerSubtitle}>Accede con tu correo y contraseña.</Text>
       </View>
 
       <View style={styles.content}>
-        <TextInput
-          style={styles.input}
+        <IconTextInput
+          icon="mail-outline"
           placeholder="Correo electrónico"
-          placeholderTextColor={colors.textDim}
           value={email}
           onChangeText={setEmail}
           autoCapitalize="none"
           keyboardType="email-address"
         />
-        <TextInput
-          style={styles.input}
+        <IconTextInput
+          icon="lock-closed-outline"
           placeholder="Contraseña"
-          placeholderTextColor={colors.textDim}
           value={password}
           onChangeText={setPassword}
           secureTextEntry
@@ -84,7 +86,10 @@ export default function LoginScreen({
           {submitting ? (
             <ActivityIndicator color={colors.courtBlueDeep} />
           ) : (
-            <Text style={styles.submitLabel}>Entrar</Text>
+            <View style={styles.submitContent}>
+              <Ionicons name="log-in-outline" size={18} color={colors.courtBlueDeep} />
+              <Text style={styles.submitLabel}>Entrar</Text>
+            </View>
           )}
         </Pressable>
 
@@ -114,6 +119,7 @@ const styles = StyleSheet.create({
     color: colors.lineWhite,
     fontSize: 22,
     fontWeight: '800',
+    marginTop: 18,
     marginBottom: 6,
   },
   headerSubtitle: {
@@ -123,17 +129,6 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 20,
-  },
-  input: {
-    backgroundColor: colors.panel,
-    borderRadius: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    color: colors.lineWhite,
-    fontSize: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginBottom: 10,
   },
   errorText: {
     color: colors.errorCoral,
@@ -153,6 +148,11 @@ const styles = StyleSheet.create({
   },
   submitButtonDisabled: {
     backgroundColor: withOpacity(colors.ballLime, 0.3),
+  },
+  submitContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   submitLabel: {
     color: colors.courtBlueDeep,

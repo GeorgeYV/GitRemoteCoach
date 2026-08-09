@@ -1,6 +1,8 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import React, { useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import IconTextInput from '../../components/shared/IconTextInput';
 import TrainerAvatarPlaceholder from '../../components/shared/TrainerAvatarPlaceholder';
 import { useAuth } from '../../context/AuthContext';
 import { ApiError, requestBooking } from '../../lib/api';
@@ -129,10 +131,10 @@ export default function BookingConfirmScreen({
         </Section>
 
         <Section label="Nota para el entrenador (opcional)">
-          <TextInput
-            style={styles.input}
+          <IconTextInput
+            icon="chatbubble-ellipses-outline"
+            style={styles.noteInput}
             placeholder={`Ej. ${trainerName.split(' ')[0]}, es su primer torneo nacional…`}
-            placeholderTextColor={colors.textDim}
             value={note}
             onChangeText={setNote}
             multiline
@@ -151,7 +153,10 @@ export default function BookingConfirmScreen({
           {submitting ? (
             <ActivityIndicator color={colors.courtBlueDeep} />
           ) : (
-            <Text style={styles.continueLabel}>Continuar a pago</Text>
+            <View style={styles.continueContent}>
+              <Text style={styles.continueLabel}>Continuar a pago</Text>
+              <Ionicons name="arrow-forward-outline" size={18} color={colors.courtBlueDeep} />
+            </View>
           )}
         </Pressable>
       </View>
@@ -265,15 +270,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
   },
-  input: {
-    backgroundColor: colors.panel,
-    borderRadius: radius,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    color: colors.lineWhite,
-    fontSize: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
+  noteInput: {
     minHeight: 70,
     textAlignVertical: 'top',
   },
@@ -303,6 +300,11 @@ const styles = StyleSheet.create({
   },
   continueButtonDisabled: {
     backgroundColor: withOpacity(colors.ballLime, 0.3),
+  },
+  continueContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   continueLabel: {
     color: colors.courtBlueDeep,

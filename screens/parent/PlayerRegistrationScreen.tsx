@@ -1,6 +1,8 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import React, { useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import IconTextInput from '../../components/shared/IconTextInput';
 import { useAuth } from '../../context/AuthContext';
 import { AgeCategory, ApiError, Player, registerPlayer } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
@@ -62,17 +64,10 @@ export default function PlayerRegistrationScreen({
 
       <ScrollView contentContainerStyle={styles.content}>
         <Section label="Datos del jugador">
-          <TextInput
-            style={styles.input}
-            placeholder="Nombre completo"
-            placeholderTextColor={colors.textDim}
-            value={fullName}
-            onChangeText={setFullName}
-          />
-          <TextInput
-            style={styles.input}
+          <IconTextInput icon="person-outline" placeholder="Nombre completo" value={fullName} onChangeText={setFullName} />
+          <IconTextInput
+            icon="calendar-outline"
             placeholder="Fecha de nacimiento (AAAA-MM-DD)"
-            placeholderTextColor={colors.textDim}
             value={birthDate}
             onChangeText={setBirthDate}
           />
@@ -106,7 +101,10 @@ export default function PlayerRegistrationScreen({
           {submitting ? (
             <ActivityIndicator color={colors.courtBlueDeep} />
           ) : (
-            <Text style={styles.submitLabel}>Continuar</Text>
+            <View style={styles.submitContent}>
+              <Text style={styles.submitLabel}>Continuar</Text>
+              <Ionicons name="arrow-forward-outline" size={18} color={colors.courtBlueDeep} />
+            </View>
           )}
         </Pressable>
       </View>
@@ -174,17 +172,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
     marginBottom: 12,
   },
-  input: {
-    backgroundColor: colors.panel,
-    borderRadius: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    color: colors.lineWhite,
-    fontSize: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginBottom: 10,
-  },
   chipRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -227,6 +214,11 @@ const styles = StyleSheet.create({
   },
   submitButtonDisabled: {
     backgroundColor: withOpacity(colors.ballLime, 0.3),
+  },
+  submitContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   submitLabel: {
     color: colors.courtBlueDeep,

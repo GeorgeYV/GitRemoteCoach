@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -71,7 +72,7 @@ export default function ParentHomeScreen() {
         </View>
 
         <Pressable style={styles.searchBar} onPress={goToTrainers}>
-          <Text style={styles.searchIcon}>⌕</Text>
+          <Ionicons name="search-outline" size={16} color={colors.textDim} />
           <Text style={styles.searchPlaceholder}>Buscar por nombre o sede del torneo</Text>
         </Pressable>
 
@@ -209,10 +210,6 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     marginBottom: 24,
     gap: 8,
-  },
-  searchIcon: {
-    color: colors.textDim,
-    fontSize: 15,
   },
   searchPlaceholder: {
     color: colors.textDim,
