@@ -7,6 +7,7 @@ import { ForbiddenError, ValidationError } from '../lib/errors.js';
 
 const AGE_CATEGORIES = ['U10', 'U12', 'U14', 'U16', 'U18'] as const;
 const PLAYING_LEVELS = ['recreativo', 'competitivo', 'alto_rendimiento'] as const;
+const VERIFICATION_DOC_TYPES = ['identity', 'background_check', 'certification', 'club_reference'] as const;
 
 const updateTrainingSchema = z.object({
   ageCategories: z.array(z.enum(AGE_CATEGORIES)),
@@ -21,6 +22,9 @@ const registerCoachSchema = z.object({
   hourlyRate: z.number().min(0),
   ageCategories: z.array(z.enum(AGE_CATEGORIES)),
   levels: z.array(z.enum(PLAYING_LEVELS)),
+  // file_url es un placeholder hasta que exista almacenamiento real de archivos — ver
+  // coachVerificationDocumentRepository.create.
+  documents: z.array(z.object({ docType: z.enum(VERIFICATION_DOC_TYPES), fileUrl: z.string().min(1) })).default([]),
 });
 
 export async function coachRoutes(app: FastifyInstance): Promise<void> {
@@ -45,6 +49,7 @@ export async function coachRoutes(app: FastifyInstance): Promise<void> {
       hourlyRate: parsed.data.hourlyRate,
       ageCategories: parsed.data.ageCategories,
       levels: parsed.data.levels,
+      documents: parsed.data.documents,
     });
     reply.code(201);
     return profile;
@@ -78,5 +83,13 @@ export async function coachRoutes(app: FastifyInstance): Promise<void> {
     const { sub } = req.user as { sub: string };
     if (sub !== id) throw new ForbiddenError('No puedes ver las reservas de otro entrenador');
     return bookingService.listBookingsForCoach(id);
+  });
+
+  // CoachVerificationPendingScreen: checklist real, documentos de identidad — no público.
+  app.get('/coaches/:id/verification-documents', { preHandler: app.authenticate }, async (req) => {
+    const { id } = req.params as { id: string };
+    const { sub } = req.user as { sub: string };
+    if (sub !== id) throw new ForbiddenError('No puedes ver los documentos de otro entrenador');
+    return coachProfileService.listVerificationDocuments(id);
   });
 }

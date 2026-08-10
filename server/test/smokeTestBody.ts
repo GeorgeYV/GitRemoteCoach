@@ -54,6 +54,7 @@ const parentToken = app.jwt.sign({ sub: fixtures.parentUserId, role: 'parent' })
 const coachAToken = app.jwt.sign({ sub: fixtures.coachAUserId, role: 'coach' });
 const coachBToken = app.jwt.sign({ sub: fixtures.coachBUserId, role: 'coach' });
 const clubAdminToken = app.jwt.sign({ sub: fixtures.clubAdminUserId, role: 'club_admin' });
+const platformAdminToken = app.jwt.sign({ sub: fixtures.platformAdminUserId, role: 'platform_admin' });
 
 function inFuture(hours: number): string {
   return new Date(Date.now() + hours * 3600_000).toISOString();
@@ -1147,6 +1148,125 @@ console.log('\n=== Escenario 22: insignias de "entrenador oficial" del propio co
 
   const untaggedRes = await app.inject({ method: 'GET', url: '/coaches/00000000-0000-0000-0000-000000000099/club-tags' });
   assertEqual(untaggedRes.json(), [], 'un coach sin insignias devuelve lista vacía');
+}
+
+console.log('\n=== Escenario 23: documentos de verificación de coach (CoachRegistrationScreen, CoachVerificationPendingScreen) ===');
+{
+  const registerRes = await app.inject({
+    method: 'POST',
+    url: '/auth/register',
+    payload: {
+      email: 'coach.documentado@example.com',
+      password: 'super-secreta-123',
+      fullName: 'Coach Documentado',
+      primaryRole: 'coach',
+    },
+  });
+  const { token: docCoachToken, user: docCoach } = registerRes.json();
+
+  const createRes = await app.inject({
+    method: 'POST',
+    url: '/coaches',
+    headers: { authorization: `Bearer ${docCoachToken}` },
+    payload: {
+      city: 'CDMX',
+      yearsExperience: 3,
+      hourlyRate: 25,
+      ageCategories: ['U12'],
+      levels: ['competitivo'],
+      documents: [
+        { docType: 'identity', fileUrl: 'placeholder://identity' },
+        { docType: 'background_check', fileUrl: 'placeholder://background_check' },
+      ],
+    },
+  });
+  assertEqual(createRes.statusCode, 201, 'POST /coaches con documentos devuelve 201');
+  assertEqual(createRes.json().profile.verificationStatus, 'pending', 'sigue en pending: los documentos recién creados están pending');
+
+  const noAuthDocsRes = await app.inject({ method: 'GET', url: `/coaches/${docCoach.id}/verification-documents` });
+  assertEqual(noAuthDocsRes.statusCode, 401, 'GET /coaches/:id/verification-documents sin Bearer token devuelve 401');
+
+  const wrongActorDocsRes = await app.inject({
+    method: 'GET',
+    url: `/coaches/${docCoach.id}/verification-documents`,
+    headers: { authorization: `Bearer ${coachAToken}` },
+  });
+  assertEqual(wrongActorDocsRes.statusCode, 403, 'GET /coaches/:id/verification-documents con el token de otro entrenador devuelve 403');
+
+  const docsRes = await app.inject({
+    method: 'GET',
+    url: `/coaches/${docCoach.id}/verification-documents`,
+    headers: { authorization: `Bearer ${docCoachToken}` },
+  });
+  assertEqual(docsRes.statusCode, 200, 'GET /coaches/:id/verification-documents (el propio entrenador) devuelve 200');
+  const docs = docsRes.json();
+  assertTrue(
+    docs.length === 2 && docs.every((d: any) => d.status === 'pending'),
+    'los 2 documentos enviados quedan pending, esperando revisión',
+  );
+  const identityDoc = docs.find((d: any) => d.docType === 'identity');
+  const backgroundDoc = docs.find((d: any) => d.docType === 'background_check');
+
+  const noAuthReviewRes = await app.inject({
+    method: 'PUT',
+    url: `/coach-verification-documents/${identityDoc.id}/review`,
+    payload: { status: 'approved' },
+  });
+  assertEqual(noAuthReviewRes.statusCode, 401, 'PUT .../review sin Bearer token devuelve 401');
+
+  const wrongRoleReviewRes = await app.inject({
+    method: 'PUT',
+    url: `/coach-verification-documents/${identityDoc.id}/review`,
+    headers: { authorization: `Bearer ${clubAdminToken}` },
+    payload: { status: 'approved' },
+  });
+  assertEqual(wrongRoleReviewRes.statusCode, 403, 'PUT .../review con un rol que no es platform_admin devuelve 403');
+
+  const approveIdentityRes = await app.inject({
+    method: 'PUT',
+    url: `/coach-verification-documents/${identityDoc.id}/review`,
+    headers: { authorization: `Bearer ${platformAdminToken}` },
+    payload: { status: 'approved' },
+  });
+  assertEqual(approveIdentityRes.statusCode, 200, 'platform_admin aprueba el documento de identidad');
+  assertEqual(approveIdentityRes.json().reviewedBy, fixtures.platformAdminUserId, 'reviewedBy queda en quien revisó');
+
+  const stillPendingRes = await app.inject({ method: 'GET', url: `/coaches/${docCoach.id}` });
+  assertEqual(
+    stillPendingRes.json().profile.verificationStatus,
+    'pending',
+    'con solo 1 de 2 documentos obligatorios aprobados, el coach sigue en pending',
+  );
+
+  const approveBackgroundRes = await app.inject({
+    method: 'PUT',
+    url: `/coach-verification-documents/${backgroundDoc.id}/review`,
+    headers: { authorization: `Bearer ${platformAdminToken}` },
+    payload: { status: 'approved' },
+  });
+  assertEqual(approveBackgroundRes.statusCode, 200, 'platform_admin aprueba el documento de antecedentes');
+
+  const approvedCoachRes = await app.inject({ method: 'GET', url: `/coaches/${docCoach.id}` });
+  assertEqual(
+    approvedCoachRes.json().profile.verificationStatus,
+    'approved',
+    'con los 2 documentos obligatorios aprobados, el coach pasa a approved',
+  );
+
+  const rejectRes = await app.inject({
+    method: 'PUT',
+    url: `/coach-verification-documents/${identityDoc.id}/review`,
+    headers: { authorization: `Bearer ${platformAdminToken}` },
+    payload: { status: 'rejected' },
+  });
+  assertEqual(rejectRes.statusCode, 200, 'platform_admin puede rechazar un documento ya aprobado');
+
+  const rejectedCoachRes = await app.inject({ method: 'GET', url: `/coaches/${docCoach.id}` });
+  assertEqual(
+    rejectedCoachRes.json().profile.verificationStatus,
+    'rejected',
+    'un solo documento obligatorio rechazado tumba al coach a rejected, aunque el otro esté approved',
+  );
 }
 
 console.log(`\n=== Resultado: ${passed} pasaron, ${failed} fallaron ===`);

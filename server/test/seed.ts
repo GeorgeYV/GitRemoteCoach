@@ -11,6 +11,9 @@ export interface Fixtures {
   /** Torneo activo (status scheduled, fechas futuras) — a diferencia de tournamentId, que es
    * 'completed' a propósito para probar liquidación. Usado por el escenario de GET /tournaments. */
   activeTournamentId: string;
+  /** 'platform_admin' no es auto-registrable (ver SELF_SERVICE_ROLES en authService), así que se
+   * sembra directo — igual que club_admin. Usado para probar la revisión de documentos. */
+  platformAdminUserId: string;
 }
 
 const CLUB_ID = '00000000-0000-0000-0000-000000000001';
@@ -22,6 +25,7 @@ const PLAYER_ID = '00000000-0000-0000-0000-000000000006';
 const CLUB_ADMIN_ID = '00000000-0000-0000-0000-000000000007';
 const CLUB_2_ID = '00000000-0000-0000-0000-000000000008';
 const ACTIVE_TOURNAMENT_ID = '00000000-0000-0000-0000-000000000009';
+const PLATFORM_ADMIN_ID = '00000000-0000-0000-0000-000000000010';
 
 export async function seedFixtures(pool: Pool): Promise<Fixtures> {
   await pool.query(
@@ -29,8 +33,9 @@ export async function seedFixtures(pool: Pool): Promise<Fixtures> {
      ($1, 'maria@example.com', 'x', 'María Guardián', 'parent'),
      ($2, 'carlos@example.com', 'x', 'Carlos Medina', 'coach'),
      ($3, 'ana@example.com', 'x', 'Ana Beltrán', 'coach'),
-     ($4, 'club.bosques@example.com', 'x', 'Laura Ibarra', 'club_admin')`,
-    [PARENT_ID, COACH_A_ID, COACH_B_ID, CLUB_ADMIN_ID],
+     ($4, 'club.bosques@example.com', 'x', 'Laura Ibarra', 'club_admin'),
+     ($5, 'admin@example.com', 'x', 'Admin Plataforma', 'platform_admin')`,
+    [PARENT_ID, COACH_A_ID, COACH_B_ID, CLUB_ADMIN_ID, PLATFORM_ADMIN_ID],
   );
 
   await pool.query(
@@ -91,5 +96,6 @@ export async function seedFixtures(pool: Pool): Promise<Fixtures> {
     coachBUserId: COACH_B_ID,
     playerId: PLAYER_ID,
     activeTournamentId: ACTIVE_TOURNAMENT_ID,
+    platformAdminUserId: PLATFORM_ADMIN_ID,
   };
 }

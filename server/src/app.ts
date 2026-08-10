@@ -8,6 +8,7 @@ import { bookingRoutes } from './routes/bookings.js';
 import { webhookRoutes } from './routes/webhooks.js';
 import { settlementRoutes } from './routes/settlements.js';
 import { coachRoutes } from './routes/coaches.js';
+import { coachVerificationDocumentRoutes } from './routes/coachVerificationDocuments.js';
 import { playerRoutes } from './routes/players.js';
 import { parentRoutes } from './routes/parents.js';
 import { clubInvitationRoutes } from './routes/clubInvitations.js';
@@ -65,6 +66,7 @@ export function buildApp() {
   app.register(bookingRoutes);
   app.register(settlementRoutes);
   app.register(coachRoutes);
+  app.register(coachVerificationDocumentRoutes);
   app.register(playerRoutes);
   app.register(parentRoutes);
   app.register(clubInvitationRoutes);

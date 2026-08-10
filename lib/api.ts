@@ -313,6 +313,19 @@ export function sendBookingMessage(
 export type AgeCategory = 'U10' | 'U12' | 'U14' | 'U16' | 'U18';
 export type PlayingLevel = 'recreativo' | 'competitivo' | 'alto_rendimiento';
 export type VerificationStatus = 'pending' | 'approved' | 'rejected';
+export type VerificationDocType = 'identity' | 'background_check' | 'certification' | 'club_reference';
+
+/** Espeja server/src/types.ts#CoachVerificationDocument. */
+export interface CoachVerificationDocument {
+  id: string;
+  coachId: string;
+  docType: VerificationDocType;
+  fileUrl: string;
+  status: VerificationStatus;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  uploadedAt: string;
+}
 
 /** Espeja server/src/types.ts#CoachProfile. */
 export interface CoachProfile {
@@ -374,12 +387,21 @@ export function registerCoachProfile(
     hourlyRate: number;
     ageCategories: AgeCategory[];
     levels: PlayingLevel[];
+    documents: { docType: VerificationDocType; fileUrl: string }[];
   },
 ): Promise<CoachProfileWithTraining> {
   return request('/coaches', {
     method: 'POST',
     headers: { Authorization: `Bearer ${authToken}` },
     body: JSON.stringify(params),
+  });
+}
+
+/** GET /coaches/:id/verification-documents — CoachVerificationPendingScreen: checklist real del
+ * propio entrenador (no público, requiere ser el dueño de la sesión). */
+export function listCoachVerificationDocuments(authToken: string, coachId: string): Promise<CoachVerificationDocument[]> {
+  return request(`/coaches/${coachId}/verification-documents`, {
+    headers: { Authorization: `Bearer ${authToken}` },
   });
 }
 

@@ -1,6 +1,14 @@
 import { withTransaction } from '../lib/db.js';
 import * as coachRepository from '../repositories/coachRepository.js';
-import type { AgeCategory, CoachProfile, CoachSearchResult, PlayingLevel } from '../types.js';
+import * as coachVerificationDocumentRepository from '../repositories/coachVerificationDocumentRepository.js';
+import type {
+  AgeCategory,
+  CoachProfile,
+  CoachSearchResult,
+  CoachVerificationDocument,
+  PlayingLevel,
+  VerificationDocType,
+} from '../types.js';
 
 export interface CoachProfileWithTraining {
   profile: CoachProfile;
@@ -39,6 +47,7 @@ export async function registerCoachProfile(
     hourlyRate: number;
     ageCategories: AgeCategory[];
     levels: PlayingLevel[];
+    documents: { docType: VerificationDocType; fileUrl: string }[];
   },
 ): Promise<CoachProfileWithTraining> {
   return withTransaction(async (client) => {
@@ -55,6 +64,12 @@ export async function registerCoachProfile(
     );
     await coachRepository.setCoachAgeCategories(userId, params.ageCategories, client);
     await coachRepository.setCoachLevels(userId, params.levels, client);
+    for (const doc of params.documents) {
+      await coachVerificationDocumentRepository.create({ coachId: userId, docType: doc.docType, fileUrl: doc.fileUrl }, client);
+    }
+    if (params.documents.length > 0) {
+      await coachVerificationDocumentRepository.recalculateVerificationStatus(userId, client);
+    }
     const profile = await coachRepository.getCoachProfile(userId, client);
     return { profile, ageCategories: params.ageCategories, levels: params.levels };
   });
@@ -74,5 +89,26 @@ export async function updateCoachTraining(
     await coachRepository.setCoachLevels(coachId, params.levels, client);
     const profile = await coachRepository.getCoachProfile(coachId, client);
     return { profile, ageCategories: params.ageCategories, levels: params.levels };
+  });
+}
+
+/** CoachVerificationPendingScreen: checklist real del propio entrenador. */
+export async function listVerificationDocuments(coachId: string): Promise<CoachVerificationDocument[]> {
+  return coachVerificationDocumentRepository.listForCoach(coachId);
+}
+
+/**
+ * Cola de revisión del admin de plataforma — sin pantalla propia todavía (fuera de alcance de esta
+ * tarea, que solo hace real el estado de los documentos). Recalcula coach_profiles.verification_status
+ * en la misma transacción para que quede consistente con el documento recién revisado.
+ */
+export async function reviewVerificationDocument(
+  documentId: string,
+  params: { status: 'approved' | 'rejected'; reviewedBy: string },
+): Promise<CoachVerificationDocument> {
+  return withTransaction(async (client) => {
+    const document = await coachVerificationDocumentRepository.review(documentId, params, client);
+    await coachVerificationDocumentRepository.recalculateVerificationStatus(document.coachId, client);
+    return document;
   });
 }

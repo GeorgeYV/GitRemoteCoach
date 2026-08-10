@@ -2,9 +2,23 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import VerificationRow from '../../components/shared/VerificationRow';
-import { ApiError, CoachProfileWithTraining, getCoachProfile, VerificationStatus } from '../../lib/api';
+import { useAuth } from '../../context/AuthContext';
+import {
+  ApiError,
+  CoachProfileWithTraining,
+  CoachVerificationDocument,
+  getCoachProfile,
+  listCoachVerificationDocuments,
+  VerificationStatus,
+} from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
-import { mockDocumentChecklist } from '../../mock/coachFlow';
+import { VERIFICATION_DOC_LABELS } from '../../mock/coachFlow';
+
+const DOC_STATUS_SUBTITLE: Record<VerificationStatus, string> = {
+  pending: 'Recibido, en revisión',
+  approved: 'Aprobado',
+  rejected: 'Rechazado, vuelve a enviarlo',
+};
 
 const STEPS = ['Enviado', 'En revisión', 'Aprobado'];
 
@@ -28,15 +42,23 @@ const SUBTITLE_FOR_STATUS: Record<VerificationStatus, string> = {
 };
 
 export default function CoachVerificationPendingScreen({ coachId }: { coachId: string }) {
+  const { token } = useAuth();
   const [profile, setProfile] = useState<CoachProfileWithTraining | null>(null);
+  const [documents, setDocuments] = useState<CoachVerificationDocument[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!token) {
+      setError('No hay una sesión activa.');
+      return;
+    }
     let cancelled = false;
     setError(null);
-    getCoachProfile(coachId)
-      .then((result) => {
-        if (!cancelled) setProfile(result);
+    Promise.all([getCoachProfile(coachId), listCoachVerificationDocuments(token, coachId)])
+      .then(([profileResult, documentsResult]) => {
+        if (cancelled) return;
+        setProfile(profileResult);
+        setDocuments(documentsResult);
       })
       .catch((err) => {
         if (cancelled) return;
@@ -45,7 +67,7 @@ export default function CoachVerificationPendingScreen({ coachId }: { coachId: s
     return () => {
       cancelled = true;
     };
-  }, [coachId]);
+  }, [coachId, token]);
 
   const status = profile?.profile.verificationStatus ?? 'pending';
   const currentStepIndex = STEP_INDEX_FOR_STATUS[status];
@@ -90,13 +112,17 @@ export default function CoachVerificationPendingScreen({ coachId }: { coachId: s
 
         <View style={styles.card}>
           <Text style={styles.cardLabel}>Documentos recibidos</Text>
-          {mockDocumentChecklist.map((doc) => (
-            <VerificationRow
-              key={doc.id}
-              title={doc.title}
-              subtitle={doc.optional ? 'Opcional · recibido' : 'Recibido, en revisión'}
-            />
-          ))}
+          {documents.length === 0 ? (
+            <Text style={styles.emptyDocsText}>Todavía no recibimos documentos tuyos.</Text>
+          ) : (
+            documents.map((doc) => {
+              const label = VERIFICATION_DOC_LABELS[doc.docType];
+              const subtitle = label.optional
+                ? `Opcional · ${DOC_STATUS_SUBTITLE[doc.status].toLowerCase()}`
+                : DOC_STATUS_SUBTITLE[doc.status];
+              return <VerificationRow key={doc.id} title={label.title} subtitle={subtitle} />;
+            })
+          )}
         </View>
 
         <View style={styles.reassuranceBox}>
@@ -226,6 +252,10 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.8,
     marginBottom: 14,
+  },
+  emptyDocsText: {
+    color: colors.textDim,
+    fontSize: 12,
   },
   reassuranceBox: {
     backgroundColor: withOpacity(colors.ballLime, 0.08),

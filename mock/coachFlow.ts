@@ -1,7 +1,8 @@
+import type { VerificationDocType } from '../lib/api';
 import { REAL_TOURNAMENT_ID } from './parentFlow';
 
 export interface DocumentItem {
-  id: string;
+  id: VerificationDocType;
   title: string;
   subtitle: string;
   status: 'pending' | 'uploaded';
@@ -11,7 +12,9 @@ export interface DocumentItem {
 export const AGE_CATEGORY_OPTIONS = ['U10', 'U12', 'U14', 'U16', 'U18'];
 export const LEVEL_OPTIONS = ['Recreativo', 'Competitivo', 'Alto rendimiento'];
 
-export const mockDocumentChecklist: DocumentItem[] = [
+/** Checklist de registro del entrenador — id coincide 1:1 con VerificationDocType para poder
+ * enviarse directo al backend real en CoachRegistrationScreen (ver server/db/schema.sql#verification_doc_type). */
+export const VERIFICATION_DOC_CHECKLIST: DocumentItem[] = [
   {
     id: 'identity',
     title: 'Identificación oficial',
@@ -19,25 +22,35 @@ export const mockDocumentChecklist: DocumentItem[] = [
     status: 'uploaded',
   },
   {
-    id: 'background',
+    id: 'background_check',
     title: 'Certificado de antecedentes penales',
     subtitle: 'Vigencia no mayor a 6 meses',
     status: 'uploaded',
   },
   {
-    id: 'federation',
+    id: 'certification',
     title: 'Certificación federativa',
     subtitle: 'Aumenta tu visibilidad ante los padres',
     status: 'pending',
     optional: true,
   },
   {
-    id: 'references',
+    id: 'club_reference',
     title: 'Referencias de club o academia',
     subtitle: 'Al menos un contacto que confirme tu experiencia',
     status: 'pending',
   },
 ];
+
+/** Metadatos de despliegue (título/subtítulo) por tipo de documento — usado por
+ * CoachVerificationPendingScreen para etiquetar los documentos reales que trae el backend
+ * (que solo guarda doc_type, no copy de UI). */
+export const VERIFICATION_DOC_LABELS: Record<VerificationDocType, { title: string; subtitle: string; optional?: boolean }> = {
+  identity: VERIFICATION_DOC_CHECKLIST[0],
+  background_check: VERIFICATION_DOC_CHECKLIST[1],
+  certification: VERIFICATION_DOC_CHECKLIST[2],
+  club_reference: VERIFICATION_DOC_CHECKLIST[3],
+};
 
 export type RateMode = 'partido' | 'dia' | 'torneo';
 

@@ -8,7 +8,11 @@ import TrainerAvatarPlaceholder from '../../components/shared/TrainerAvatarPlace
 import { useAuth } from '../../context/AuthContext';
 import { AgeCategory, ApiError, PlayingLevel, registerCoachProfile } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
-import { AGE_CATEGORY_OPTIONS, DocumentItem, LEVEL_OPTIONS, mockDocumentChecklist } from '../../mock/coachFlow';
+import { AGE_CATEGORY_OPTIONS, DocumentItem, LEVEL_OPTIONS, VERIFICATION_DOC_CHECKLIST } from '../../mock/coachFlow';
+
+/** No hay almacenamiento real de archivos todavía: el checklist sigue siendo interactivo, pero el
+ * backend recibe un placeholder en vez de un archivo real por cada documento marcado como subido. */
+const PLACEHOLDER_FILE_URL_PREFIX = 'placeholder://';
 
 const LEVEL_LABEL_TO_VALUE: Record<string, PlayingLevel> = {
   Recreativo: 'recreativo',
@@ -25,7 +29,7 @@ export default function CoachRegistrationScreen({ onSubmit }: { onSubmit?: () =>
   const [hourlyRate, setHourlyRate] = useState('');
   const [categories, setCategories] = useState<string[]>([]);
   const [levels, setLevels] = useState<string[]>([]);
-  const [documents, setDocuments] = useState<DocumentItem[]>(mockDocumentChecklist);
+  const [documents, setDocuments] = useState<DocumentItem[]>(VERIFICATION_DOC_CHECKLIST);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -52,6 +56,9 @@ export default function CoachRegistrationScreen({ onSubmit }: { onSubmit?: () =>
         hourlyRate: Number(hourlyRate) || 0,
         ageCategories: categories as AgeCategory[],
         levels: levels.map((label) => LEVEL_LABEL_TO_VALUE[label]),
+        documents: documents
+          .filter((d) => d.status === 'uploaded')
+          .map((d) => ({ docType: d.id, fileUrl: `${PLACEHOLDER_FILE_URL_PREFIX}${d.id}` })),
       });
       onSubmit?.();
     } catch (err) {

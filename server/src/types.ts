@@ -165,6 +165,24 @@ export interface CoachProfile {
   updatedAt: string;
 }
 
+/** 'club_reference' cubre el checklist de registro del entrenador ("referencias de club o
+ * academia"), distinto de 'certification' (certificación federativa). Espeja verification_doc_type. */
+export type VerificationDocType = 'identity' | 'background_check' | 'certification' | 'club_reference';
+
+/** CoachRegistrationScreen (envío), CoachVerificationPendingScreen (lectura). 'identity' y
+ * 'background_check' son obligatorios para que verification_status llegue a 'approved'
+ * (ver recalculateVerificationStatus en coachVerificationDocumentRepository). */
+export interface CoachVerificationDocument {
+  id: string;
+  coachId: string;
+  docType: VerificationDocType;
+  fileUrl: string;
+  status: VerificationStatus;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  uploadedAt: string;
+}
+
 export interface CoachAgeCategory {
   coachId: string;
   ageCategory: AgeCategory;
