@@ -4,20 +4,16 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import PaymentMethodRow from '../../components/parent/PaymentMethodRow';
 import TrainerAvatarPlaceholder from '../../components/shared/TrainerAvatarPlaceholder';
 import { useAuth } from '../../context/AuthContext';
-import { ApiError, payBooking } from '../../lib/api';
+import { ApiError, payBooking, TournamentSearchResult } from '../../lib/api';
 import { colors, radius } from '../../lib/theme';
-import {
-  BOOKING_PERIOD_LABELS,
-  BookingSlotSelection,
-  mockFeaturedTournament,
-  mockPaymentMethods,
-} from '../../mock/parentFlow';
+import { BOOKING_PERIOD_LABELS, BookingSlotSelection, mockPaymentMethods } from '../../mock/parentFlow';
 
 export default function BookingPaymentScreen({
   bookingId,
   selection,
   note,
   trainerName,
+  tournament,
   price,
   onBack,
   onConfirm,
@@ -26,6 +22,7 @@ export default function BookingPaymentScreen({
   selection: BookingSlotSelection;
   note: string;
   trainerName: string;
+  tournament: TournamentSearchResult;
   price: number;
   onBack: () => void;
   onConfirm: () => void;
@@ -72,12 +69,12 @@ export default function BookingPaymentScreen({
               <TrainerAvatarPlaceholder size={48} />
               <View style={styles.summaryInfo}>
                 <Text style={styles.trainerName}>{trainerName}</Text>
-                <Text style={styles.summaryMeta}>{mockFeaturedTournament.name}</Text>
+                <Text style={styles.summaryMeta}>{tournament.name}</Text>
               </View>
             </View>
             <View style={styles.summaryDivider} />
             <SummaryLine label="Día y horario" value={`${selection.dayLabel} · ${BOOKING_PERIOD_LABELS[selection.period]}`} />
-            <SummaryLine label="Sede" value={mockFeaturedTournament.venue} />
+            <SummaryLine label="Sede" value={tournament.venue} />
             {note ? <SummaryLine label="Nota" value={note} /> : null}
             <View style={styles.summaryDivider} />
             <SummaryLine label="Total a pagar" value={`$${price}`} emphasize />

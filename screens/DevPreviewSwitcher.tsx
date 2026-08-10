@@ -4,7 +4,7 @@ import { colors } from '../lib/theme';
 import { mockClubAdmin } from '../mock/clubFlow';
 import { CoachBooking } from '../mock/coachFlow';
 import { BookingHistoryEntry, mockCarlosMedinaProfile, REAL_COMPLETED_BOOKING_ID } from '../mock/parentFlow';
-import type { BookingWithParticipants } from '../lib/api';
+import type { BookingWithParticipants, TournamentSearchResult } from '../lib/api';
 import LoginScreen from './auth/LoginScreen';
 import RegisterScreen from './auth/RegisterScreen';
 import CoachChatScreen from './coach/CoachChatScreen';
@@ -136,6 +136,18 @@ const PREVIEW_COACH_MATCH_BOOKING: BookingWithParticipants = {
   tournamentVenue: '—',
 };
 
+/** Mismo criterio que las demás fixtures de esta pantalla: id real (Copa Nacional Juvenil en
+ * server/test/seed.ts) para que la disponibilidad real cargue, resto placeholder porque no hay
+ * torneo elegido fuera del flujo real (ParentTournamentSearchScreen). */
+const PREVIEW_TOURNAMENT: TournamentSearchResult = {
+  id: '00000000-0000-0000-0000-000000000002',
+  name: 'Vista previa',
+  venue: '—',
+  city: '—',
+  startDate: new Date().toISOString(),
+  endDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
+};
+
 const PREVIEW_PARENT_CHAT_BOOKING: BookingHistoryEntry = {
   id: REAL_COMPLETED_BOOKING_ID,
   trainerName: 'Vista previa',
@@ -191,7 +203,7 @@ export default function DevPreviewSwitcher() {
         ) : screen === 'parentHome' ? (
           <ParentHomeScreen />
         ) : screen === 'parentList' ? (
-          <TrainerListScreen />
+          <TrainerListScreen tournament={PREVIEW_TOURNAMENT} />
         ) : screen === 'parentChat' ? (
           <ParentChatScreen booking={PREVIEW_PARENT_CHAT_BOOKING} />
         ) : screen === 'parentHistory' ? (

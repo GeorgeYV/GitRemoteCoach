@@ -1,15 +1,3 @@
-export interface Tournament {
-  id: string;
-  name: string;
-  venue: string;
-  city: string;
-  dates: string;
-}
-
-export interface FeaturedTournament extends Tournament {
-  badgeLabel: string;
-}
-
 export interface Trainer {
   id: string;
   name: string;
@@ -32,6 +20,9 @@ export interface ReportStat {
 
 export interface AvailabilityDay {
   dayLabel: string;
+  /** Fecha ISO real del día (ver lib/dateSlots.ts#buildDaySlotsFromRange) — necesaria para
+   * construir el matchDatetime real al reservar, ya no se busca por dayLabel en una tabla fija. */
+  isoDate: string;
   morningAvailable: boolean;
   afternoonAvailable: boolean;
 }
@@ -45,38 +36,22 @@ export const BOOKING_PERIOD_LABELS: Record<BookingPeriod, string> = {
 
 export interface BookingSlotSelection {
   dayLabel: string;
+  isoDate: string;
   period: BookingPeriod;
 }
-
-/** UUID real del torneo — coincide con tournamentId en server/test/seed.ts. Independiente de
- * mockFeaturedTournament.id (un slug que el lado coach usa para presets de disponibilidad/tarifa
- * en mock/coachFlow.ts — cambiarlo rompería esos lookups). */
-export const REAL_TOURNAMENT_ID = '00000000-0000-0000-0000-000000000002';
 
 /** UUID real de una reserva completada con Carlos — usada para probar reseñas y chat
  * (GET/POST /bookings/:id/messages, POST /bookings/:id/review) contra el backend real. */
 export const REAL_COMPLETED_BOOKING_ID = '44444444-4444-4444-8444-444444444444';
-
-/** Compartido con CoachAvailabilityScreen (mock/coachFlow.ts usa las mismas etiquetas de día para
- * 'copa-nacional-juvenil') para que ambos lados del torneo hablen de las mismas fechas reales. */
-export const BOOKING_DAY_LABEL_TO_DATE: Record<string, string> = {
-  'Vie 5': '2026-08-10',
-  'Sáb 6': '2026-08-11',
-  'Dom 7': '2026-08-12',
-  'Lun 8': '2026-08-13',
-  'Mar 9': '2026-08-14',
-};
 
 const BOOKING_PERIOD_TO_TIME: Record<BookingPeriod, string> = {
   morning: '10:00:00',
   afternoon: '16:00:00',
 };
 
-/** Traduce la selección de día/horario del wireframe a un ISO datetime real para POST /bookings. */
+/** Traduce la selección de día/horario a un ISO datetime real para POST /bookings. */
 export function buildMatchDatetime(selection: BookingSlotSelection): string {
-  const date = BOOKING_DAY_LABEL_TO_DATE[selection.dayLabel] ?? BOOKING_DAY_LABEL_TO_DATE['Vie 5'];
-  const time = BOOKING_PERIOD_TO_TIME[selection.period];
-  return `${date}T${time}.000Z`;
+  return `${selection.isoDate}T${BOOKING_PERIOD_TO_TIME[selection.period]}.000Z`;
 }
 
 export interface PaymentMethod {
@@ -133,39 +108,6 @@ export interface TrainerProfile {
   availability: AvailabilityDay[];
   officialClub: string;
 }
-
-export const mockFeaturedTournament: FeaturedTournament = {
-  id: 'copa-nacional-juvenil',
-  name: 'Copa Nacional Juvenil',
-  venue: 'Club Deportivo Bosques',
-  city: 'CDMX',
-  dates: '5 – 9 Ago 2026',
-  badgeLabel: 'Empieza en 5 días',
-};
-
-export const mockActiveTournaments: Tournament[] = [
-  {
-    id: 'copa-nacional-juvenil',
-    name: 'Copa Nacional Juvenil',
-    venue: 'Club Deportivo Bosques',
-    city: 'CDMX',
-    dates: '5 – 9 Ago 2026',
-  },
-  {
-    id: 'abierto-regional-sub16',
-    name: 'Abierto Regional Sub-16',
-    venue: 'Club Guadalajara Tenis',
-    city: 'Guadalajara',
-    dates: '20 – 24 Ago 2026',
-  },
-  {
-    id: 'copa-verano-u14',
-    name: 'Copa de Verano U14',
-    venue: 'Club Puebla Racquet',
-    city: 'Puebla',
-    dates: '2 – 5 Sep 2026',
-  },
-];
 
 export const mockTrainers: Trainer[] = [
   {
@@ -229,11 +171,11 @@ export const mockCarlosMedinaProfile: TrainerProfile = {
     { value: '4/6', label: 'Quiebres' },
   ],
   availability: [
-    { dayLabel: 'Vie 5', morningAvailable: true, afternoonAvailable: false },
-    { dayLabel: 'Sáb 6', morningAvailable: true, afternoonAvailable: true },
-    { dayLabel: 'Dom 7', morningAvailable: false, afternoonAvailable: true },
-    { dayLabel: 'Lun 8', morningAvailable: true, afternoonAvailable: true },
-    { dayLabel: 'Mar 9', morningAvailable: true, afternoonAvailable: false },
+    { dayLabel: 'Vie 5', isoDate: '2026-08-05', morningAvailable: true, afternoonAvailable: false },
+    { dayLabel: 'Sáb 6', isoDate: '2026-08-06', morningAvailable: true, afternoonAvailable: true },
+    { dayLabel: 'Dom 7', isoDate: '2026-08-07', morningAvailable: false, afternoonAvailable: true },
+    { dayLabel: 'Lun 8', isoDate: '2026-08-08', morningAvailable: true, afternoonAvailable: true },
+    { dayLabel: 'Mar 9', isoDate: '2026-08-09', morningAvailable: true, afternoonAvailable: false },
   ],
   officialClub: 'Club Deportivo Bosques',
 };

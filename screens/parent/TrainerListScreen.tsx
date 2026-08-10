@@ -2,14 +2,17 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import TrainerAvatarPlaceholder from '../../components/shared/TrainerAvatarPlaceholder';
-import { ApiError, CoachSearchResult, searchCoaches } from '../../lib/api';
+import { ApiError, CoachSearchResult, searchCoaches, TournamentSearchResult } from '../../lib/api';
+import { dateRangeLabel } from '../../lib/dateSlots';
 import { colors, radius } from '../../lib/theme';
-import { FILTER_CHIPS, mockFeaturedTournament } from '../../mock/parentFlow';
+import { FILTER_CHIPS } from '../../mock/parentFlow';
 
 export default function TrainerListScreen({
+  tournament,
   onBack,
   onSelectTrainer,
 }: {
+  tournament: TournamentSearchResult;
   onBack?: () => void;
   onSelectTrainer?: (coach: CoachSearchResult) => void;
 }) {
@@ -45,10 +48,10 @@ export default function TrainerListScreen({
         </Pressable>
         <View style={styles.headerText}>
           <Text style={styles.tournamentName} numberOfLines={1}>
-            {mockFeaturedTournament.name}
+            {tournament.name}
           </Text>
           <Text style={styles.tournamentMeta} numberOfLines={1}>
-            {mockFeaturedTournament.venue} · {mockFeaturedTournament.dates}
+            {tournament.venue} · {dateRangeLabel(tournament.startDate, tournament.endDate)}
           </Text>
         </View>
       </View>

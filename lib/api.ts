@@ -174,6 +174,19 @@ export function getBooking(authToken: string, bookingId: string): Promise<Bookin
   return request(`/bookings/${bookingId}`, { headers: { Authorization: `Bearer ${authToken}` } });
 }
 
+/** Espeja server/src/services/bookingService.ts#AlternativeCoach — sugerencia simple (mismo
+ * torneo, sin lógica real de matching/disponibilidad) para cuando la reserva original no prosperó. */
+export interface AlternativeCoach {
+  coachId: string;
+  name: string;
+  ratingAvg: number;
+}
+
+/** GET /bookings/:id/alternatives — BookingStatusScreen, cuando la reserva termina 'rejected' o 'expired'. */
+export function getBookingAlternatives(authToken: string, bookingId: string): Promise<AlternativeCoach[]> {
+  return request(`/bookings/${bookingId}/alternatives`, { headers: { Authorization: `Bearer ${authToken}` } });
+}
+
 /** GET /coaches/:id/bookings — CoachHomeScreen, CoachRequestInboxScreen, CoachSessionHistoryScreen, CoachEarningsScreen. */
 export function listCoachBookings(authToken: string, coachId: string): Promise<BookingWithParticipants[]> {
   return request(`/coaches/${coachId}/bookings`, { headers: { Authorization: `Bearer ${authToken}` } });

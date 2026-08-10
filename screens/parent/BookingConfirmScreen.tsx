@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import IconTextInput from '../../components/shared/IconTextInput';
 import TrainerAvatarPlaceholder from '../../components/shared/TrainerAvatarPlaceholder';
 import { useAuth } from '../../context/AuthContext';
-import { ApiError, requestBooking } from '../../lib/api';
+import { ApiError, requestBooking, TournamentSearchResult } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
 import {
   AvailabilityDay,
@@ -13,13 +13,12 @@ import {
   BookingPeriod,
   BookingSlotSelection,
   buildMatchDatetime,
-  mockFeaturedTournament,
-  REAL_TOURNAMENT_ID,
 } from '../../mock/parentFlow';
 
 export default function BookingConfirmScreen({
   playerId,
   coachId,
+  tournament,
   trainerName,
   price,
   availability,
@@ -28,6 +27,7 @@ export default function BookingConfirmScreen({
 }: {
   playerId: string;
   coachId: string;
+  tournament: TournamentSearchResult;
   trainerName: string;
   price: number;
   availability: AvailabilityDay[];
@@ -40,8 +40,8 @@ export default function BookingConfirmScreen({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  function selectSlot(dayLabel: string, period: BookingPeriod) {
-    setSelection({ dayLabel, period });
+  function selectSlot(day: AvailabilityDay, period: BookingPeriod) {
+    setSelection({ dayLabel: day.dayLabel, isoDate: day.isoDate, period });
   }
 
   async function handleContinue() {
@@ -56,7 +56,7 @@ export default function BookingConfirmScreen({
       const booking = await requestBooking(token, {
         playerId,
         coachId,
-        tournamentId: REAL_TOURNAMENT_ID,
+        tournamentId: tournament.id,
         matchDatetime: buildMatchDatetime(selection),
         agreedRate: price,
         note: note.trim() || undefined,
@@ -83,7 +83,7 @@ export default function BookingConfirmScreen({
             Reservar con {trainerName}
           </Text>
           <Text style={styles.tournamentMeta} numberOfLines={1}>
-            {mockFeaturedTournament.name}
+            {tournament.name}
           </Text>
         </View>
       </View>
@@ -101,7 +101,7 @@ export default function BookingConfirmScreen({
                     <Pressable
                       key={period}
                       disabled={!available}
-                      onPress={() => selectSlot(day.dayLabel, period)}
+                      onPress={() => selectSlot(day, period)}
                       style={[
                         styles.slotPill,
                         !available && styles.slotPillDisabled,

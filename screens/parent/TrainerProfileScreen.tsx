@@ -14,10 +14,12 @@ import {
   listCoachReviews,
   PlayingLevel,
   ReviewWithParent,
+  TournamentSearchResult,
   VerificationStatus,
 } from '../../lib/api';
+import { buildDaySlotsFromRange } from '../../lib/dateSlots';
 import { colors, radius } from '../../lib/theme';
-import { AvailabilityDay, BOOKING_DAY_LABEL_TO_DATE, REAL_TOURNAMENT_ID } from '../../mock/parentFlow';
+import { AvailabilityDay } from '../../mock/parentFlow';
 
 /** Contenido de ejemplo, no ligado a ningún coach real — la sección ya se etiqueta como
  * "anonimizado" en la UI; no hay un endpoint de reporte-promedio del que sacar esto de verdad. */
@@ -40,14 +42,18 @@ const VERIFICATION_LABELS: Record<VerificationStatus, string> = {
   rejected: 'Verificación no aprobada',
 };
 
-function toAvailabilityDays(availability: CoachTournamentAvailability[]): AvailabilityDay[] {
-  // slotDate llega como datetime ISO completo (pg serializa DATE como Date → JSON), no como
-  // 'YYYY-MM-DD' — hay que recortarlo antes de matchear contra BOOKING_DAY_LABEL_TO_DATE.
+/** slotDate llega como datetime ISO completo (pg serializa DATE como Date → JSON), no como
+ * 'YYYY-MM-DD' — hay que recortarlo antes de matchear contra los días reales del torneo. */
+function toAvailabilityDays(
+  tournament: TournamentSearchResult,
+  availability: CoachTournamentAvailability[],
+): AvailabilityDay[] {
   const byDate = new Map(availability.map((a) => [a.slotDate.slice(0, 10), a]));
-  return Object.entries(BOOKING_DAY_LABEL_TO_DATE).map(([dayLabel, date]) => {
-    const slot = byDate.get(date);
+  return buildDaySlotsFromRange(tournament.startDate, tournament.endDate).map(({ dayLabel, isoDate }) => {
+    const slot = byDate.get(isoDate);
     return {
       dayLabel,
+      isoDate,
       morningAvailable: slot?.morning ?? false,
       afternoonAvailable: slot?.afternoon ?? false,
     };
@@ -56,10 +62,12 @@ function toAvailabilityDays(availability: CoachTournamentAvailability[]): Availa
 
 export default function TrainerProfileScreen({
   coachId,
+  tournament,
   onBack,
   onReserve,
 }: {
   coachId: string;
+  tournament: TournamentSearchResult;
   onBack?: () => void;
   onReserve?: (info: { coachId: string; name: string; price: number; availability: AvailabilityDay[] }) => void;
 }) {
@@ -74,11 +82,11 @@ export default function TrainerProfileScreen({
   useEffect(() => {
     let cancelled = false;
     setLoadError(null);
-    Promise.all([getCoachProfile(coachId), getCoachTournamentAvailability(coachId, REAL_TOURNAMENT_ID)])
+    Promise.all([getCoachProfile(coachId), getCoachTournamentAvailability(coachId, tournament.id)])
       .then(([profileResult, availabilityResult]) => {
         if (cancelled) return;
         setProfile(profileResult);
-        setAvailability(toAvailabilityDays(availabilityResult.availability));
+        setAvailability(toAvailabilityDays(tournament, availabilityResult.availability));
         setPrice(Number(availabilityResult.rate?.amount ?? profileResult.profile.hourlyRate));
       })
       .catch((err) => {
@@ -88,7 +96,7 @@ export default function TrainerProfileScreen({
     return () => {
       cancelled = true;
     };
-  }, [coachId]);
+  }, [coachId, tournament]);
 
   useEffect(() => {
     let cancelled = false;

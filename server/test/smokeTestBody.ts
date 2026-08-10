@@ -253,6 +253,8 @@ console.log('\n=== Escenario 6: expiración por vencimiento de ventana (sin resp
     })
   ).json();
   assertTrue(Array.isArray(alternatives) && alternatives.some((a: any) => a.coachId === fixtures.coachAUserId), 'sugiere al otro entrenador etiquetado en el torneo como alternativa');
+  const suggestedCoachA = alternatives.find((a: any) => a.coachId === fixtures.coachAUserId);
+  assertEqual(suggestedCoachA.name, 'Carlos Medina', 'la alternativa trae el nombre del entrenador (JOIN con users)');
 }
 
 console.log('\n=== Escenario 7: condición de carrera — cancelar una reserva ya completada ===');

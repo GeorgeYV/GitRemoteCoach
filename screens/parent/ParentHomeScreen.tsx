@@ -6,14 +6,29 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import ParentTabBar from '../../components/parent/ParentTabBar';
 import InitialAvatar from '../../components/shared/InitialAvatar';
 import { useAuth } from '../../context/AuthContext';
-import { listPlayers } from '../../lib/api';
+import { listPlayers, searchTournaments, TournamentSearchResult } from '../../lib/api';
+import { dateRangeLabel } from '../../lib/dateSlots';
 import { colors, radius } from '../../lib/theme';
-import { mockActiveTournaments, mockFeaturedTournament, Tournament } from '../../mock/parentFlow';
+
+/** "Empieza en N días" si el torneo todavía no arranca, "En curso" si hoy cae dentro del rango,
+ * o nada si por alguna razón el rango ya pasó (no debería, GET /tournaments ya filtra por status). */
+function tournamentBadgeLabel(tournament: TournamentSearchResult): string | null {
+  const now = Date.now();
+  const start = new Date(tournament.startDate).getTime();
+  const end = new Date(tournament.endDate).getTime();
+  if (now < start) {
+    const days = Math.ceil((start - now) / (24 * 60 * 60 * 1000));
+    return days <= 1 ? 'Empieza mañana' : `Empieza en ${days} días`;
+  }
+  if (now <= end) return 'En curso';
+  return null;
+}
 
 export default function ParentHomeScreen() {
   const router = useRouter();
   const { user, token } = useAuth();
   const [childName, setChildName] = useState<string | null>(null);
+  const [tournaments, setTournaments] = useState<TournamentSearchResult[] | null>(null);
 
   useEffect(() => {
     if (!token) return;
@@ -22,11 +37,19 @@ export default function ParentHomeScreen() {
       .catch(() => setChildName(null));
   }, [token]);
 
+  useEffect(() => {
+    searchTournaments()
+      .then(setTournaments)
+      .catch(() => setTournaments([]));
+  }, []);
+
   function goToTrainers() {
     router.push('/trainers');
   }
 
   const firstName = user?.fullName.split(' ')[0] ?? '';
+  const featured = tournaments?.[0] ?? null;
+  const rest = tournaments?.slice(1) ?? [];
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -43,20 +66,26 @@ export default function ParentHomeScreen() {
             : 'Encuentra un entrenador para tu próximo torneo'}
         </Text>
 
-        <Text style={styles.sectionLabel}>Continuar con</Text>
-        <View style={styles.featuredCard}>
-          <View style={styles.badge}>
-            <Text style={styles.badgeLabel}>{mockFeaturedTournament.badgeLabel}</Text>
-          </View>
-          <Text style={styles.featuredName}>{mockFeaturedTournament.name}</Text>
-          <Text style={styles.featuredMeta}>
-            {mockFeaturedTournament.venue} · {mockFeaturedTournament.city}
-          </Text>
-          <Text style={styles.featuredMeta}>{mockFeaturedTournament.dates}</Text>
-          <Pressable style={styles.ctaButton} onPress={goToTrainers}>
-            <Text style={styles.ctaLabel}>Ver entrenadores</Text>
-          </Pressable>
-        </View>
+        {featured && (
+          <>
+            <Text style={styles.sectionLabel}>Continuar con</Text>
+            <View style={styles.featuredCard}>
+              {tournamentBadgeLabel(featured) && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeLabel}>{tournamentBadgeLabel(featured)}</Text>
+                </View>
+              )}
+              <Text style={styles.featuredName}>{featured.name}</Text>
+              <Text style={styles.featuredMeta}>
+                {featured.venue} · {featured.city}
+              </Text>
+              <Text style={styles.featuredMeta}>{dateRangeLabel(featured.startDate, featured.endDate)}</Text>
+              <Pressable style={styles.ctaButton} onPress={goToTrainers}>
+                <Text style={styles.ctaLabel}>Ver entrenadores</Text>
+              </Pressable>
+            </View>
+          </>
+        )}
 
         <Pressable style={styles.searchBar} onPress={goToTrainers}>
           <Ionicons name="search-outline" size={16} color={colors.textDim} />
@@ -64,11 +93,17 @@ export default function ParentHomeScreen() {
         </Pressable>
 
         <Text style={styles.sectionLabel}>Torneos activos</Text>
-        <View style={styles.tournamentList}>
-          {mockActiveTournaments.map((tournament) => (
-            <TournamentRow key={tournament.id} tournament={tournament} onPress={goToTrainers} />
-          ))}
-        </View>
+        {tournaments === null ? (
+          <Text style={styles.tournamentMeta}>Cargando torneos…</Text>
+        ) : rest.length === 0 && !featured ? (
+          <Text style={styles.tournamentMeta}>No hay torneos activos por ahora.</Text>
+        ) : (
+          <View style={styles.tournamentList}>
+            {rest.map((tournament) => (
+              <TournamentRow key={tournament.id} tournament={tournament} onPress={goToTrainers} />
+            ))}
+          </View>
+        )}
       </ScrollView>
 
       <ParentTabBar active="inicio" />
@@ -76,13 +111,13 @@ export default function ParentHomeScreen() {
   );
 }
 
-function TournamentRow({ tournament, onPress }: { tournament: Tournament; onPress?: () => void }) {
+function TournamentRow({ tournament, onPress }: { tournament: TournamentSearchResult; onPress?: () => void }) {
   return (
     <Pressable style={styles.tournamentRow} onPress={onPress}>
       <View style={styles.tournamentInfo}>
         <Text style={styles.tournamentName}>{tournament.name}</Text>
         <Text style={styles.tournamentMeta}>
-          {tournament.venue} · {tournament.city} · {tournament.dates}
+          {tournament.venue} · {tournament.city} · {dateRangeLabel(tournament.startDate, tournament.endDate)}
         </Text>
       </View>
       <Text style={styles.chevron}>›</Text>

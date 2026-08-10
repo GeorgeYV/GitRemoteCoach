@@ -100,21 +100,28 @@ export async function rejectBooking(bookingId: string): Promise<Booking> {
   return updated;
 }
 
+export interface AlternativeCoach {
+  coachId: string;
+  name: string;
+  ratingAvg: number;
+}
+
 /**
  * Placeholder de sugerencia de alternativas: entrenadores del mismo torneo,
  * distintos del original, sin lógica real de matching/disponibilidad todavía.
  * No es el foco de este trabajo — ver resumen de flujo acordado.
  */
-export async function suggestAlternativeCoaches(bookingId: string): Promise<Array<{ coachId: string; ratingAvg: number }>> {
+export async function suggestAlternativeCoaches(bookingId: string): Promise<AlternativeCoach[]> {
   const booking = await bookingRepository.getBookingById(bookingId);
   const { rows } = await pool.query(
-    `SELECT DISTINCT cp.user_id AS coach_id, cp.rating_avg
+    `SELECT DISTINCT cp.user_id AS coach_id, u.full_name AS name, cp.rating_avg
      FROM coach_profiles cp
+     JOIN users u ON u.id = cp.user_id
      JOIN tournament_coach_tags tct ON tct.coach_id = cp.user_id
      WHERE tct.tournament_id = $1 AND cp.user_id != $2
      ORDER BY cp.rating_avg DESC
      LIMIT 5`,
     [booking.tournamentId, booking.coachId],
   );
-  return rows.map((r: any) => ({ coachId: r.coach_id, ratingAvg: Number(r.rating_avg) }));
+  return rows.map((r: any) => ({ coachId: r.coach_id, name: r.name, ratingAvg: Number(r.rating_avg) }));
 }

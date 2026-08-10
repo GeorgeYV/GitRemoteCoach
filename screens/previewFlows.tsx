@@ -46,6 +46,7 @@ import CoachSessionHistoryScreen from './coach/CoachSessionHistoryScreen';
 import CoachTournamentSearchScreen from './coach/CoachTournamentSearchScreen';
 import TrainerListScreen from './parent/TrainerListScreen';
 import TrainerProfileScreen from './parent/TrainerProfileScreen';
+import ParentTournamentSearchScreen from './parent/ParentTournamentSearchScreen';
 import BookingConfirmScreen from './parent/BookingConfirmScreen';
 import BookingPaymentScreen from './parent/BookingPaymentScreen';
 import BookingStatusScreen from './parent/BookingStatusScreen';
@@ -92,7 +93,8 @@ interface SelectedTrainer {
 export function ParentBookingFlow() {
   const router = useRouter();
   const { token } = useAuth();
-  const [step, setStep] = useState<'list' | 'profile' | 'confirm' | 'status' | 'payment'>('list');
+  const [step, setStep] = useState<'tournament' | 'list' | 'profile' | 'confirm' | 'status' | 'payment'>('tournament');
+  const [tournament, setTournament] = useState<TournamentSearchResult | null>(null);
   const [coachId, setCoachId] = useState<string | null>(null);
   const [selectedTrainer, setSelectedTrainer] = useState<SelectedTrainer | null>(null);
   const [selection, setSelection] = useState<BookingSlotSelection | null>(null);
@@ -113,10 +115,25 @@ export function ParentBookingFlow() {
       .catch(() => setPlayerId(null));
   }, [token]);
 
+  if (step === 'tournament') {
+    return (
+      <ParentTournamentSearchScreen
+        onSelect={(next) => {
+          setTournament(next);
+          setStep('list');
+        }}
+        onBack={() => router.back()}
+      />
+    );
+  }
+
+  if (!tournament) return null;
+
   if (step === 'list') {
     return (
       <TrainerListScreen
-        onBack={() => router.back()}
+        tournament={tournament}
+        onBack={() => setTournament(null)}
         onSelectTrainer={(coach: CoachSearchResult) => {
           setCoachId(coach.id);
           setStep('profile');
@@ -130,6 +147,7 @@ export function ParentBookingFlow() {
     return (
       <TrainerProfileScreen
         coachId={coachId}
+        tournament={tournament}
         onBack={() => setStep('list')}
         onReserve={(info) => {
           setSelectedTrainer(info);
@@ -163,6 +181,7 @@ export function ParentBookingFlow() {
       <BookingConfirmScreen
         playerId={playerId}
         coachId={selectedTrainer.coachId}
+        tournament={tournament}
         trainerName={selectedTrainer.name}
         price={selectedTrainer.price}
         availability={selectedTrainer.availability}
@@ -184,9 +203,15 @@ export function ParentBookingFlow() {
         bookingId={bookingId}
         selection={selection}
         trainerName={selectedTrainer.name}
+        tournament={tournament}
         price={selectedTrainer.price}
         onAccepted={() => setStep('payment')}
         onDone={() => setStep('profile')}
+        onSelectAlternative={(nextCoachId) => {
+          setCoachId(nextCoachId);
+          setSelectedTrainer(null);
+          setStep('profile');
+        }}
       />
     );
   }
@@ -199,6 +224,7 @@ export function ParentBookingFlow() {
       selection={selection}
       note={note}
       trainerName={selectedTrainer.name}
+      tournament={tournament}
       price={selectedTrainer.price}
       onBack={() => setStep('status')}
       onConfirm={() => setStep('status')}

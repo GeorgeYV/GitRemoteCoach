@@ -15,6 +15,7 @@ import {
   setCoachTournamentRate,
   TournamentSearchResult,
 } from '../../lib/api';
+import { buildDaySlotsFromRange as buildDateSlotsFromRange, dateRangeLabel } from '../../lib/dateSlots';
 import { colors, radius, withOpacity } from '../../lib/theme';
 import { RATE_MODE_LABELS, RateMode } from '../../mock/coachFlow';
 
@@ -25,36 +26,8 @@ interface DaySlot {
   afternoon: boolean;
 }
 
-function capitalize(s: string): string {
-  return s.charAt(0).toUpperCase() + s.slice(1);
-}
-
-/** Un DaySlot por cada día calendario entre el inicio y el fin del torneo (inclusive), con su
- * fecha ISO real para guardar y una etiqueta corta en español para mostrar (p. ej. "Vie 5"). Todo
- * en UTC a propósito: startDate/endDate llegan como columnas DATE serializadas por pg como
- * datetime ISO (p. ej. "2026-08-22T05:00:00.000Z", no "2026-08-22" plano), así que hacer aritmética
- * de fechas en hora local podría correr el día según la zona horaria del navegador. */
 function buildDaySlotsFromRange(startDate: string, endDate: string): DaySlot[] {
-  const days: DaySlot[] = [];
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-  const cursor = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate()));
-  const endUtc = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate()));
-  while (cursor <= endUtc) {
-    const isoDate = cursor.toISOString().slice(0, 10);
-    const dayLabel = capitalize(
-      cursor.toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric', timeZone: 'UTC' }),
-    );
-    days.push({ dayLabel, isoDate, morning: false, afternoon: false });
-    cursor.setUTCDate(cursor.getUTCDate() + 1);
-  }
-  return days;
-}
-
-function dateRangeLabel(startIso: string, endIso: string): string {
-  const start = new Date(startIso).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' });
-  const end = new Date(endIso).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' });
-  return `${start} – ${end}`;
+  return buildDateSlotsFromRange(startDate, endDate).map((slot) => ({ ...slot, morning: false, afternoon: false }));
 }
 
 const RATE_MODE_TO_API: Record<RateMode, ApiRateMode> = {

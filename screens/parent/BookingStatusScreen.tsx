@@ -3,9 +3,11 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { SafeAreaView } from 'react-native-safe-area-context';
 import TrainerAvatarPlaceholder from '../../components/shared/TrainerAvatarPlaceholder';
 import { useAuth } from '../../context/AuthContext';
-import { ApiError, Booking, getBooking } from '../../lib/api';
+import { AlternativeCoach, ApiError, Booking, getBooking, getBookingAlternatives, TournamentSearchResult } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
-import { BOOKING_PERIOD_LABELS, BookingSlotSelection, mockFeaturedTournament } from '../../mock/parentFlow';
+import { BOOKING_PERIOD_LABELS, BookingSlotSelection } from '../../mock/parentFlow';
+
+const ALTERNATIVES_STATUSES: Booking['status'][] = ['rejected', 'expired'];
 
 /** El coach normalmente responde en minutos, pero la ventana real es de horas — pollear cada 4s alcanza para la demo. */
 const POLL_INTERVAL_MS = 4000;
@@ -16,21 +18,27 @@ export default function BookingStatusScreen({
   bookingId,
   selection,
   trainerName,
+  tournament,
   price,
   onAccepted,
   onDone,
+  onSelectAlternative,
 }: {
   bookingId: string;
   selection: BookingSlotSelection;
   trainerName: string;
+  tournament: TournamentSearchResult;
   price: number;
   /** Se llama una sola vez, la primera vez que el estado real pasa a 'accepted', para continuar a pago. */
   onAccepted: () => void;
   onDone: () => void;
+  /** Reserva 'rejected' o 'expired': el padre eligió una alternativa sugerida para empezar de nuevo con ese coach. */
+  onSelectAlternative?: (coachId: string) => void;
 }) {
   const { token } = useAuth();
   const [booking, setBooking] = useState<Booking | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [alternatives, setAlternatives] = useState<AlternativeCoach[] | null>(null);
 
   useEffect(() => {
     if (!token) {
@@ -64,6 +72,17 @@ export default function BookingStatusScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bookingId]);
 
+  useEffect(() => {
+    if (!token || !booking || !ALTERNATIVES_STATUSES.includes(booking.status)) return;
+    let cancelled = false;
+    getBookingAlternatives(token, bookingId).then((result) => {
+      if (!cancelled) setAlternatives(result);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [token, bookingId, booking?.status]);
+
   const negative = booking && TERMINAL_NEGATIVE_STATUSES.includes(booking.status);
   const confirmed = booking?.status === 'paid' || booking?.status === 'completed';
 
@@ -90,18 +109,43 @@ export default function BookingStatusScreen({
               <TrainerAvatarPlaceholder size={48} />
               <View style={styles.detailInfo}>
                 <Text style={styles.trainerName}>{trainerName}</Text>
-                <Text style={styles.detailMeta}>{mockFeaturedTournament.name}</Text>
+                <Text style={styles.detailMeta}>{tournament.name}</Text>
               </View>
             </View>
             <View style={styles.detailDivider} />
             <DetailLine label="Día y horario" value={`${selection.dayLabel} · ${BOOKING_PERIOD_LABELS[selection.period]}`} />
-            <DetailLine label="Sede" value={mockFeaturedTournament.venue} />
+            <DetailLine label="Sede" value={tournament.venue} />
             <DetailLine
               label={booking?.totalAmountPaid ? 'Total pagado' : 'Tarifa acordada'}
               value={`$${booking?.totalAmountPaid ?? price}`}
             />
           </View>
         </Section>
+
+        {booking && ALTERNATIVES_STATUSES.includes(booking.status) && (alternatives === null || alternatives.length > 0) && (
+          <Section label="Otros entrenadores en este torneo">
+            {alternatives === null ? (
+              <ActivityIndicator color={colors.ballLime} />
+            ) : (
+              <View style={styles.alternativesList}>
+                {alternatives.map((coach) => (
+                  <Pressable
+                    key={coach.coachId}
+                    style={styles.alternativeCard}
+                    onPress={() => onSelectAlternative?.(coach.coachId)}
+                  >
+                    <TrainerAvatarPlaceholder size={40} />
+                    <View style={styles.alternativeInfo}>
+                      <Text style={styles.alternativeName}>{coach.name}</Text>
+                      <Text style={styles.alternativeRating}>★ {coach.ratingAvg.toFixed(2)}</Text>
+                    </View>
+                    <Text style={styles.chevron}>›</Text>
+                  </Pressable>
+                ))}
+              </View>
+            )}
+          </Section>
+        )}
       </ScrollView>
 
       <View style={styles.footer}>
@@ -293,6 +337,39 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     flexShrink: 1,
     textAlign: 'right',
+  },
+  alternativesList: {
+    gap: 10,
+  },
+  alternativeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.panel,
+    borderRadius: radius,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  alternativeInfo: {
+    flex: 1,
+    marginLeft: 12,
+    marginRight: 8,
+  },
+  alternativeName: {
+    color: colors.lineWhite,
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  alternativeRating: {
+    color: colors.ballLime,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  chevron: {
+    color: colors.textDim,
+    fontSize: 20,
+    fontWeight: '700',
   },
   footer: {
     borderTopWidth: 1,
