@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import React, { useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DocumentRow from '../../components/coach/DocumentRow';
 import IconTextInput from '../../components/shared/IconTextInput';
@@ -83,7 +83,10 @@ export default function CoachRegistrationScreen({ onSubmit }: { onSubmit?: () =>
         <View style={styles.photoBlock}>
           <View style={styles.photoWrap}>
             <TrainerAvatarPlaceholder size={88} />
-            <Pressable style={styles.photoAddButton}>
+            <Pressable
+              style={styles.photoAddButton}
+              onPress={() => Alert.alert('Foto de perfil', 'Próximamente: sube una foto de perfil real.')}
+            >
               <Text style={styles.photoAddIcon}>+</Text>
             </Pressable>
           </View>
