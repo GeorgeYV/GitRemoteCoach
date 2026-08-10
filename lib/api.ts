@@ -224,6 +224,15 @@ export function cancelBooking(
   });
 }
 
+/** POST /bookings/:id/complete — CoachBookingDetailScreen "Marcar sesión como completada". Solo el
+ * entrenador de la reserva puede liberar su propio pago; requiere que ya esté 'paid'. */
+export function completeBooking(authToken: string, bookingId: string): Promise<Booking> {
+  return request(`/bookings/${bookingId}/complete`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${authToken}` },
+  });
+}
+
 /** POST /bookings — BookingConfirmScreen. Crea la reserva en estado 'requested'. */
 export function requestBooking(
   authToken: string,

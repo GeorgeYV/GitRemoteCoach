@@ -252,6 +252,13 @@ export function CoachHomeFlow({ coachId, coachName }: { coachId: string; coachNa
     setStep('home');
   }
 
+  function handleBookingCompleted() {
+    if (!nextBookingRaw) return;
+    const targetId = nextBookingRaw.id;
+    setBookings((prev) => prev?.map((b) => (b.id === targetId ? { ...b, status: 'completed' } : b)) ?? null);
+    setStep('home');
+  }
+
   if (step === 'detail' && nextBooking) {
     return (
       <CoachBookingDetailScreen
@@ -260,6 +267,7 @@ export function CoachHomeFlow({ coachId, coachName }: { coachId: string; coachNa
         onCancel={() => setStep('cancel')}
         onChat={() => setStep('chat')}
         onStartMatch={nextBooking.status === 'confirmed' ? () => setStep('match') : undefined}
+        onCompleted={handleBookingCompleted}
       />
     );
   }

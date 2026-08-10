@@ -190,4 +190,7 @@ export interface CoachBooking {
   /** Monto real ya calculado por el servidor. Ausente si la reserva aún no llega a 'paid'. */
   coachNetAmount?: number;
   status: CoachBookingStatus;
+  /** true solo cuando el estado real (no el colapsado) es 'paid' — el único momento en que
+   * POST /bookings/:id/complete puede liberar el pago. */
+  readyToComplete: boolean;
 }

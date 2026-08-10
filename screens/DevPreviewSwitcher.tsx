@@ -99,6 +99,7 @@ const PREVIEW_COACH_CHAT_BOOKING: CoachBooking = {
   venue: '—',
   agreedRate: 0,
   status: 'completed',
+  readyToComplete: false,
 };
 
 const PREVIEW_PARENT_CHAT_BOOKING: BookingHistoryEntry = {

@@ -1,8 +1,10 @@
-import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import CoachBookingStatusPill from '../../components/coach/CoachBookingStatusPill';
 import InitialAvatar from '../../components/shared/InitialAvatar';
+import { useAuth } from '../../context/AuthContext';
+import { ApiError, completeBooking } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
 import { CoachBooking, PLATFORM_COMMISSION_RATE } from '../../mock/coachFlow';
 
@@ -22,16 +24,38 @@ export default function CoachBookingDetailScreen({
   onCancel,
   onChat,
   onStartMatch,
+  onCompleted,
 }: {
   booking: CoachBooking;
   onBack: () => void;
   onCancel: () => void;
   onChat?: () => void;
   onStartMatch?: () => void;
+  onCompleted?: () => void;
 }) {
+  const { token } = useAuth();
+  const [completing, setCompleting] = useState(false);
+  const [completeError, setCompleteError] = useState<string | null>(null);
   const net = booking.coachNetAmount ?? booking.agreedRate * (1 - PLATFORM_COMMISSION_RATE);
   const commission = booking.agreedRate - net;
   const confirmed = booking.status === 'confirmed';
+
+  async function handleComplete() {
+    if (!token) {
+      setCompleteError('No hay una sesión activa.');
+      return;
+    }
+    setCompleting(true);
+    setCompleteError(null);
+    try {
+      await completeBooking(token, booking.id);
+      onCompleted?.();
+    } catch (err) {
+      setCompleteError(err instanceof ApiError ? err.message : 'No se pudo completar la sesión. Intenta de nuevo.');
+    } finally {
+      setCompleting(false);
+    }
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -83,6 +107,20 @@ export default function CoachBookingDetailScreen({
 
       {confirmed && (
         <View style={styles.footer}>
+          {completeError && <Text style={styles.completeErrorText}>{completeError}</Text>}
+          {booking.readyToComplete && (
+            <Pressable
+              style={[styles.completeButton, completing && styles.completeButtonDisabled]}
+              disabled={completing}
+              onPress={handleComplete}
+            >
+              {completing ? (
+                <ActivityIndicator color={colors.courtBlueDeep} />
+              ) : (
+                <Text style={styles.completeLabel}>Marcar sesión como completada</Text>
+              )}
+            </Pressable>
+          )}
           {onStartMatch && (
             <Pressable style={styles.startMatchButton} onPress={onStartMatch}>
               <Text style={styles.startMatchLabel}>Iniciar partido</Text>
@@ -237,6 +275,25 @@ const styles = StyleSheet.create({
     backgroundColor: colors.courtBlueDeep,
     padding: 16,
     gap: 10,
+  },
+  completeErrorText: {
+    color: colors.errorCoral,
+    fontSize: 12,
+    textAlign: 'center',
+  },
+  completeButton: {
+    backgroundColor: colors.ballLime,
+    borderRadius: radius,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  completeButtonDisabled: {
+    backgroundColor: withOpacity(colors.ballLime, 0.3),
+  },
+  completeLabel: {
+    color: colors.courtBlueDeep,
+    fontSize: 15,
+    fontWeight: '800',
   },
   startMatchButton: {
     backgroundColor: colors.ballLime,

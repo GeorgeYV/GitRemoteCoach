@@ -37,5 +37,6 @@ export function toCoachBooking(booking: BookingWithParticipants): CoachBooking {
     agreedRate: Number(booking.agreedRate),
     coachNetAmount: booking.coachNetAmount !== null ? Number(booking.coachNetAmount) : undefined,
     status: STATUS_MAP[booking.status],
+    readyToComplete: booking.status === 'paid',
   };
 }
