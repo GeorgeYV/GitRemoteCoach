@@ -5,7 +5,8 @@ import TrainerAvatarPlaceholder from '../../components/shared/TrainerAvatarPlace
 import { ApiError, CoachSearchResult, searchCoaches, TournamentSearchResult } from '../../lib/api';
 import { dateRangeLabel } from '../../lib/dateSlots';
 import { colors, radius } from '../../lib/theme';
-import { FILTER_CHIPS } from '../../mock/parentFlow';
+
+const MIN_RATING_THRESHOLD = 4;
 
 export default function TrainerListScreen({
   tournament,
@@ -16,7 +17,7 @@ export default function TrainerListScreen({
   onBack?: () => void;
   onSelectTrainer?: (coach: CoachSearchResult) => void;
 }) {
-  const [activeChips, setActiveChips] = useState<Record<string, boolean>>({});
+  const [minRatingOnly, setMinRatingOnly] = useState(false);
   const [trainers, setTrainers] = useState<CoachSearchResult[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -36,9 +37,7 @@ export default function TrainerListScreen({
     };
   }, []);
 
-  function toggleChip(chip: string) {
-    setActiveChips((prev) => ({ ...prev, [chip]: !prev[chip] }));
-  }
+  const visibleTrainers = trainers?.filter((t) => !minRatingOnly || Number(t.ratingAvg) >= MIN_RATING_THRESHOLD) ?? null;
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -56,36 +55,40 @@ export default function TrainerListScreen({
         </View>
       </View>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipsRow} contentContainerStyle={styles.chipsContent}>
-        {FILTER_CHIPS.map((chip) => {
-          const active = !!activeChips[chip];
-          return (
-            <Pressable key={chip} onPress={() => toggleChip(chip)} style={[styles.chip, active && styles.chipActive]}>
-              <Text style={[styles.chipLabel, active && styles.chipLabelActive]}>{chip}</Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
+      <View style={styles.chipsRow}>
+        <Pressable
+          onPress={() => setMinRatingOnly((v) => !v)}
+          style={[styles.chip, minRatingOnly && styles.chipActive]}
+        >
+          <Text style={[styles.chipLabel, minRatingOnly && styles.chipLabelActive]}>
+            ★ {MIN_RATING_THRESHOLD}+ Calificación
+          </Text>
+        </Pressable>
+      </View>
 
       {error ? (
         <View style={styles.emptyState}>
           <Text style={styles.emptyText}>{error}</Text>
         </View>
-      ) : !trainers ? (
+      ) : !visibleTrainers ? (
         <View style={styles.emptyState}>
           <ActivityIndicator color={colors.ballLime} />
         </View>
       ) : (
         <>
-          <Text style={styles.resultsLabel}>{trainers.length} entrenadores disponibles</Text>
+          <Text style={styles.resultsLabel}>{visibleTrainers.length} entrenadores disponibles</Text>
 
           <ScrollView contentContainerStyle={styles.list}>
-            {trainers.map((trainer) => (
+            {visibleTrainers.map((trainer) => (
               <TrainerCard key={trainer.id} trainer={trainer} onPress={() => onSelectTrainer?.(trainer)} />
             ))}
 
-            {trainers.length === 0 && (
-              <Text style={styles.emptyText}>No hay entrenadores disponibles por ahora.</Text>
+            {visibleTrainers.length === 0 && (
+              <Text style={styles.emptyText}>
+                {minRatingOnly
+                  ? `Ningún entrenador tiene ${MIN_RATING_THRESHOLD}+ estrellas todavía.`
+                  : 'No hay entrenadores disponibles por ahora.'}
+              </Text>
             )}
           </ScrollView>
         </>
@@ -145,20 +148,18 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   chipsRow: {
-    flexGrow: 0,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderSoft,
-  },
-  chipsContent: {
+    flexDirection: 'row',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    gap: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderSoft,
   },
   chip: {
     backgroundColor: 'rgba(255,255,255,0.08)',
     borderRadius: 16,
     paddingVertical: 8,
     paddingHorizontal: 14,
+    alignSelf: 'flex-start',
   },
   chipActive: {
     backgroundColor: colors.ballLime,

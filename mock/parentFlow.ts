@@ -150,8 +150,6 @@ export const mockTrainers: Trainer[] = [
   },
 ];
 
-export const FILTER_CHIPS = ['Fecha', 'Horario', 'Tarifa', 'Calificación', 'Categoría'];
-
 export const mockCarlosMedinaProfile: TrainerProfile = {
   trainer: mockTrainers[0],
   bio:
