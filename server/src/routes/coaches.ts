@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import * as coachProfileService from '../services/coachProfileService.js';
 import * as bookingService from '../services/bookingService.js';
+import * as tournamentService from '../services/tournamentService.js';
 import { ForbiddenError, ValidationError } from '../lib/errors.js';
 
 const AGE_CATEGORIES = ['U10', 'U12', 'U14', 'U16', 'U18'] as const;
@@ -52,6 +53,13 @@ export async function coachRoutes(app: FastifyInstance): Promise<void> {
   app.get('/coaches/:id', async (req) => {
     const { id } = req.params as { id: string };
     return coachProfileService.getCoachProfile(id);
+  });
+
+  // CoachAvailabilityScreen, CoachTournamentSearchScreen, CoachReputationScreen: insignias de
+  // "entrenador oficial" — público, igual que /coaches/:id/reviews.
+  app.get('/coaches/:id/club-tags', async (req) => {
+    const { id } = req.params as { id: string };
+    return tournamentService.listClubTagsForCoach(id);
   });
 
   // Guarda categorías de edad + niveles de juego del propio entrenador logueado.

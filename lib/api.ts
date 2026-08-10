@@ -635,6 +635,19 @@ export function searchTournaments(query?: string): Promise<TournamentSearchResul
   return request(`/tournaments${suffix ? `?${suffix}` : ''}`);
 }
 
+/** Espeja server/src/types.ts#CoachClubTag — insignias de "oficial" del propio entrenador. */
+export interface CoachClubTag {
+  tournamentId: string;
+  tournamentName: string;
+  clubName: string;
+  taggedAt: string;
+}
+
+/** GET /coaches/:id/club-tags — CoachAvailabilityScreen, CoachTournamentSearchScreen, CoachReputationScreen. */
+export function listCoachClubTags(coachId: string): Promise<CoachClubTag[]> {
+  return request(`/coaches/${coachId}/club-tags`);
+}
+
 /** Espeja server/src/types.ts#TournamentCoachTagWithProfile. */
 export interface TournamentCoachTagWithProfile {
   coachId: string;

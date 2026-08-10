@@ -3,9 +3,9 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ClubTagBadge from '../../components/coach/ClubTagBadge';
-import { ApiError, searchTournaments, TournamentSearchResult } from '../../lib/api';
+import { useAuth } from '../../context/AuthContext';
+import { ApiError, CoachClubTag, listCoachClubTags, searchTournaments, TournamentSearchResult } from '../../lib/api';
 import { colors, radius } from '../../lib/theme';
-import { mockOfficialClubTaggings } from '../../mock/coachFlow';
 
 function dateRangeLabel(startIso: string, endIso: string): string {
   const start = new Date(startIso).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' });
@@ -20,9 +20,22 @@ export default function CoachTournamentSearchScreen({
   onSelect: (tournament: TournamentSearchResult) => void;
   onBack?: () => void;
 }) {
+  const { user } = useAuth();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<TournamentSearchResult[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [clubTags, setClubTags] = useState<CoachClubTag[]>([]);
+
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    listCoachClubTags(user.id).then((tags) => {
+      if (!cancelled) setClubTags(tags);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   useEffect(() => {
     let cancelled = false;
@@ -80,7 +93,12 @@ export default function CoachTournamentSearchScreen({
       ) : (
         <ScrollView contentContainerStyle={styles.list}>
           {results.map((tournament) => (
-            <TournamentCard key={tournament.id} tournament={tournament} onPress={() => onSelect(tournament)} />
+            <TournamentCard
+              key={tournament.id}
+              tournament={tournament}
+              clubTags={clubTags}
+              onPress={() => onSelect(tournament)}
+            />
           ))}
 
           {results.length === 0 && (
@@ -92,8 +110,16 @@ export default function CoachTournamentSearchScreen({
   );
 }
 
-function TournamentCard({ tournament, onPress }: { tournament: TournamentSearchResult; onPress: () => void }) {
-  const tagging = mockOfficialClubTaggings.find((t) => t.tournamentId === tournament.id);
+function TournamentCard({
+  tournament,
+  clubTags,
+  onPress,
+}: {
+  tournament: TournamentSearchResult;
+  clubTags: CoachClubTag[];
+  onPress: () => void;
+}) {
+  const tagging = clubTags.find((t) => t.tournamentId === tournament.id);
 
   return (
     <Pressable style={styles.card} onPress={onPress}>

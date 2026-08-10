@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ClubTagBadge from '../../components/coach/ClubTagBadge';
@@ -7,13 +7,15 @@ import TogglePill from '../../components/coach/TogglePill';
 import { useAuth } from '../../context/AuthContext';
 import {
   ApiError,
+  CoachClubTag,
+  listCoachClubTags,
   RateMode as ApiRateMode,
   setCoachTournamentAvailability,
   setCoachTournamentRate,
   TournamentSearchResult,
 } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
-import { DEFAULT_RATE_AMOUNT, mockOfficialClubTaggings, PRESET_AVAILABILITY, RATE_MODE_LABELS, RateMode } from '../../mock/coachFlow';
+import { DEFAULT_RATE_AMOUNT, PRESET_AVAILABILITY, RATE_MODE_LABELS, RateMode } from '../../mock/coachFlow';
 
 interface DaySlot {
   dayLabel: string;
@@ -68,7 +70,8 @@ export default function CoachAvailabilityScreen({
   onBack: () => void;
 }) {
   const { user, token } = useAuth();
-  const tagging = mockOfficialClubTaggings.find((t) => t.tournamentId === tournament.id);
+  const [clubTags, setClubTags] = useState<CoachClubTag[]>([]);
+  const tagging = clubTags.find((t) => t.tournamentId === tournament.id);
   const [days, setDays] = useState<DaySlot[]>(() => {
     const preset = PRESET_AVAILABILITY[tournament.id];
     return buildDaySlotsFromRange(tournament.startDate, tournament.endDate).map((day, i) => ({
@@ -82,6 +85,17 @@ export default function CoachAvailabilityScreen({
   const [saved, setSaved] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    listCoachClubTags(user.id).then((tags) => {
+      if (!cancelled) setClubTags(tags);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   function toggleSlot(dayIndex: number, period: 'morning' | 'afternoon') {
     setSaved(false);

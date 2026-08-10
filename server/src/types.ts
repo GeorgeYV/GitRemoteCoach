@@ -216,6 +216,16 @@ export interface TournamentCoachTagWithProfile {
   taggedAt: string;
 }
 
+/** Insignia de "oficial" vista desde el propio entrenador (CoachAvailabilityScreen,
+ * CoachTournamentSearchScreen, CoachReputationScreen) — inverso de TournamentCoachTagWithProfile:
+ * nombre del torneo y del club vienen de un JOIN en vez de nombre/ciudad/rating del coach. */
+export interface CoachClubTag {
+  tournamentId: string;
+  tournamentName: string;
+  clubName: string;
+  taggedAt: string;
+}
+
 export interface ClubCoachInvitation {
   id: string;
   clubId: string;

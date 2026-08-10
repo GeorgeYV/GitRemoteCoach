@@ -5,9 +5,18 @@ import ReviewCard from '../../components/coach/ReviewCard';
 import StatTile from '../../components/shared/StatTile';
 import TrainerAvatarPlaceholder from '../../components/shared/TrainerAvatarPlaceholder';
 import { useAuth } from '../../context/AuthContext';
-import { ApiError, CoachProfile, getCoachProfile, listCoachBookings, listCoachReviews, ReviewWithParent } from '../../lib/api';
+import {
+  ApiError,
+  CoachClubTag,
+  CoachProfile,
+  getCoachProfile,
+  listCoachBookings,
+  listCoachClubTags,
+  listCoachReviews,
+  ReviewWithParent,
+} from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
-import { CoachReview, mockOfficialClubTaggings } from '../../mock/coachFlow';
+import { CoachReview } from '../../mock/coachFlow';
 
 interface ActivityStats {
   matchesPlayed: number;
@@ -36,12 +45,12 @@ export default function CoachReputationScreen({
   coachName: string;
   onBack?: () => void;
 }) {
-  const taggings = mockOfficialClubTaggings;
   const { token } = useAuth();
 
   const [profile, setProfile] = useState<CoachProfile | null>(null);
   const [reviews, setReviews] = useState<CoachReview[] | null>(null);
   const [stats, setStats] = useState<ActivityStats | null>(null);
+  const [taggings, setTaggings] = useState<CoachClubTag[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -51,11 +60,17 @@ export default function CoachReputationScreen({
     }
     let cancelled = false;
     setError(null);
-    Promise.all([getCoachProfile(coachId), listCoachReviews(coachId), listCoachBookings(token, coachId)])
-      .then(([profileResult, reviewsResult, bookings]) => {
+    Promise.all([
+      getCoachProfile(coachId),
+      listCoachReviews(coachId),
+      listCoachBookings(token, coachId),
+      listCoachClubTags(coachId),
+    ])
+      .then(([profileResult, reviewsResult, bookings, clubTags]) => {
         if (cancelled) return;
         setProfile(profileResult.profile);
         setReviews(reviewsResult.map(toCoachReview));
+        setTaggings(clubTags);
 
         const responded = bookings.filter((b) => b.decidedAt !== null);
         const accepted = responded.filter((b) => b.status !== 'rejected');

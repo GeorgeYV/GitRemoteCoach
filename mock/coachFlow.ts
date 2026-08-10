@@ -124,18 +124,6 @@ export interface CoachReview {
   date: string;
 }
 
-/** A club tagging the coach as its official trainer for one specific tournament — never global. */
-export interface ClubTagging {
-  clubName: string;
-  tournamentName: string;
-  tournamentId: string;
-}
-
-/** Already-accepted taggings, the ones that show up as badges everywhere without further action. */
-export const mockOfficialClubTaggings: ClubTagging[] = [
-  { clubName: 'Club Deportivo Bosques', tournamentName: 'Copa Nacional Juvenil', tournamentId: 'copa-nacional-juvenil' },
-];
-
 export type CoachBookingStatus = 'confirmed' | 'completed' | 'cancelled';
 
 export const COACH_BOOKING_STATUS_LABELS: Record<CoachBookingStatus, string> = {

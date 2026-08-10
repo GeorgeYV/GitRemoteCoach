@@ -1133,6 +1133,22 @@ console.log('\n=== Escenario 21: descubrimiento de torneos (CoachTournamentSearc
   assertEqual(noMatchRes.json(), [], 'una búsqueda sin coincidencias devuelve lista vacía');
 }
 
+console.log('\n=== Escenario 22: insignias de "entrenador oficial" del propio coach (CoachAvailabilityScreen, etc.) ===');
+{
+  const taggedRes = await app.inject({ method: 'GET', url: `/coaches/${fixtures.coachAUserId}/club-tags` });
+  assertEqual(taggedRes.statusCode, 200, 'GET /coaches/:id/club-tags devuelve 200');
+  const tagged = taggedRes.json();
+  assertTrue(
+    tagged.length === 1 && tagged[0].tournamentId === fixtures.tournamentId,
+    'trae la insignia del torneo donde el club etiquetó a este coach',
+  );
+  assertEqual(tagged[0].tournamentName, 'Copa Nacional Juvenil', 'trae el nombre del torneo (JOIN con tournaments)');
+  assertEqual(tagged[0].clubName, 'Club Deportivo Bosques', 'trae el nombre del club (JOIN con clubs)');
+
+  const untaggedRes = await app.inject({ method: 'GET', url: '/coaches/00000000-0000-0000-0000-000000000099/club-tags' });
+  assertEqual(untaggedRes.json(), [], 'un coach sin insignias devuelve lista vacía');
+}
+
 console.log(`\n=== Resultado: ${passed} pasaron, ${failed} fallaron ===`);
 await app.close();
 process.exit(failed > 0 ? 1 : 0);
