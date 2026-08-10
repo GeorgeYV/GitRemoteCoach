@@ -9,10 +9,12 @@ import {
   ApiError,
   BookingWithParticipants,
   Club,
+  ClubCoachInvitationWithNames,
   CoachSearchResult,
   createOrGetMatch,
   getClubForAdmin,
   getCoachProfile,
+  listClubInvitations,
   listCoachBookings,
   listPlayers,
   TournamentSearchResult,
@@ -209,9 +211,21 @@ export function CoachHomeFlow({ coachId, coachName }: { coachId: string; coachNa
   const { token } = useAuth();
   const [bookings, setBookings] = useState<BookingWithParticipants[] | null>(null);
   const [rating, setRating] = useState('—');
+  const [pendingInvitation, setPendingInvitation] = useState<ClubCoachInvitationWithNames | null>(null);
+  const [invitationRefreshKey, setInvitationRefreshKey] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [step, setStep] = useState<
-    'home' | 'detail' | 'cancel' | 'chat' | 'requests' | 'availability' | 'sessions' | 'earnings' | 'reputation' | 'match'
+    | 'home'
+    | 'detail'
+    | 'cancel'
+    | 'chat'
+    | 'requests'
+    | 'availability'
+    | 'sessions'
+    | 'earnings'
+    | 'reputation'
+    | 'invitation'
+    | 'match'
   >('home');
 
   useEffect(() => {
@@ -235,6 +249,19 @@ export function CoachHomeFlow({ coachId, coachName }: { coachId: string; coachNa
       cancelled = true;
     };
   }, [coachId, token]);
+
+  // Invitaciones de club pendientes (CoachClubInvitationScreen) — separado del efecto de arriba para
+  // poder refrescar solo esto al volver de la pantalla de invitación, sin recargar todo el panel.
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+    listClubInvitations(token, coachId).then((result) => {
+      if (!cancelled) setPendingInvitation(result[0] ?? null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [coachId, token, invitationRefreshKey]);
 
   const nextBookingRaw =
     bookings
@@ -307,6 +334,18 @@ export function CoachHomeFlow({ coachId, coachName }: { coachId: string; coachNa
     return <CoachReputationScreen coachId={coachId} coachName={coachName} onBack={() => setStep('home')} />;
   }
 
+  if (step === 'invitation') {
+    return (
+      <CoachClubInvitationScreen
+        coachId={coachId}
+        onBack={() => {
+          setStep('home');
+          setInvitationRefreshKey((k) => k + 1);
+        }}
+      />
+    );
+  }
+
   if (loadError) {
     return (
       <View style={[styles.root, styles.centerState]}>
@@ -330,12 +369,14 @@ export function CoachHomeFlow({ coachId, coachName }: { coachId: string; coachNa
       pendingRequests={pendingRequests}
       pendingEarnings={pendingEarnings}
       nextBooking={nextBooking}
+      pendingInvitation={pendingInvitation}
       onOpenBooking={() => setStep('detail')}
       onOpenRequests={() => setStep('requests')}
       onOpenAvailability={() => setStep('availability')}
       onOpenSessions={() => setStep('sessions')}
       onOpenEarnings={() => setStep('earnings')}
       onOpenReputation={() => setStep('reputation')}
+      onOpenInvitation={() => setStep('invitation')}
     />
   );
 }

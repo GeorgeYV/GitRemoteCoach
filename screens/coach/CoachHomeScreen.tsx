@@ -2,7 +2,8 @@ import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import InitialAvatar from '../../components/shared/InitialAvatar';
-import { colors, radius } from '../../lib/theme';
+import { ClubCoachInvitationWithNames } from '../../lib/api';
+import { colors, radius, withOpacity } from '../../lib/theme';
 import { CoachBooking } from '../../mock/coachFlow';
 
 const QUICK_LINKS = [
@@ -22,24 +23,28 @@ export default function CoachHomeScreen({
   pendingRequests,
   pendingEarnings,
   nextBooking,
+  pendingInvitation,
   onOpenBooking,
   onOpenRequests,
   onOpenAvailability,
   onOpenSessions,
   onOpenEarnings,
   onOpenReputation,
+  onOpenInvitation,
 }: {
   coachName: string;
   rating: string;
   pendingRequests: number;
   pendingEarnings: number;
   nextBooking?: CoachBooking;
+  pendingInvitation?: ClubCoachInvitationWithNames | null;
   onOpenBooking?: () => void;
   onOpenRequests?: () => void;
   onOpenAvailability?: () => void;
   onOpenSessions?: () => void;
   onOpenEarnings?: () => void;
   onOpenReputation?: () => void;
+  onOpenInvitation?: () => void;
 }) {
   const quickLinkHandlers: Record<(typeof QUICK_LINKS)[number]['key'], (() => void) | undefined> = {
     availability: onOpenAvailability,
@@ -65,6 +70,16 @@ export default function CoachHomeScreen({
           <StatChip value={money(pendingEarnings)} label="Por liberar" onPress={onOpenEarnings} />
           <StatChip value={`★ ${rating}`} label="Reputación" onPress={onOpenReputation} />
         </View>
+
+        {pendingInvitation && (
+          <Pressable style={styles.invitationCard} onPress={onOpenInvitation}>
+            <View style={styles.invitationTextWrap}>
+              <Text style={styles.invitationTitle}>Invitación de {pendingInvitation.clubName}</Text>
+              <Text style={styles.invitationMeta}>Entrenador oficial para {pendingInvitation.tournamentName}</Text>
+            </View>
+            <Text style={styles.chevron}>›</Text>
+          </Pressable>
+        )}
 
         <Text style={styles.sectionLabel}>Próxima sesión</Text>
         {nextBooking ? (
@@ -187,6 +202,30 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.8,
     marginBottom: 10,
+  },
+  invitationCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: withOpacity(colors.ballLime, 0.1),
+    borderRadius: radius,
+    borderWidth: 1,
+    borderColor: withOpacity(colors.ballLime, 0.35),
+    padding: 16,
+    marginBottom: 24,
+  },
+  invitationTextWrap: {
+    flex: 1,
+    marginRight: 8,
+  },
+  invitationTitle: {
+    color: colors.ballLime,
+    fontSize: 14,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
+  invitationMeta: {
+    color: colors.textSoft,
+    fontSize: 12,
   },
   nextCard: {
     backgroundColor: colors.panelLight,
