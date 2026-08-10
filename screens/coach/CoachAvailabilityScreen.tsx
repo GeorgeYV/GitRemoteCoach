@@ -8,6 +8,7 @@ import { useAuth } from '../../context/AuthContext';
 import {
   ApiError,
   CoachClubTag,
+  getCoachTournamentAvailability,
   listCoachClubTags,
   RateMode as ApiRateMode,
   setCoachTournamentAvailability,
@@ -15,7 +16,7 @@ import {
   TournamentSearchResult,
 } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
-import { DEFAULT_RATE_AMOUNT, PRESET_AVAILABILITY, RATE_MODE_LABELS, RateMode } from '../../mock/coachFlow';
+import { RATE_MODE_LABELS, RateMode } from '../../mock/coachFlow';
 
 interface DaySlot {
   dayLabel: string;
@@ -62,6 +63,12 @@ const RATE_MODE_TO_API: Record<RateMode, ApiRateMode> = {
   torneo: 'per_tournament',
 };
 
+const API_RATE_MODE_TO_LOCAL: Record<ApiRateMode, RateMode> = {
+  per_match: 'partido',
+  per_day: 'dia',
+  per_tournament: 'torneo',
+};
+
 export default function CoachAvailabilityScreen({
   tournament,
   onBack,
@@ -72,16 +79,9 @@ export default function CoachAvailabilityScreen({
   const { user, token } = useAuth();
   const [clubTags, setClubTags] = useState<CoachClubTag[]>([]);
   const tagging = clubTags.find((t) => t.tournamentId === tournament.id);
-  const [days, setDays] = useState<DaySlot[]>(() => {
-    const preset = PRESET_AVAILABILITY[tournament.id];
-    return buildDaySlotsFromRange(tournament.startDate, tournament.endDate).map((day, i) => ({
-      ...day,
-      morning: preset?.[i]?.morning ?? false,
-      afternoon: preset?.[i]?.afternoon ?? false,
-    }));
-  });
+  const [days, setDays] = useState<DaySlot[]>(() => buildDaySlotsFromRange(tournament.startDate, tournament.endDate));
   const [rateMode, setRateMode] = useState<RateMode>('partido');
-  const [rateAmount, setRateAmount] = useState(String(DEFAULT_RATE_AMOUNT[tournament.id] ?? ''));
+  const [rateAmount, setRateAmount] = useState('');
   const [saved, setSaved] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -96,6 +96,31 @@ export default function CoachAvailabilityScreen({
       cancelled = true;
     };
   }, [user]);
+
+  // Hidrata con la disponibilidad y tarifa ya guardadas, si el coach ya había configurado este
+  // torneo antes — sin esto, reabrir la pantalla siempre arrancaba en blanco.
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    getCoachTournamentAvailability(user.id, tournament.id).then(({ availability, rate }) => {
+      if (cancelled) return;
+      if (availability.length > 0) {
+        setDays((prev) =>
+          prev.map((day) => {
+            const savedDay = availability.find((a) => a.slotDate.slice(0, 10) === day.isoDate);
+            return savedDay ? { ...day, morning: savedDay.morning, afternoon: savedDay.afternoon } : day;
+          }),
+        );
+      }
+      if (rate) {
+        setRateMode(API_RATE_MODE_TO_LOCAL[rate.rateMode]);
+        setRateAmount(String(Number(rate.amount)));
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [user, tournament.id]);
 
   function toggleSlot(dayIndex: number, period: 'morning' | 'afternoon') {
     setSaved(false);

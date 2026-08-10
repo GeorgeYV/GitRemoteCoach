@@ -1,5 +1,4 @@
 import type { VerificationDocType } from '../lib/api';
-import { REAL_TOURNAMENT_ID } from './parentFlow';
 
 export interface DocumentItem {
   id: VerificationDocType;
@@ -58,23 +57,6 @@ export const RATE_MODE_LABELS: Record<RateMode, string> = {
   partido: 'Por partido',
   dia: 'Por día',
   torneo: 'Torneo completo',
-};
-
-/** Matches the availability already shown on Carlos Medina's public profile in the parent flow —
- * keyed by REAL_TOURNAMENT_ID (mock/parentFlow.ts) since CoachAvailabilityScreen now always gets a
- * real tournament UUID from search, not a mock slug. Indexed by day position within the range. */
-export const PRESET_AVAILABILITY: Record<string, { morning: boolean; afternoon: boolean }[]> = {
-  [REAL_TOURNAMENT_ID]: [
-    { morning: true, afternoon: false },
-    { morning: true, afternoon: true },
-    { morning: false, afternoon: true },
-    { morning: true, afternoon: true },
-    { morning: true, afternoon: false },
-  ],
-};
-
-export const DEFAULT_RATE_AMOUNT: Record<string, number> = {
-  [REAL_TOURNAMENT_ID]: 35,
 };
 
 export interface BookingRequest {
