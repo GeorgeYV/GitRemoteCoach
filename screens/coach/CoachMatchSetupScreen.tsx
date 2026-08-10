@@ -5,14 +5,16 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import IconTextInput from '../../components/shared/IconTextInput';
 import { colors, radius, withOpacity } from '../../lib/theme';
 import { MatchConfig, PlayerId } from '../../lib/types';
-import { mockPreMatchReminder } from '../../mock/coachFlow';
 
 export default function CoachMatchSetupScreen({
+  playerName,
+  category,
   onStart,
 }: {
+  playerName: string;
+  category: string;
   onStart: (config: MatchConfig, roundLabel: string) => void;
 }) {
-  const reminder = mockPreMatchReminder;
   const [opponentName, setOpponentName] = useState('');
   const [roundLabel, setRoundLabel] = useState('');
   const [bestOf, setBestOf] = useState<1 | 3>(3);
@@ -27,11 +29,11 @@ export default function CoachMatchSetupScreen({
       {
         bestOf,
         noAd,
-        player1Name: reminder.playerName,
+        player1Name: playerName,
         player2Name: opponentName.trim(),
         initialServer,
       },
-      roundLabel.trim() || reminder.category
+      roundLabel.trim() || category
     );
   }
 
@@ -45,8 +47,8 @@ export default function CoachMatchSetupScreen({
       <ScrollView contentContainerStyle={styles.content}>
         <Section label="Tu jugadora">
           <View style={styles.playerBadge}>
-            <Text style={styles.playerBadgeName}>{reminder.playerName}</Text>
-            <Text style={styles.playerBadgeMeta}>{reminder.category}</Text>
+            <Text style={styles.playerBadgeName}>{playerName}</Text>
+            <Text style={styles.playerBadgeMeta}>{category}</Text>
           </View>
         </Section>
 
@@ -57,7 +59,7 @@ export default function CoachMatchSetupScreen({
         <Section label="Ronda (opcional)">
           <IconTextInput
             icon="flag-outline"
-            placeholder={`Ej. ${reminder.category}`}
+            placeholder={`Ej. ${category}`}
             value={roundLabel}
             onChangeText={setRoundLabel}
           />
@@ -105,7 +107,7 @@ export default function CoachMatchSetupScreen({
                 style={[styles.serverLabel, initialServer === 'player1' && styles.serverLabelActive]}
                 numberOfLines={1}
               >
-                {reminder.playerName}
+                {playerName}
               </Text>
             </Pressable>
             <Pressable

@@ -284,7 +284,7 @@ export function CoachHomeFlow({ coachId, coachName }: { coachId: string; coachNa
 
   if (step === 'match' && nextBookingRaw) {
     // Sin onBack: una vez iniciado el partido es forward-only, igual que CoachCapturePreview en /dev-preview.
-    return <CoachMatchDayFlow bookingId={nextBookingRaw.id} />;
+    return <CoachMatchDayFlow booking={nextBookingRaw} />;
   }
 
   if (step === 'requests') {
@@ -341,15 +341,16 @@ export function CoachHomeFlow({ coachId, coachName }: { coachId: string; coachNa
 }
 
 /**
- * Local four-step flow: pre-match reminder → confirm match setup → resolve/create the
- * server-side `matches` row for this booking → the existing, unmodified live-capture
- * wireframe. CoachPreMatchReminderScreen/CoachMatchSetupScreen keep showing mock content
- * (mockPreMatchReminder) — only the persistence plumbing (bookingId → matchId) is real;
- * re-wiring their displayed content to the real booking is separate follow-up work.
+ * Local flow: pre-match reminder (real booking data, editable cancha/punto de encuentro) →
+ * confirm match setup → resolve/create the server-side `matches` row for this booking → the
+ * existing, unmodified live-capture wireframe. Chat is a side-step off the reminder screen,
+ * back to it on close.
  */
-export function CoachMatchDayFlow({ bookingId }: { bookingId: string }) {
+export function CoachMatchDayFlow({ booking: initialBooking }: { booking: BookingWithParticipants }) {
   const { token } = useAuth();
-  const [step, setStep] = useState<'reminder' | 'setup' | 'loadingMatch' | 'live'>('reminder');
+  const [booking, setBooking] = useState(initialBooking);
+  const bookingId = booking.id;
+  const [step, setStep] = useState<'reminder' | 'setup' | 'loadingMatch' | 'live' | 'chat'>('reminder');
   const [session, setSession] = useState<{ config: MatchConfig; roundLabel: string } | null>(null);
   const [matchId, setMatchId] = useState<string | null>(null);
   const [matchError, setMatchError] = useState<string | null>(null);
@@ -385,12 +386,25 @@ export function CoachMatchDayFlow({ bookingId }: { bookingId: string }) {
   }, [step, session, bookingId, token]);
 
   if (step === 'reminder') {
-    return <CoachPreMatchReminderScreen onStartCapture={() => setStep('setup')} />;
+    return (
+      <CoachPreMatchReminderScreen
+        booking={booking}
+        onStartCapture={() => setStep('setup')}
+        onOpenChat={() => setStep('chat')}
+        onMeetingSaved={(details) => setBooking((b) => ({ ...b, ...details }))}
+      />
+    );
+  }
+
+  if (step === 'chat') {
+    return <CoachChatScreen booking={toCoachBooking(booking)} onBack={() => setStep('reminder')} />;
   }
 
   if (step === 'setup') {
     return (
       <CoachMatchSetupScreen
+        playerName={booking.playerName}
+        category={booking.ageCategory}
         onStart={(config, roundLabel) => {
           setSession({ config, roundLabel });
           setStep('loadingMatch');

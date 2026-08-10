@@ -4,6 +4,7 @@ import { colors } from '../lib/theme';
 import { mockClubAdmin } from '../mock/clubFlow';
 import { CoachBooking } from '../mock/coachFlow';
 import { BookingHistoryEntry, mockCarlosMedinaProfile, REAL_COMPLETED_BOOKING_ID } from '../mock/parentFlow';
+import type { BookingWithParticipants } from '../lib/api';
 import LoginScreen from './auth/LoginScreen';
 import RegisterScreen from './auth/RegisterScreen';
 import CoachChatScreen from './coach/CoachChatScreen';
@@ -102,6 +103,39 @@ const PREVIEW_COACH_CHAT_BOOKING: CoachBooking = {
   readyToComplete: false,
 };
 
+/** Mismo criterio que PREVIEW_COACH_CHAT_BOOKING: id real para que la logística/reminder puedan
+ * persistir contra el backend real, pero el resto son placeholders porque no hay sesión aquí. */
+const PREVIEW_COACH_MATCH_BOOKING: BookingWithParticipants = {
+  id: REAL_COMPLETED_BOOKING_ID,
+  playerId: '—',
+  coachId: '—',
+  tournamentId: '—',
+  matchDatetime: new Date(Date.now() + 45 * 60000).toISOString(),
+  agreedRate: '0',
+  status: 'accepted',
+  parentNote: null,
+  courtLabel: null,
+  meetingPointDetail: null,
+  responseDeadline: new Date().toISOString(),
+  paymentDeadline: null,
+  totalAmountPaid: null,
+  coachNetAmount: null,
+  platformCommissionAmount: null,
+  clubCommissionAmount: null,
+  refundAmount: null,
+  coachCompensationAmount: null,
+  cancelledAt: null,
+  cancellationReason: null,
+  requestedAt: new Date().toISOString(),
+  decidedAt: null,
+  completedAt: null,
+  playerName: 'Vista previa',
+  ageCategory: '—',
+  parentName: 'Vista previa',
+  tournamentName: '—',
+  tournamentVenue: '—',
+};
+
 const PREVIEW_PARENT_CHAT_BOOKING: BookingHistoryEntry = {
   id: REAL_COMPLETED_BOOKING_ID,
   trainerName: 'Vista previa',
@@ -145,7 +179,7 @@ export default function DevPreviewSwitcher() {
         ) : screen === 'coachChat' ? (
           <CoachChatScreen booking={PREVIEW_COACH_CHAT_BOOKING} />
         ) : screen === 'coachPreMatch' ? (
-          <CoachMatchDayFlow bookingId={REAL_COMPLETED_BOOKING_ID} />
+          <CoachMatchDayFlow booking={PREVIEW_COACH_MATCH_BOOKING} />
         ) : screen === 'coachSessions' ? (
           <CoachSessionHistoryScreen coachId={COACH_ID} />
         ) : screen === 'coachEarnings' ? (

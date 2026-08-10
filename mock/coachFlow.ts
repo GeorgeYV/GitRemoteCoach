@@ -77,37 +77,6 @@ export interface BookingRequest {
   expiresInSeconds: number;
 }
 
-export interface PreMatchReminder {
-  bookingId: string;
-  playerName: string;
-  playerInitial: string;
-  category: string;
-  parentName: string;
-  date: string;
-  time: string;
-  minutesUntilMatch: number;
-  venue: string;
-  courtLabel: string;
-  meetingPointDetail: string;
-  playerNote?: string;
-}
-
-export const mockPreMatchReminder: PreMatchReminder = {
-  bookingId: 'req-1',
-  playerName: 'Valentina Torres',
-  playerInitial: 'V',
-  category: 'U14 · Individual femenil',
-  parentName: 'María Torres',
-  date: 'Vie 5 Ago',
-  time: '10:00 AM',
-  minutesUntilMatch: 45,
-  venue: 'Club Deportivo Bosques',
-  courtLabel: 'Cancha 3',
-  meetingPointDetail: 'Entrada principal → pasillo de canchas 1–4 → gradas junto a la Cancha 3',
-  playerNote:
-    'Valentina se pone nerviosa con el saque, si puedes darle ánimo entre juegos se lo agradecería.',
-};
-
 export interface ChatMessage {
   id: string;
   sender: 'coach' | 'parent' | 'system';

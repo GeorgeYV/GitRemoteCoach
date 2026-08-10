@@ -1,14 +1,21 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import React, { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import IconTextInput from '../../components/shared/IconTextInput';
 import InitialAvatar from '../../components/shared/InitialAvatar';
+import { useAuth } from '../../context/AuthContext';
+import { ApiError, BookingWithParticipants, setMeetingDetails } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
-import { mockPreMatchReminder } from '../../mock/coachFlow';
 
 const URGENT_MINUTES_THRESHOLD = 15;
 
 function usePreMatchCountdown(initialMinutes: number): number {
   const [minutes, setMinutes] = useState(initialMinutes);
+
+  useEffect(() => {
+    setMinutes(initialMinutes);
+  }, [initialMinutes]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -20,13 +27,56 @@ function usePreMatchCountdown(initialMinutes: number): number {
   return minutes;
 }
 
-export default function CoachPreMatchReminderScreen({ onStartCapture }: { onStartCapture?: () => void }) {
-  const reminder = mockPreMatchReminder;
-  const minutesLeft = usePreMatchCountdown(reminder.minutesUntilMatch);
+export default function CoachPreMatchReminderScreen({
+  booking,
+  onStartCapture,
+  onOpenChat,
+  onMeetingSaved,
+}: {
+  booking: BookingWithParticipants;
+  onStartCapture?: () => void;
+  onOpenChat?: () => void;
+  onMeetingSaved?: (details: { courtLabel: string; meetingPointDetail: string }) => void;
+}) {
+  const { token } = useAuth();
+  const matchDate = new Date(booking.matchDatetime);
+  const initialMinutes = Math.max(0, Math.round((matchDate.getTime() - Date.now()) / 60000));
+  const minutesLeft = usePreMatchCountdown(initialMinutes);
   const urgent = minutesLeft <= URGENT_MINUTES_THRESHOLD;
   const startingNow = minutesLeft <= 0;
-  const playerFirstName = reminder.playerName.split(' ')[0];
-  const parentFirstName = reminder.parentName.split(' ')[0];
+  const playerFirstName = booking.playerName.split(' ')[0];
+  const parentFirstName = booking.parentName.split(' ')[0];
+  const dateLabel = matchDate.toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric', month: 'short' });
+  const timeLabel = matchDate.toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit' });
+
+  const [courtLabel, setCourtLabel] = useState(booking.courtLabel ?? '');
+  const [meetingPointDetail, setMeetingPointDetail] = useState(booking.meetingPointDetail ?? '');
+  const [editingMeeting, setEditingMeeting] = useState(false);
+  const [savingMeeting, setSavingMeeting] = useState(false);
+  const [meetingError, setMeetingError] = useState<string | null>(null);
+
+  async function handleSaveMeeting() {
+    if (!token) {
+      setMeetingError('No hay una sesión activa.');
+      return;
+    }
+    setSavingMeeting(true);
+    setMeetingError(null);
+    try {
+      const trimmedCourtLabel = courtLabel.trim();
+      const trimmedMeetingPointDetail = meetingPointDetail.trim();
+      await setMeetingDetails(token, booking.id, {
+        courtLabel: trimmedCourtLabel || undefined,
+        meetingPointDetail: trimmedMeetingPointDetail || undefined,
+      });
+      setEditingMeeting(false);
+      onMeetingSaved?.({ courtLabel: trimmedCourtLabel, meetingPointDetail: trimmedMeetingPointDetail });
+    } catch (err) {
+      setMeetingError(err instanceof ApiError ? err.message : 'No se pudo guardar la logística. Intenta de nuevo.');
+    } finally {
+      setSavingMeeting(false);
+    }
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -43,7 +93,7 @@ export default function CoachPreMatchReminderScreen({ onStartCapture }: { onStar
             </View>
             <Text style={styles.notifTitle}>Tu partido con {playerFirstName} empieza pronto</Text>
             <Text style={styles.notifBody}>
-              {reminder.time} · {reminder.courtLabel}, {reminder.venue}
+              {timeLabel} · {courtLabel || 'Cancha sin asignar'}, {booking.tournamentVenue}
             </Text>
           </View>
         </View>
@@ -56,38 +106,86 @@ export default function CoachPreMatchReminderScreen({ onStartCapture }: { onStar
             <Text style={[styles.countdownValue, urgent && styles.countdownValueUrgent]}>{minutesLeft} min</Text>
           )}
           <Text style={styles.countdownMeta}>
-            {reminder.date} · {reminder.time}
+            {dateLabel} · {timeLabel}
           </Text>
         </View>
 
-        <Section label="Lugar exacto">
-          <View style={styles.locationCard}>
-            <View style={styles.locationAccent} />
-            <View style={styles.locationTextWrap}>
-              <Text style={styles.locationVenue}>{reminder.venue}</Text>
-              <Text style={styles.locationCourt}>{reminder.courtLabel}</Text>
-              <Text style={styles.locationDirections}>{reminder.meetingPointDetail}</Text>
+        <Section
+          label="Lugar exacto"
+          action={
+            !editingMeeting ? (
+              <Pressable style={styles.editButton} onPress={() => setEditingMeeting(true)}>
+                <Ionicons name="create-outline" size={14} color={colors.ballLime} />
+                <Text style={styles.editButtonLabel}>Editar</Text>
+              </Pressable>
+            ) : undefined
+          }
+        >
+          {editingMeeting ? (
+            <View style={styles.editCard}>
+              <IconTextInput icon="basketball-outline" placeholder="Cancha (ej. Cancha 3)" value={courtLabel} onChangeText={setCourtLabel} />
+              <IconTextInput
+                icon="navigate-outline"
+                placeholder="Cómo llegar (ej. Entrada principal → pasillo 1–4)"
+                value={meetingPointDetail}
+                onChangeText={setMeetingPointDetail}
+                multiline
+                style={styles.editMultiline}
+              />
+              {meetingError && <Text style={styles.editErrorText}>{meetingError}</Text>}
+              <View style={styles.editActionsRow}>
+                <Pressable
+                  style={styles.editCancelButton}
+                  onPress={() => {
+                    setCourtLabel(booking.courtLabel ?? '');
+                    setMeetingPointDetail(booking.meetingPointDetail ?? '');
+                    setMeetingError(null);
+                    setEditingMeeting(false);
+                  }}
+                  disabled={savingMeeting}
+                >
+                  <Text style={styles.editCancelLabel}>Cancelar</Text>
+                </Pressable>
+                <Pressable style={styles.editSaveButton} onPress={handleSaveMeeting} disabled={savingMeeting}>
+                  {savingMeeting ? (
+                    <ActivityIndicator color={colors.courtBlueDeep} />
+                  ) : (
+                    <Text style={styles.editSaveLabel}>Guardar</Text>
+                  )}
+                </Pressable>
+              </View>
             </View>
-          </View>
+          ) : (
+            <View style={styles.locationCard}>
+              <View style={styles.locationAccent} />
+              <View style={styles.locationTextWrap}>
+                <Text style={styles.locationVenue}>{booking.tournamentVenue}</Text>
+                <Text style={styles.locationCourt}>{courtLabel || 'Cancha sin asignar'}</Text>
+                <Text style={styles.locationDirections}>
+                  {meetingPointDetail || 'Agrega indicaciones para que sea fácil encontrarte.'}
+                </Text>
+              </View>
+            </View>
+          )}
         </Section>
 
         <Section label="Jugador">
           <View style={styles.playerCard}>
             <View style={styles.playerTopRow}>
-              <InitialAvatar initial={reminder.playerInitial} size={48} />
+              <InitialAvatar initial={booking.playerName[0] ?? '?'} size={48} />
               <View style={styles.playerInfo}>
-                <Text style={styles.playerName}>{reminder.playerName}</Text>
-                <Text style={styles.playerMeta}>{reminder.category}</Text>
-                <Text style={styles.parentMeta}>Padre/madre: {reminder.parentName}</Text>
+                <Text style={styles.playerName}>{booking.playerName}</Text>
+                <Text style={styles.playerMeta}>{booking.ageCategory}</Text>
+                <Text style={styles.parentMeta}>Padre/madre: {booking.parentName}</Text>
               </View>
             </View>
-            {reminder.playerNote && <Text style={styles.playerNote}>“{reminder.playerNote}”</Text>}
+            {booking.parentNote && <Text style={styles.playerNote}>“{booking.parentNote}”</Text>}
           </View>
         </Section>
       </ScrollView>
 
       <View style={styles.footer}>
-        <Pressable style={styles.chatButton}>
+        <Pressable style={styles.chatButton} onPress={onOpenChat}>
           <Text style={styles.chatButtonLabel}>Abrir chat con {parentFirstName}</Text>
         </Pressable>
         {onStartCapture && (
@@ -100,10 +198,13 @@ export default function CoachPreMatchReminderScreen({ onStartCapture }: { onStar
   );
 }
 
-function Section({ label, children }: { label: string; children: React.ReactNode }) {
+function Section({ label, action, children }: { label: string; action?: React.ReactNode; children: React.ReactNode }) {
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionLabel}>{label}</Text>
+      <View style={styles.sectionHeaderRow}>
+        <Text style={styles.sectionLabel}>{label}</Text>
+        {action}
+      </View>
       {children}
     </View>
   );
@@ -217,13 +318,74 @@ const styles = StyleSheet.create({
   section: {
     marginBottom: 22,
   },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
   sectionLabel: {
     color: colors.textDim,
     fontSize: 12,
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.8,
-    marginBottom: 12,
+  },
+  editButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  editButtonLabel: {
+    color: colors.ballLime,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  editCard: {
+    backgroundColor: colors.panel,
+    borderRadius: radius,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  editMultiline: {
+    minHeight: 60,
+    textAlignVertical: 'top',
+  },
+  editErrorText: {
+    color: colors.errorCoral,
+    fontSize: 12,
+    marginBottom: 8,
+  },
+  editActionsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 4,
+  },
+  editCancelButton: {
+    flex: 1,
+    borderRadius: radius,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  editCancelLabel: {
+    color: colors.textSoft,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  editSaveButton: {
+    flex: 1,
+    backgroundColor: colors.ballLime,
+    borderRadius: radius,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  editSaveLabel: {
+    color: colors.courtBlueDeep,
+    fontSize: 13,
+    fontWeight: '800',
   },
   locationCard: {
     flexDirection: 'row',

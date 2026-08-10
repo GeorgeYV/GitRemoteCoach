@@ -233,6 +233,20 @@ export function completeBooking(authToken: string, bookingId: string): Promise<B
   });
 }
 
+/** PATCH /bookings/:id/meeting-details — CoachPreMatchReminderScreen. Solo el entrenador de la
+ * reserva puede fijar la logística de encuentro (cancha, punto de encuentro). */
+export function setMeetingDetails(
+  authToken: string,
+  bookingId: string,
+  params: { courtLabel?: string; meetingPointDetail?: string },
+): Promise<Booking> {
+  return request(`/bookings/${bookingId}/meeting-details`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${authToken}` },
+    body: JSON.stringify(params),
+  });
+}
+
 /** POST /bookings — BookingConfirmScreen. Crea la reserva en estado 'requested'. */
 export function requestBooking(
   authToken: string,
