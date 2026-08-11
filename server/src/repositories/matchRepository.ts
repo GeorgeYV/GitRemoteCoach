@@ -73,6 +73,19 @@ export async function findByBookingId(bookingId: string, db: Queryable = pool): 
   return rows.length > 0 ? mapRow(rows[0]) : null;
 }
 
+/** TrainerProfileScreen ("Estadísticas de partidos"): todos los partidos completados de un coach,
+ * a través de sus reservas — usado para agregar stats reales sin exponer el detalle de un partido
+ * individual (que pertenece a un padre/hijo específico) a un visitante público. */
+export async function listCompletedByCoach(coachId: string, db: Queryable = pool): Promise<Match[]> {
+  const { rows } = await db.query(
+    `SELECT m.* FROM matches m
+     JOIN bookings b ON b.id = m.booking_id
+     WHERE b.coach_id = $1 AND m.status = 'completed'`,
+    [coachId],
+  );
+  return rows.map(mapRow);
+}
+
 /** Fija completed_at explícitamente (no depende del trigger, que pg-mem no ejecuta) —
  * mismo patrón que paymentService.completeBooking con bookings.completed_at. */
 export async function updateStatus(id: string, status: MatchStatus, db: Queryable = pool): Promise<Match> {

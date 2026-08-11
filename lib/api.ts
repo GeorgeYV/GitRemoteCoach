@@ -369,6 +369,22 @@ export function getCoachProfile(coachId: string): Promise<CoachProfileWithTraini
   return request(`/coaches/${coachId}`);
 }
 
+/** Espeja server/src/types.ts#CoachReportSummary. */
+export interface CoachReportSummary {
+  matchesCount: number;
+  winners: number;
+  unforcedErrors: number;
+  firstServePct: number | null;
+  breaksConverted: number;
+  returnGamesPlayed: number;
+}
+
+/** GET /coaches/:id/report-summary — TrainerProfileScreen: stats agregadas de todos los partidos
+ * completados del coach (público, igual que GET /coaches/:id). null si todavía no tiene ninguno. */
+export function getCoachReportSummary(coachId: string): Promise<CoachReportSummary | null> {
+  return request(`/coaches/${coachId}/report-summary`);
+}
+
 /** Espeja server/src/types.ts#CoachSearchResult. */
 export interface CoachSearchResult {
   id: string;

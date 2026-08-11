@@ -9,8 +9,10 @@ import TrainerAvatarPlaceholder from '../../components/shared/TrainerAvatarPlace
 import {
   ApiError,
   CoachProfileWithTraining,
+  CoachReportSummary,
   CoachTournamentAvailability,
   getCoachProfile,
+  getCoachReportSummary,
   getCoachTournamentAvailability,
   listCoachReviews,
   PlayingLevel,
@@ -22,14 +24,14 @@ import { buildDaySlotsFromRange } from '../../lib/dateSlots';
 import { colors, radius } from '../../lib/theme';
 import { AvailabilityDay } from '../../mock/parentFlow';
 
-/** Contenido de ejemplo, no ligado a ningún coach real — la sección ya se etiqueta como
- * "anonimizado" en la UI; no hay un endpoint de reporte-promedio del que sacar esto de verdad. */
-const EXAMPLE_REPORT_STATS = [
-  { value: '18', label: 'Winners' },
-  { value: '9', label: 'Errores' },
-  { value: '71%', label: '1er saque' },
-  { value: '4/6', label: 'Quiebres' },
-];
+function reportStatTiles(summary: CoachReportSummary): { value: string; label: string }[] {
+  return [
+    { value: String(summary.winners), label: 'Winners' },
+    { value: String(summary.unforcedErrors), label: 'Errores' },
+    { value: summary.firstServePct === null ? '—' : `${summary.firstServePct}%`, label: '1er saque' },
+    { value: `${summary.breaksConverted}/${summary.returnGamesPlayed}`, label: 'Quiebres' },
+  ];
+}
 
 const LEVEL_LABELS: Record<PlayingLevel, string> = {
   recreativo: 'Recreativo',
@@ -80,6 +82,9 @@ export default function TrainerProfileScreen({
   const [reviews, setReviews] = useState<ReviewWithParent[] | null>(null);
   const [reviewsError, setReviewsError] = useState<string | null>(null);
 
+  const [reportSummary, setReportSummary] = useState<CoachReportSummary | null | undefined>(undefined);
+  const [reportError, setReportError] = useState<string | null>(null);
+
   useEffect(() => {
     let cancelled = false;
     setLoadError(null);
@@ -109,6 +114,22 @@ export default function TrainerProfileScreen({
       .catch((err) => {
         if (cancelled) return;
         setReviewsError(err instanceof ApiError ? err.message : 'No se pudieron cargar las reseñas.');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [coachId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setReportError(null);
+    getCoachReportSummary(coachId)
+      .then((result) => {
+        if (!cancelled) setReportSummary(result);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setReportError(err instanceof ApiError ? err.message : 'No se pudieron cargar las estadísticas.');
       });
     return () => {
       cancelled = true;
@@ -200,12 +221,28 @@ export default function TrainerProfileScreen({
           )}
         </Section>
 
-        <Section label="Ejemplo de reporte (anonimizado)">
-          <View style={styles.statsGrid}>
-            {EXAMPLE_REPORT_STATS.map((stat) => (
-              <StatTile key={stat.label} value={stat.value} label={stat.label} />
-            ))}
-          </View>
+        <Section label="Estadísticas de partidos capturados">
+          {reportError ? (
+            <Text style={styles.reviewsMessage}>{reportError}</Text>
+          ) : reportSummary === undefined ? (
+            <ActivityIndicator color={colors.ballLime} />
+          ) : reportSummary === null ? (
+            <Text style={styles.reviewsMessage}>
+              {firstName} todavía no tiene partidos con captura en vivo completada.
+            </Text>
+          ) : (
+            <>
+              <View style={styles.statsGrid}>
+                {reportStatTiles(reportSummary).map((stat) => (
+                  <StatTile key={stat.label} value={stat.value} label={stat.label} />
+                ))}
+              </View>
+              <Text style={styles.statsFootnote}>
+                Basado en {reportSummary.matchesCount}{' '}
+                {reportSummary.matchesCount === 1 ? 'partido capturado' : 'partidos capturados'}.
+              </Text>
+            </>
+          )}
         </Section>
 
         <Section label="Disponibilidad para este torneo">
@@ -383,6 +420,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
+  },
+  statsFootnote: {
+    color: colors.textDim,
+    fontSize: 11,
+    marginTop: 4,
   },
   availabilityGrid: {
     flexDirection: 'row',

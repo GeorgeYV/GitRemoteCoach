@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import * as coachProfileService from '../services/coachProfileService.js';
 import * as bookingService from '../services/bookingService.js';
+import * as matchService from '../services/matchService.js';
 import * as tournamentService from '../services/tournamentService.js';
 import { ForbiddenError, ValidationError } from '../lib/errors.js';
 
@@ -58,6 +59,13 @@ export async function coachRoutes(app: FastifyInstance): Promise<void> {
   app.get('/coaches/:id', async (req) => {
     const { id } = req.params as { id: string };
     return coachProfileService.getCoachProfile(id);
+  });
+
+  // TrainerProfileScreen "Estadísticas de partidos": público como el resto del perfil — solo
+  // devuelve sumas/promedios agregados, nunca el detalle de un partido individual.
+  app.get('/coaches/:id/report-summary', async (req) => {
+    const { id } = req.params as { id: string };
+    return matchService.getCoachReportSummary(id);
   });
 
   // CoachAvailabilityScreen, CoachTournamentSearchScreen, CoachReputationScreen: insignias de

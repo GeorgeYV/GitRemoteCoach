@@ -1354,6 +1354,89 @@ console.log('\n=== Escenario 24: onboarding de club_admin (POST /clubs) ===');
   assertEqual(duplicateRes.statusCode, 409, 'un segundo POST /clubs para el mismo usuario devuelve 409');
 }
 
+console.log('\n=== Escenario 25: estadísticas agregadas de partidos de un coach (GET /coaches/:id/report-summary) ===');
+{
+  const registerRes = await app.inject({
+    method: 'POST',
+    url: '/auth/register',
+    payload: {
+      email: 'coach.stats.e2e@example.com',
+      password: 'super-secreta-123',
+      fullName: 'Coach Stats E2E',
+      primaryRole: 'coach',
+    },
+  });
+  const { token: statsCoachToken, user: statsCoach } = registerRes.json();
+
+  await app.inject({
+    method: 'POST',
+    url: '/coaches',
+    headers: { authorization: `Bearer ${statsCoachToken}` },
+    payload: { city: 'CDMX', yearsExperience: 4, hourlyRate: 30, ageCategories: ['U14'], levels: ['competitivo'] },
+  });
+
+  const noMatchesRes = await app.inject({ method: 'GET', url: `/coaches/${statsCoach.id}/report-summary` });
+  assertEqual(noMatchesRes.statusCode, 200, 'GET .../report-summary devuelve 200 aunque el coach no tenga partidos');
+  assertEqual(noMatchesRes.json(), null, 'sin partidos completados, devuelve null (no un ejemplo inventado)');
+
+  const bookingRes = await requestBooking(statsCoach.id, inFuture(48));
+  const statsBooking = bookingRes.json();
+
+  const matchRes = await app.inject({
+    method: 'POST',
+    url: '/matches',
+    headers: { authorization: `Bearer ${statsCoachToken}` },
+    payload: {
+      bookingId: statsBooking.id,
+      player2Label: 'Rival de práctica',
+      bestOf: '1',
+      noAd: true,
+      initialServer: 'player1',
+      captureMode: 'rapida',
+    },
+  });
+  const statsMatch = matchRes.json();
+
+  // Juego 1 (server: player1) — player1 gana su propio saque 4-1, sin quiebre.
+  // Juego 2 (server: player2, alterna automáticamente) — player1 quiebra 4-1 como restador.
+  await app.inject({
+    method: 'POST',
+    url: `/matches/${statsMatch.id}/points/bulk`,
+    headers: { authorization: `Bearer ${statsCoachToken}` },
+    payload: {
+      points: [
+        { sequenceNumber: 1, wonBy: 'player1', detail: 'ace', firstServeIn: true },
+        { sequenceNumber: 2, wonBy: 'player1', detail: 'winner_derecha', firstServeIn: true },
+        { sequenceNumber: 3, wonBy: 'player2', detail: 'error_no_forzado', firstServeIn: true },
+        { sequenceNumber: 4, wonBy: 'player1', detail: 'winner_reves', firstServeIn: true },
+        { sequenceNumber: 5, wonBy: 'player1', detail: 'winner_volea', firstServeIn: true },
+        { sequenceNumber: 6, wonBy: 'player2', detail: 'ace', firstServeIn: true },
+        { sequenceNumber: 7, wonBy: 'player1', detail: 'winner_derecha', firstServeIn: true },
+        { sequenceNumber: 8, wonBy: 'player1', detail: 'error_no_forzado', firstServeIn: true },
+        { sequenceNumber: 9, wonBy: 'player1', detail: 'winner_reves', firstServeIn: true },
+        { sequenceNumber: 10, wonBy: 'player1', detail: 'winner_volea', firstServeIn: true },
+      ],
+    },
+  });
+
+  await app.inject({
+    method: 'PATCH',
+    url: `/matches/${statsMatch.id}/status`,
+    headers: { authorization: `Bearer ${statsCoachToken}` },
+    payload: { status: 'completed' },
+  });
+
+  const summaryRes = await app.inject({ method: 'GET', url: `/coaches/${statsCoach.id}/report-summary` });
+  assertEqual(summaryRes.statusCode, 200, 'GET .../report-summary (público, sin token) devuelve 200');
+  const summary = summaryRes.json();
+  assertEqual(summary.matchesCount, 1, 'cuenta 1 partido completado');
+  assertEqual(summary.winners, 7, 'suma los 7 winners/aces de player1 a través de ambos juegos');
+  assertEqual(summary.unforcedErrors, 1, 'solo el punto 3 fue un error no forzado cargado a player1');
+  assertEqual(summary.firstServePct, 100, 'todos los puntos del propio saque de player1 fueron primer saque adentro');
+  assertEqual(summary.breaksConverted, 1, 'player1 quebró el saque de player2 en el juego 2');
+  assertEqual(summary.returnGamesPlayed, 1, 'player1 solo devolvió el saque en el juego 2');
+}
+
 console.log(`\n=== Resultado: ${passed} pasaron, ${failed} fallaron ===`);
 await app.close();
 process.exit(failed > 0 ? 1 : 0);

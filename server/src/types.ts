@@ -355,3 +355,14 @@ export interface MatchPointEvent {
   detail: PointDetail | null;
   firstServeIn: boolean;
 }
+
+/** TrainerProfileScreen: stats agregadas de todos los partidos completados de un coach —
+ * nunca datos de un partido individual, solo sumas/promedios (ver matchService.getCoachReportSummary). */
+export interface CoachReportSummary {
+  matchesCount: number;
+  winners: number;
+  unforcedErrors: number;
+  firstServePct: number | null;
+  breaksConverted: number;
+  returnGamesPlayed: number;
+}
