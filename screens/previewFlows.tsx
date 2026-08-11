@@ -56,6 +56,7 @@ import ClubTournamentListScreen from './club/ClubTournamentListScreen';
 import ClubTournamentDetailScreen from './club/ClubTournamentDetailScreen';
 import ClubInviteCoachScreen from './club/ClubInviteCoachScreen';
 import ClubCreateTournamentScreen from './club/ClubCreateTournamentScreen';
+import ClubRegistrationScreen from './club/ClubRegistrationScreen';
 
 /** UUID real de Carlos Medina — coincide con coachAUserId en server/test/seed.ts. Toda la previsualización
  * del lado coach opera como este entrenador hasta que exista una sesión/login real. */
@@ -617,16 +618,25 @@ export function ClubTournamentFlow({ clubId, clubName }: { clubId: string; clubN
 export function ClubFlow({ adminUserId }: { adminUserId: string }) {
   const [club, setClub] = useState<Club | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // 404 en GET /club-admins/:userId/club no es un error real: significa que este club_admin
+  // todavía no tiene ningún club vinculado — antes esto dejaba a ClubFlow atascado para siempre
+  // en un mensaje de error estático. Ahora se resuelve con un onboarding real.
+  const [needsRegistration, setNeedsRegistration] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     setError(null);
+    setNeedsRegistration(false);
     getClubForAdmin(adminUserId)
       .then((result) => {
         if (!cancelled) setClub(result);
       })
       .catch((err) => {
         if (cancelled) return;
+        if (err instanceof ApiError && err.status === 404) {
+          setNeedsRegistration(true);
+          return;
+        }
         setError(err instanceof ApiError ? err.message : 'No se pudo cargar tu club.');
       });
     return () => {
@@ -635,6 +645,10 @@ export function ClubFlow({ adminUserId }: { adminUserId: string }) {
   }, [adminUserId]);
 
   const [screen, setScreen] = useState<'home' | 'tournaments' | 'settlements'>('home');
+
+  if (needsRegistration) {
+    return <ClubRegistrationScreen onSuccess={(newClub) => { setClub(newClub); setNeedsRegistration(false); }} />;
+  }
 
   if (error) {
     return (

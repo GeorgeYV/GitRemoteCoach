@@ -1271,6 +1271,53 @@ console.log('\n=== Escenario 23: documentos de verificación de coach (CoachRegi
   );
 }
 
+console.log('\n=== Escenario 24: onboarding de club_admin (POST /clubs) ===');
+{
+  const registerRes = await app.inject({
+    method: 'POST',
+    url: '/auth/register',
+    payload: {
+      email: 'nuevo.club@example.com',
+      password: 'super-secreta-123',
+      fullName: 'Nuevo Club Admin',
+      primaryRole: 'club_admin',
+    },
+  });
+  const { token: newAdminToken, user: newAdmin } = registerRes.json();
+
+  const beforeRes = await app.inject({ method: 'GET', url: `/club-admins/${newAdmin.id}/club` });
+  assertEqual(beforeRes.statusCode, 404, 'un club_admin recién registrado todavía no administra ningún club');
+
+  const noAuthRes = await app.inject({
+    method: 'POST',
+    url: '/clubs',
+    payload: { name: 'Academia Nueva', type: 'club', city: 'Monterrey' },
+  });
+  assertEqual(noAuthRes.statusCode, 401, 'POST /clubs sin Bearer token devuelve 401');
+
+  const createRes = await app.inject({
+    method: 'POST',
+    url: '/clubs',
+    headers: { authorization: `Bearer ${newAdminToken}` },
+    payload: { name: 'Academia Nueva', type: 'club', city: 'Monterrey', contactEmail: 'contacto@academianueva.com' },
+  });
+  assertEqual(createRes.statusCode, 201, 'POST /clubs con datos válidos devuelve 201');
+  const createdClub = createRes.json();
+  assertEqual(createdClub.name, 'Academia Nueva', 'devuelve el club recién creado');
+
+  const afterRes = await app.inject({ method: 'GET', url: `/club-admins/${newAdmin.id}/club` });
+  assertEqual(afterRes.statusCode, 200, 'GET /club-admins/:userId/club ya resuelve el club recién creado');
+  assertEqual(afterRes.json().id, createdClub.id, 'queda vinculado como admin del club que acaba de crear');
+
+  const duplicateRes = await app.inject({
+    method: 'POST',
+    url: '/clubs',
+    headers: { authorization: `Bearer ${newAdminToken}` },
+    payload: { name: 'Otra Academia', type: 'federation', city: 'CDMX' },
+  });
+  assertEqual(duplicateRes.statusCode, 409, 'un segundo POST /clubs para el mismo usuario devuelve 409');
+}
+
 console.log(`\n=== Resultado: ${passed} pasaron, ${failed} fallaron ===`);
 await app.close();
 process.exit(failed > 0 ? 1 : 0);

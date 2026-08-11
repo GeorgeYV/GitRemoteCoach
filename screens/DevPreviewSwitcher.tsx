@@ -20,6 +20,7 @@ import TrainerListScreen from './parent/TrainerListScreen';
 import ParentChatScreen from './parent/ParentChatScreen';
 import BookingHistoryScreen from './parent/BookingHistoryScreen';
 import ClubHomeScreen from './club/ClubHomeScreen';
+import ClubRegistrationScreen from './club/ClubRegistrationScreen';
 import ClubSettlementsScreen from './club/ClubSettlementsScreen';
 import {
   COACH_ID,
@@ -54,7 +55,8 @@ type PreviewScreen =
   | 'parentHistory'
   | 'clubSettlements'
   | 'clubTournaments'
-  | 'clubHome';
+  | 'clubHome'
+  | 'clubRegister';
 
 const PREVIEW_OPTIONS: { key: PreviewScreen; label: string }[] = [
   { key: 'authLogin', label: 'Auth · Login' },
@@ -79,6 +81,7 @@ const PREVIEW_OPTIONS: { key: PreviewScreen; label: string }[] = [
   { key: 'clubHome', label: 'Club · Inicio' },
   { key: 'clubTournaments', label: 'Club · Torneos' },
   { key: 'clubSettlements', label: 'Club · Liquidaciones' },
+  { key: 'clubRegister', label: 'Club · Registro' },
 ];
 
 /**
@@ -218,6 +221,8 @@ export default function DevPreviewSwitcher() {
             onOpenTournaments={() => setScreen('clubTournaments')}
             onOpenSettlements={() => setScreen('clubSettlements')}
           />
+        ) : screen === 'clubRegister' ? (
+          <ClubRegistrationScreen />
         ) : (
           <ParentBookingFlow />
         )}

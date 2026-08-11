@@ -16,7 +16,25 @@ const createTournamentSchema = z
     path: ['endDate'],
   });
 
+const registerClubSchema = z.object({
+  name: z.string().min(1),
+  type: z.enum(['club', 'federation']),
+  city: z.string().min(1),
+  contactEmail: z.string().email().optional(),
+  contactPhone: z.string().min(1).optional(),
+});
+
 export async function clubRoutes(app: FastifyInstance): Promise<void> {
+  // ClubRegistrationScreen: onboarding del club_admin logueado — crea el club y lo vincula a él.
+  app.post('/clubs', { preHandler: app.authenticate }, async (req, reply) => {
+    const parsed = registerClubSchema.safeParse(req.body);
+    if (!parsed.success) throw new ValidationError(parsed.error.message);
+    const { sub } = req.user as { sub: string };
+    const club = await clubService.registerClub(sub, parsed.data);
+    reply.code(201);
+    return club;
+  });
+
   // ClubHomeScreen
   app.get('/clubs/:id', async (req) => {
     const { id } = req.params as { id: string };

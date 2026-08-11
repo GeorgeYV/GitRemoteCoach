@@ -608,6 +608,19 @@ export function getClub(clubId: string): Promise<Club> {
   return request(`/clubs/${clubId}`);
 }
 
+/** POST /clubs — ClubRegistrationScreen: onboarding de un club_admin recién registrado,
+ * crea el club y lo vincula al usuario de la sesión. */
+export function registerClub(
+  authToken: string,
+  params: { name: string; type: 'club' | 'federation'; city: string; contactEmail?: string; contactPhone?: string },
+): Promise<Club> {
+  return request('/clubs', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${authToken}` },
+    body: JSON.stringify(params),
+  });
+}
+
 /** GET /club-admins/:userId/club — ClubFlow, para resolver el club del club_admin logueado. */
 export function getClubForAdmin(userId: string): Promise<Club> {
   return request(`/club-admins/${userId}/club`);
