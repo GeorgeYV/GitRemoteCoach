@@ -1209,6 +1209,32 @@ console.log('\n=== Escenario 23: documentos de verificación de coach (CoachRegi
   const identityDoc = docs.find((d: any) => d.docType === 'identity');
   const backgroundDoc = docs.find((d: any) => d.docType === 'background_check');
 
+  const noAuthPendingRes = await app.inject({ method: 'GET', url: '/coach-verification-documents/pending' });
+  assertEqual(noAuthPendingRes.statusCode, 401, 'GET /coach-verification-documents/pending sin Bearer token devuelve 401');
+
+  const wrongRolePendingRes = await app.inject({
+    method: 'GET',
+    url: '/coach-verification-documents/pending',
+    headers: { authorization: `Bearer ${docCoachToken}` },
+  });
+  assertEqual(wrongRolePendingRes.statusCode, 403, 'GET .../pending con un rol que no es platform_admin devuelve 403');
+
+  const pendingBeforeRes = await app.inject({
+    method: 'GET',
+    url: '/coach-verification-documents/pending',
+    headers: { authorization: `Bearer ${platformAdminToken}` },
+  });
+  assertEqual(pendingBeforeRes.statusCode, 200, 'platform_admin puede ver la cola de revisión');
+  const pendingBefore = pendingBeforeRes.json();
+  assertTrue(
+    pendingBefore.some((d: any) => d.id === identityDoc.id && d.coachName === 'Coach Documentado'),
+    'la cola incluye el documento de identidad recién enviado, con el nombre del coach',
+  );
+  assertTrue(
+    pendingBefore.some((d: any) => d.id === backgroundDoc.id),
+    'la cola incluye el documento de antecedentes recién enviado',
+  );
+
   const noAuthReviewRes = await app.inject({
     method: 'PUT',
     url: `/coach-verification-documents/${identityDoc.id}/review`,
@@ -1232,6 +1258,16 @@ console.log('\n=== Escenario 23: documentos de verificación de coach (CoachRegi
   });
   assertEqual(approveIdentityRes.statusCode, 200, 'platform_admin aprueba el documento de identidad');
   assertEqual(approveIdentityRes.json().reviewedBy, fixtures.platformAdminUserId, 'reviewedBy queda en quien revisó');
+
+  const pendingAfterRes = await app.inject({
+    method: 'GET',
+    url: '/coach-verification-documents/pending',
+    headers: { authorization: `Bearer ${platformAdminToken}` },
+  });
+  assertTrue(
+    !pendingAfterRes.json().some((d: any) => d.id === identityDoc.id),
+    'el documento aprobado ya no aparece en la cola de pendientes',
+  );
 
   const stillPendingRes = await app.inject({ method: 'GET', url: `/coaches/${docCoach.id}` });
   assertEqual(

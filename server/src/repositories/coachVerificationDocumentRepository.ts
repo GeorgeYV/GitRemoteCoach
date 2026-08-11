@@ -1,7 +1,7 @@
 import type { Pool, PoolClient } from 'pg';
 import { pool } from '../lib/db.js';
 import { NotFoundError } from '../lib/errors.js';
-import type { CoachVerificationDocument, VerificationDocType } from '../types.js';
+import type { CoachVerificationDocument, CoachVerificationDocumentWithCoachName, VerificationDocType } from '../types.js';
 
 type Queryable = Pool | PoolClient;
 
@@ -18,6 +18,10 @@ function mapRow(row: any): CoachVerificationDocument {
     reviewedAt: row.reviewed_at,
     uploadedAt: row.uploaded_at,
   };
+}
+
+function mapRowWithCoachName(row: any): CoachVerificationDocumentWithCoachName {
+  return { ...mapRow(row), coachName: row.coach_name };
 }
 
 /** CoachRegistrationScreen "Enviar para verificación": una fila 'pending' por documento marcado
@@ -42,6 +46,18 @@ export async function listForCoach(coachId: string, db: Queryable = pool): Promi
     [coachId],
   );
   return rows.map(mapRow);
+}
+
+/** PlatformAdminReviewScreen: cola de documentos pendientes de todos los coaches. */
+export async function listPending(db: Queryable = pool): Promise<CoachVerificationDocumentWithCoachName[]> {
+  const { rows } = await db.query(
+    `SELECT cvd.*, u.full_name AS coach_name
+     FROM coach_verification_documents cvd
+     JOIN users u ON u.id = cvd.coach_id
+     WHERE cvd.status = 'pending'
+     ORDER BY cvd.uploaded_at ASC`,
+  );
+  return rows.map(mapRowWithCoachName);
 }
 
 export async function getById(id: string, db: Queryable = pool): Promise<CoachVerificationDocument> {

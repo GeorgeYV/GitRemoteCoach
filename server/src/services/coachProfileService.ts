@@ -6,6 +6,7 @@ import type {
   CoachProfile,
   CoachSearchResult,
   CoachVerificationDocument,
+  CoachVerificationDocumentWithCoachName,
   PlayingLevel,
   VerificationDocType,
 } from '../types.js';
@@ -97,10 +98,15 @@ export async function listVerificationDocuments(coachId: string): Promise<CoachV
   return coachVerificationDocumentRepository.listForCoach(coachId);
 }
 
+/** PlatformAdminReviewScreen: cola de documentos pendientes de todos los coaches. */
+export async function listPendingVerificationDocuments(): Promise<CoachVerificationDocumentWithCoachName[]> {
+  return coachVerificationDocumentRepository.listPending();
+}
+
 /**
- * Cola de revisión del admin de plataforma — sin pantalla propia todavía (fuera de alcance de esta
- * tarea, que solo hace real el estado de los documentos). Recalcula coach_profiles.verification_status
- * en la misma transacción para que quede consistente con el documento recién revisado.
+ * Cola de revisión del admin de plataforma (PlatformAdminReviewScreen). Recalcula
+ * coach_profiles.verification_status en la misma transacción para que quede consistente con el
+ * documento recién revisado.
  */
 export async function reviewVerificationDocument(
   documentId: string,

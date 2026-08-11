@@ -9,10 +9,18 @@ const reviewSchema = z.object({
 
 /**
  * Cola de revisión del admin de plataforma (rol 'platform_admin', no auto-registrable —
- * ver SELF_SERVICE_ROLES en authService). Sin pantalla propia todavía: esta tarea solo hace
- * real el estado de los documentos que ya lee CoachVerificationPendingScreen.
+ * ver SELF_SERVICE_ROLES en authService). Sembrado directo en la base, igual que club_admin.
  */
 export async function coachVerificationDocumentRoutes(app: FastifyInstance): Promise<void> {
+  // PlatformAdminReviewScreen: cola de documentos pendientes de todos los coaches.
+  app.get('/coach-verification-documents/pending', { preHandler: app.authenticate }, async (req) => {
+    const { role } = req.user as { role: string };
+    if (role !== 'platform_admin') {
+      throw new ForbiddenError('Solo un administrador de la plataforma puede ver la cola de revisión');
+    }
+    return coachProfileService.listPendingVerificationDocuments();
+  });
+
   app.put('/coach-verification-documents/:id/review', { preHandler: app.authenticate }, async (req) => {
     const { id } = req.params as { id: string };
     const { sub, role } = req.user as { sub: string; role: string };

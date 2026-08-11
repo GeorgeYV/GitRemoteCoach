@@ -183,6 +183,12 @@ export interface CoachVerificationDocument {
   uploadedAt: string;
 }
 
+/** Lo que devuelve la cola de revisión del admin de plataforma (PlatformAdminReviewScreen) —
+ * nombre del entrenador viene de un JOIN, para no obligar a la pantalla a resolverlo aparte. */
+export interface CoachVerificationDocumentWithCoachName extends CoachVerificationDocument {
+  coachName: string;
+}
+
 export interface CoachAgeCategory {
   coachId: string;
   ageCategory: AgeCategory;

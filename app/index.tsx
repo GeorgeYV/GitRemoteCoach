@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { ApiError, getCoachProfile, PublicUser } from '../lib/api';
 import { colors, radius } from '../lib/theme';
 import { ClubFlow, CoachHomeFlow } from '../screens/previewFlows';
+import PlatformAdminReviewScreen from '../screens/admin/PlatformAdminReviewScreen';
 import CoachRegistrationScreen from '../screens/coach/CoachRegistrationScreen';
 import CoachVerificationPendingScreen from '../screens/coach/CoachVerificationPendingScreen';
 import ParentHomeScreen from '../screens/parent/ParentHomeScreen';
@@ -12,8 +13,8 @@ import ParentHomeScreen from '../screens/parent/ParentHomeScreen';
 /**
  * Gatea el home del coach en el estado real de su coach_profiles: sin fila todavía → formulario
  * de alta (POST /coaches lo crea); pending/rejected → pantalla de estado; approved → dashboard.
- * No hay flujo de aprobación real todavía (ver plan de onboarding) — para probar "approved" hay
- * que actualizar verification_status a mano en la base.
+ * La aprobación es real (PlatformAdminReviewScreen, rol platform_admin) — sembrado directo en la
+ * base, no auto-registrable (ver SELF_SERVICE_ROLES en authService).
  */
 function CoachRoleHome({ user }: { user: PublicUser }) {
   const [state, setState] = useState<'loading' | 'no-profile' | 'pending' | 'approved' | 'error'>('loading');
@@ -77,6 +78,8 @@ function RoleHome({ user }: { user: PublicUser }) {
       return <CoachRoleHome user={user} />;
     case 'club_admin':
       return <ClubFlow adminUserId={user.id} />;
+    case 'platform_admin':
+      return <PlatformAdminReviewScreen />;
     default:
       return (
         <View style={styles.placeholder}>

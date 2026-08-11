@@ -418,6 +418,33 @@ export function listCoachVerificationDocuments(authToken: string, coachId: strin
   });
 }
 
+/** Espeja server/src/types.ts#CoachVerificationDocumentWithCoachName. */
+export interface CoachVerificationDocumentWithCoachName extends CoachVerificationDocument {
+  coachName: string;
+}
+
+/** GET /coach-verification-documents/pending — PlatformAdminReviewScreen: cola de revisión,
+ * solo visible para el rol platform_admin. */
+export function listPendingVerificationDocuments(authToken: string): Promise<CoachVerificationDocumentWithCoachName[]> {
+  return request('/coach-verification-documents/pending', {
+    headers: { Authorization: `Bearer ${authToken}` },
+  });
+}
+
+/** PUT /coach-verification-documents/:id/review — PlatformAdminReviewScreen: aprobar o rechazar
+ * un documento individual. */
+export function reviewVerificationDocument(
+  authToken: string,
+  documentId: string,
+  status: Extract<VerificationStatus, 'approved' | 'rejected'>,
+): Promise<CoachVerificationDocument> {
+  return request(`/coach-verification-documents/${documentId}/review`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${authToken}` },
+    body: JSON.stringify({ status }),
+  });
+}
+
 /** PUT /coaches/:id/training — CoachRegistrationScreen. */
 export function updateCoachTraining(
   authToken: string,
