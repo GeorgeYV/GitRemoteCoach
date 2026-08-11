@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -226,7 +227,10 @@ export default function TrainerProfileScreen({
           style={styles.reserveButton}
           onPress={() => onReserve?.({ coachId, name, price, availability })}
         >
-          <Text style={styles.reserveLabel}>Reservar con {firstName}</Text>
+          <View style={styles.reserveContent}>
+            <Ionicons name="calendar-outline" size={17} color={colors.courtBlueDeep} />
+            <Text style={styles.reserveLabel}>Reservar con {firstName}</Text>
+          </View>
         </Pressable>
       </View>
     </SafeAreaView>
@@ -412,6 +416,11 @@ const styles = StyleSheet.create({
     borderRadius: radius,
     paddingVertical: 16,
     alignItems: 'center',
+  },
+  reserveContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   reserveLabel: {
     color: colors.courtBlueDeep,

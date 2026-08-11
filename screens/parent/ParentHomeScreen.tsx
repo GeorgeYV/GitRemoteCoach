@@ -81,7 +81,10 @@ export default function ParentHomeScreen() {
               </Text>
               <Text style={styles.featuredMeta}>{dateRangeLabel(featured.startDate, featured.endDate)}</Text>
               <Pressable style={styles.ctaButton} onPress={goToTrainers}>
-                <Text style={styles.ctaLabel}>Ver entrenadores</Text>
+                <View style={styles.ctaContent}>
+                  <Text style={styles.ctaLabel}>Ver entrenadores</Text>
+                  <Ionicons name="arrow-forward-outline" size={16} color={colors.courtBlueDeep} />
+                </View>
               </Pressable>
             </View>
           </>
@@ -208,6 +211,11 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     alignItems: 'center',
     marginTop: 14,
+  },
+  ctaContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   ctaLabel: {
     color: colors.courtBlueDeep,

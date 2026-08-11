@@ -55,7 +55,10 @@ export default function RegisterScreen({
             {user.fullName} · {user.email} · {user.primaryRole}
           </Text>
           <Pressable style={[styles.submitButton, styles.logoutButton]} onPress={logout}>
-            <Text style={styles.submitLabel}>Cerrar sesión</Text>
+            <View style={styles.submitContent}>
+              <Ionicons name="log-out-outline" size={18} color={colors.courtBlueDeep} />
+              <Text style={styles.submitLabel}>Cerrar sesión</Text>
+            </View>
           </Pressable>
         </View>
       </SafeAreaView>

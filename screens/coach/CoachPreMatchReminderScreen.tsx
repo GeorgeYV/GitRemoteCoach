@@ -144,13 +144,19 @@ export default function CoachPreMatchReminderScreen({
                   }}
                   disabled={savingMeeting}
                 >
-                  <Text style={styles.editCancelLabel}>Cancelar</Text>
+                  <View style={styles.buttonContent}>
+                    <Ionicons name="close-circle-outline" size={15} color={colors.textSoft} />
+                    <Text style={styles.editCancelLabel}>Cancelar</Text>
+                  </View>
                 </Pressable>
                 <Pressable style={styles.editSaveButton} onPress={handleSaveMeeting} disabled={savingMeeting}>
                   {savingMeeting ? (
                     <ActivityIndicator color={colors.courtBlueDeep} />
                   ) : (
-                    <Text style={styles.editSaveLabel}>Guardar</Text>
+                    <View style={styles.buttonContent}>
+                      <Ionicons name="checkmark-circle-outline" size={15} color={colors.courtBlueDeep} />
+                      <Text style={styles.editSaveLabel}>Guardar</Text>
+                    </View>
                   )}
                 </Pressable>
               </View>
@@ -186,11 +192,17 @@ export default function CoachPreMatchReminderScreen({
 
       <View style={styles.footer}>
         <Pressable style={styles.chatButton} onPress={onOpenChat}>
-          <Text style={styles.chatButtonLabel}>Abrir chat con {parentFirstName}</Text>
+          <View style={styles.buttonContent}>
+            <Ionicons name="chatbubble-outline" size={16} color={colors.lineWhite} />
+            <Text style={styles.chatButtonLabel}>Abrir chat con {parentFirstName}</Text>
+          </View>
         </Pressable>
         {onStartCapture && (
           <Pressable style={styles.captureButton} onPress={onStartCapture}>
-            <Text style={styles.captureButtonLabel}>Iniciar captura en vivo</Text>
+            <View style={styles.buttonContent}>
+              <Ionicons name="play-outline" size={17} color={colors.courtBlueDeep} />
+              <Text style={styles.captureButtonLabel}>Iniciar captura en vivo</Text>
+            </View>
           </Pressable>
         )}
       </View>
@@ -340,6 +352,11 @@ const styles = StyleSheet.create({
     color: colors.ballLime,
     fontSize: 12,
     fontWeight: '700',
+  },
+  buttonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   editCard: {
     backgroundColor: colors.panel,

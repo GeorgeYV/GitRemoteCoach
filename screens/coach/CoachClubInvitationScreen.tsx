@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -124,13 +125,19 @@ export default function CoachClubInvitationScreen({ coachId, onBack }: { coachId
           {actionError && <Text style={styles.actionErrorText}>{actionError}</Text>}
           <View style={styles.footer}>
             <Pressable style={styles.declineButton} onPress={() => respond('declined')} disabled={submitting}>
-              <Text style={styles.declineLabel}>Rechazar</Text>
+              <View style={styles.buttonContent}>
+                <Ionicons name="close-circle-outline" size={17} color={colors.errorCoral} />
+                <Text style={styles.declineLabel}>Rechazar</Text>
+              </View>
             </Pressable>
             <Pressable style={styles.acceptButton} onPress={() => respond('accepted')} disabled={submitting}>
               {submitting ? (
                 <ActivityIndicator color={colors.courtBlueDeep} />
               ) : (
-                <Text style={styles.acceptLabel}>Aceptar invitación</Text>
+                <View style={styles.buttonContent}>
+                  <Ionicons name="checkmark-circle-outline" size={17} color={colors.courtBlueDeep} />
+                  <Text style={styles.acceptLabel}>Aceptar invitación</Text>
+                </View>
               )}
             </Pressable>
           </View>
@@ -265,6 +272,11 @@ const styles = StyleSheet.create({
   footer: {
     flexDirection: 'row',
     gap: 10,
+  },
+  buttonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   declineButton: {
     flex: 1,

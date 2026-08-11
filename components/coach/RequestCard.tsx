@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors, radius } from '../../lib/theme';
@@ -36,10 +37,16 @@ export default function RequestCard({
 
       <View style={styles.actionsRow}>
         <Pressable style={styles.rejectButton} onPress={onReject}>
-          <Text style={styles.rejectLabel}>Rechazar</Text>
+          <View style={styles.buttonContent}>
+            <Ionicons name="close-circle-outline" size={16} color={colors.errorCoral} />
+            <Text style={styles.rejectLabel}>Rechazar</Text>
+          </View>
         </Pressable>
         <Pressable style={styles.acceptButton} onPress={onAccept}>
-          <Text style={styles.acceptLabel}>Aceptar</Text>
+          <View style={styles.buttonContent}>
+            <Ionicons name="checkmark-circle-outline" size={16} color={colors.courtBlueDeep} />
+            <Text style={styles.acceptLabel}>Aceptar</Text>
+          </View>
         </Pressable>
       </View>
     </View>
@@ -97,6 +104,11 @@ const styles = StyleSheet.create({
   actionsRow: {
     flexDirection: 'row',
     gap: 10,
+  },
+  buttonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   rejectButton: {
     flex: 1,

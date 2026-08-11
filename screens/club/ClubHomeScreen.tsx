@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -93,10 +94,16 @@ export default function ClubHomeScreen({
         </View>
 
         <Pressable style={styles.actionButton} onPress={onOpenTournaments}>
-          <Text style={styles.actionButtonLabel}>Ver torneos</Text>
+          <View style={styles.buttonContent}>
+            <Ionicons name="trophy-outline" size={16} color={colors.courtBlueDeep} />
+            <Text style={styles.actionButtonLabel}>Ver torneos</Text>
+          </View>
         </Pressable>
         <Pressable style={[styles.actionButton, styles.actionButtonSecondary]} onPress={onOpenSettlements}>
-          <Text style={[styles.actionButtonLabel, styles.actionButtonLabelSecondary]}>Ver liquidaciones</Text>
+          <View style={styles.buttonContent}>
+            <Ionicons name="cash-outline" size={16} color={colors.lineWhite} />
+            <Text style={[styles.actionButtonLabel, styles.actionButtonLabelSecondary]}>Ver liquidaciones</Text>
+          </View>
         </Pressable>
       </ScrollView>
     </SafeAreaView>
@@ -141,6 +148,11 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     alignItems: 'center',
     marginTop: 8,
+  },
+  buttonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   actionButtonLabel: {
     color: colors.courtBlueDeep,

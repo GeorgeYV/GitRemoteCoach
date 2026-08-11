@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import React, { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -104,7 +105,10 @@ export default function BookingPaymentScreen({
           {submitting ? (
             <ActivityIndicator color={colors.courtBlueDeep} />
           ) : (
-            <Text style={styles.confirmLabel}>Confirmar y pagar ${price}</Text>
+            <View style={styles.confirmContent}>
+              <Ionicons name="card-outline" size={17} color={colors.courtBlueDeep} />
+              <Text style={styles.confirmLabel}>Confirmar y pagar ${price}</Text>
+            </View>
           )}
         </Pressable>
       </View>
@@ -244,6 +248,11 @@ const styles = StyleSheet.create({
   },
   confirmButtonDisabled: {
     opacity: 0.6,
+  },
+  confirmContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   confirmLabel: {
     color: colors.courtBlueDeep,

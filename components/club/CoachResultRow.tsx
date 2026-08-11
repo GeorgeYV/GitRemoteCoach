@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import React from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import InitialAvatar from '../shared/InitialAvatar';
@@ -27,7 +28,14 @@ export default function CoachResultRow({
         </Text>
       </View>
       <Pressable style={styles.inviteButton} onPress={onInvite} disabled={inviting}>
-        {inviting ? <ActivityIndicator color={colors.courtBlueDeep} /> : <Text style={styles.inviteLabel}>Invitar</Text>}
+        {inviting ? (
+          <ActivityIndicator color={colors.courtBlueDeep} />
+        ) : (
+          <View style={styles.buttonContent}>
+            <Ionicons name="person-add-outline" size={13} color={colors.courtBlueDeep} />
+            <Text style={styles.inviteLabel}>Invitar</Text>
+          </View>
+        )}
       </Pressable>
     </View>
   );
@@ -74,5 +82,10 @@ const styles = StyleSheet.create({
     color: colors.courtBlueDeep,
     fontSize: 12,
     fontWeight: '800',
+  },
+  buttonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
 });

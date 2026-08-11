@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -151,11 +152,17 @@ export default function BookingStatusScreen({
       <View style={styles.footer}>
         {booking?.status === 'accepted' ? (
           <Pressable style={styles.doneButton} onPress={onAccepted}>
-            <Text style={styles.doneLabel}>Continuar a pago</Text>
+            <View style={styles.doneContent}>
+              <Ionicons name="arrow-forward-outline" size={17} color={colors.courtBlueDeep} />
+              <Text style={styles.doneLabel}>Continuar a pago</Text>
+            </View>
           </Pressable>
         ) : (
           <Pressable style={styles.doneButton} onPress={onDone}>
-            <Text style={styles.doneLabel}>Volver al inicio</Text>
+            <View style={styles.doneContent}>
+              <Ionicons name="home-outline" size={17} color={colors.courtBlueDeep} />
+              <Text style={styles.doneLabel}>Volver al inicio</Text>
+            </View>
           </Pressable>
         )}
       </View>
@@ -382,6 +389,11 @@ const styles = StyleSheet.create({
     borderRadius: radius,
     paddingVertical: 16,
     alignItems: 'center',
+  },
+  doneContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   doneLabel: {
     color: colors.courtBlueDeep,

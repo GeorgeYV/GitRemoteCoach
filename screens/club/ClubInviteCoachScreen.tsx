@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import CoachResultRow from '../../components/club/CoachResultRow';
+import IconTextInput from '../../components/shared/IconTextInput';
 import { useAuth } from '../../context/AuthContext';
 import { ApiError, CoachSearchResult, createClubInvitation, searchCoaches } from '../../lib/api';
 import { colors, radius } from '../../lib/theme';
@@ -90,10 +91,11 @@ export default function ClubInviteCoachScreen({
         />
       </View>
 
-      <TextInput
+      <IconTextInput
+        icon="chatbubble-ellipses-outline"
+        containerStyle={styles.messageInputWrap}
         style={styles.messageInput}
         placeholder="Mensaje opcional para la invitación"
-        placeholderTextColor={colors.textDim}
         value={message}
         onChangeText={setMessage}
         multiline
@@ -176,16 +178,13 @@ const styles = StyleSheet.create({
     fontSize: 13,
     padding: 0,
   },
-  messageInput: {
-    backgroundColor: colors.panel,
-    borderRadius: radius,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
+  messageInputWrap: {
+    alignItems: 'flex-start',
     marginHorizontal: 20,
     marginBottom: 14,
-    color: colors.lineWhite,
+    paddingVertical: 4,
+  },
+  messageInput: {
     fontSize: 13,
     minHeight: 48,
     textAlignVertical: 'top',

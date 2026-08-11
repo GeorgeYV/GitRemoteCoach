@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -100,7 +101,10 @@ export default function ClubTournamentDetailScreen({
           <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionLabel}>Entrenadores oficiales</Text>
             <Pressable style={styles.inviteButton} onPress={onInvite}>
-              <Text style={styles.inviteButtonLabel}>+ Invitar</Text>
+              <View style={styles.buttonContent}>
+                <Ionicons name="person-add-outline" size={14} color={colors.courtBlueDeep} />
+                <Text style={styles.inviteButtonLabel}>Invitar</Text>
+              </View>
             </Pressable>
           </View>
 
@@ -140,7 +144,10 @@ export default function ClubTournamentDetailScreen({
                   {settling ? (
                     <ActivityIndicator color={colors.courtBlueDeep} />
                   ) : (
-                    <Text style={styles.settleButtonLabel}>Liquidar</Text>
+                    <View style={styles.buttonContent}>
+                      <Ionicons name="cash-outline" size={16} color={colors.courtBlueDeep} />
+                      <Text style={styles.settleButtonLabel}>Liquidar</Text>
+                    </View>
                   )}
                 </Pressable>
               )}
@@ -218,6 +225,11 @@ const styles = StyleSheet.create({
     color: colors.courtBlueDeep,
     fontSize: 12,
     fontWeight: '800',
+  },
+  buttonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   rowGroup: {
     gap: 10,

@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import React, { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -117,22 +118,34 @@ export default function CoachBookingDetailScreen({
               {completing ? (
                 <ActivityIndicator color={colors.courtBlueDeep} />
               ) : (
-                <Text style={styles.completeLabel}>Marcar sesión como completada</Text>
+                <View style={styles.buttonContent}>
+                  <Ionicons name="checkmark-circle-outline" size={17} color={colors.courtBlueDeep} />
+                  <Text style={styles.completeLabel}>Marcar sesión como completada</Text>
+                </View>
               )}
             </Pressable>
           )}
           {onStartMatch && (
             <Pressable style={styles.startMatchButton} onPress={onStartMatch}>
-              <Text style={styles.startMatchLabel}>Iniciar partido</Text>
+              <View style={styles.buttonContent}>
+                <Ionicons name="play-outline" size={17} color={colors.courtBlueDeep} />
+                <Text style={styles.startMatchLabel}>Iniciar partido</Text>
+              </View>
             </Pressable>
           )}
           {onChat && (
             <Pressable style={styles.chatButton} onPress={onChat}>
-              <Text style={styles.chatButtonLabel}>Abrir chat</Text>
+              <View style={styles.buttonContent}>
+                <Ionicons name="chatbubble-outline" size={17} color={colors.lineWhite} />
+                <Text style={styles.chatButtonLabel}>Abrir chat</Text>
+              </View>
             </Pressable>
           )}
           <Pressable style={styles.cancelButton} onPress={onCancel}>
-            <Text style={styles.cancelLabel}>Cancelar sesión</Text>
+            <View style={styles.buttonContent}>
+              <Ionicons name="close-circle-outline" size={17} color={colors.lineWhite} />
+              <Text style={styles.cancelLabel}>Cancelar sesión</Text>
+            </View>
           </Pressable>
         </View>
       )}
@@ -280,6 +293,11 @@ const styles = StyleSheet.create({
     color: colors.errorCoral,
     fontSize: 12,
     textAlign: 'center',
+  },
+  buttonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   completeButton: {
     backgroundColor: colors.ballLime,
