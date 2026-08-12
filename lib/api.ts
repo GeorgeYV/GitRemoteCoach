@@ -530,6 +530,14 @@ export function getCoachTournamentAvailability(
   return request(`/coaches/${coachId}/tournaments/${tournamentId}/availability`);
 }
 
+/** GET /coaches/:coachId/tournaments/:tournamentId/booking-count — TrainerProfileScreen. */
+export function getCoachTournamentBookingCount(
+  coachId: string,
+  tournamentId: string,
+): Promise<{ bookedPlayers: number }> {
+  return request(`/coaches/${coachId}/tournaments/${tournamentId}/booking-count`);
+}
+
 /** PUT /coaches/:coachId/tournaments/:tournamentId/availability — CoachAvailabilityScreen "Guardar disponibilidad". */
 export function setCoachTournamentAvailability(
   authToken: string,

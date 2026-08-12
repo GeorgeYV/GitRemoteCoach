@@ -201,6 +201,21 @@ export async function expireOverduePayments(db: Queryable = pool): Promise<Booki
   return rows.map(mapRow);
 }
 
+/** TrainerProfileScreen: cuántos jugadores distintos tienen una reserva activa (no rechazada,
+ * cancelada ni ya completada) con este coach para este torneo — "reservado actualmente". */
+export async function countActivePlayersForCoachTournament(
+  coachId: string,
+  tournamentId: string,
+  db: Queryable = pool,
+): Promise<number> {
+  const { rows } = await db.query(
+    `SELECT COUNT(DISTINCT player_id) AS count FROM bookings
+     WHERE coach_id = $1 AND tournament_id = $2 AND status IN ('requested', 'accepted', 'paid')`,
+    [coachId, tournamentId],
+  );
+  return Number(rows[0].count);
+}
+
 export async function findPendingCommissionsForTournament(
   tournamentId: string,
   db: Queryable = pool,

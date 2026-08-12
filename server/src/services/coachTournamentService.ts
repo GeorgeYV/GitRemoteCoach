@@ -1,4 +1,5 @@
 import { withTransaction } from '../lib/db.js';
+import * as bookingRepository from '../repositories/bookingRepository.js';
 import * as coachTournamentRepository from '../repositories/coachTournamentRepository.js';
 import type { CoachTournamentAvailability, CoachTournamentRate, RateMode } from '../types.js';
 
@@ -37,4 +38,11 @@ export async function setRate(
   params: { rateMode: RateMode; amount: number },
 ): Promise<CoachTournamentRate> {
   return coachTournamentRepository.upsertRate({ coachId, tournamentId, ...params });
+}
+
+/** TrainerProfileScreen: reemplaza el detalle de "estadísticas de partidos" por algo con más
+ * valor para un padre decidiendo con quién reservar — cuántos jugadores ya lo reservaron para
+ * este torneo en concreto. */
+export async function getBookedPlayersCount(coachId: string, tournamentId: string): Promise<number> {
+  return bookingRepository.countActivePlayersForCoachTournament(coachId, tournamentId);
 }

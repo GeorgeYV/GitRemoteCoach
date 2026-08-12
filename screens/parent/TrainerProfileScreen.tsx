@@ -14,6 +14,7 @@ import {
   getCoachProfile,
   getCoachReportSummary,
   getCoachTournamentAvailability,
+  getCoachTournamentBookingCount,
   listCoachReviews,
   PlayingLevel,
   ReviewWithParent,
@@ -23,15 +24,6 @@ import {
 import { buildDaySlotsFromRange } from '../../lib/dateSlots';
 import { colors, radius } from '../../lib/theme';
 import { AvailabilityDay } from '../../mock/parentFlow';
-
-function reportStatTiles(summary: CoachReportSummary): { value: string; label: string }[] {
-  return [
-    { value: String(summary.winners), label: 'Winners' },
-    { value: String(summary.unforcedErrors), label: 'Errores' },
-    { value: summary.firstServePct === null ? '—' : `${summary.firstServePct}%`, label: '1er saque' },
-    { value: `${summary.breaksConverted}/${summary.returnGamesPlayed}`, label: 'Quiebres' },
-  ];
-}
 
 const LEVEL_LABELS: Record<PlayingLevel, string> = {
   recreativo: 'Recreativo',
@@ -85,6 +77,9 @@ export default function TrainerProfileScreen({
   const [reportSummary, setReportSummary] = useState<CoachReportSummary | null | undefined>(undefined);
   const [reportError, setReportError] = useState<string | null>(null);
 
+  const [bookedPlayers, setBookedPlayers] = useState<number | undefined>(undefined);
+  const [bookedPlayersError, setBookedPlayersError] = useState<string | null>(null);
+
   useEffect(() => {
     let cancelled = false;
     setLoadError(null);
@@ -135,6 +130,22 @@ export default function TrainerProfileScreen({
       cancelled = true;
     };
   }, [coachId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setBookedPlayersError(null);
+    getCoachTournamentBookingCount(coachId, tournament.id)
+      .then((result) => {
+        if (!cancelled) setBookedPlayers(result.bookedPlayers);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setBookedPlayersError(err instanceof ApiError ? err.message : 'No se pudo cargar cuántos jugadores reservaron.');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [coachId, tournament]);
 
   if (loadError) {
     return (
@@ -221,27 +232,16 @@ export default function TrainerProfileScreen({
           )}
         </Section>
 
-        <Section label="Estadísticas de partidos capturados">
-          {reportError ? (
-            <Text style={styles.reviewsMessage}>{reportError}</Text>
-          ) : reportSummary === undefined ? (
+        <Section label="En números">
+          {reportError || bookedPlayersError ? (
+            <Text style={styles.reviewsMessage}>{reportError ?? bookedPlayersError}</Text>
+          ) : reportSummary === undefined || bookedPlayers === undefined ? (
             <ActivityIndicator color={colors.courtBlue} />
-          ) : reportSummary === null ? (
-            <Text style={styles.reviewsMessage}>
-              {firstName} todavía no tiene partidos con captura en vivo completada.
-            </Text>
           ) : (
-            <>
-              <View style={styles.statsGrid}>
-                {reportStatTiles(reportSummary).map((stat) => (
-                  <StatTile key={stat.label} value={stat.value} label={stat.label} />
-                ))}
-              </View>
-              <Text style={styles.statsFootnote}>
-                Basado en {reportSummary.matchesCount}{' '}
-                {reportSummary.matchesCount === 1 ? 'partido capturado' : 'partidos capturados'}.
-              </Text>
-            </>
+            <View style={styles.statsGrid}>
+              <StatTile value={String(reportSummary?.matchesCount ?? 0)} label="Partidos capturados" />
+              <StatTile value={String(bookedPlayers)} label="Jugadores en este torneo" />
+            </View>
           )}
         </Section>
 
@@ -420,11 +420,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-  },
-  statsFootnote: {
-    color: colors.textDim,
-    fontSize: 11,
-    marginTop: 4,
   },
   availabilityGrid: {
     flexDirection: 'row',

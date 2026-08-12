@@ -32,6 +32,13 @@ export async function coachTournamentRoutes(app: FastifyInstance): Promise<void>
     return coachTournamentService.getAvailabilityAndRate(coachId, tournamentId);
   });
 
+  // Lectura pública: TrainerProfileScreen la usa para mostrarle a un padre cuántos jugadores ya reservaron.
+  app.get('/coaches/:coachId/tournaments/:tournamentId/booking-count', async (req) => {
+    const { coachId, tournamentId } = req.params as { coachId: string; tournamentId: string };
+    const bookedPlayers = await coachTournamentService.getBookedPlayersCount(coachId, tournamentId);
+    return { bookedPlayers };
+  });
+
   app.put(
     '/coaches/:coachId/tournaments/:tournamentId/availability',
     { preHandler: app.authenticate },

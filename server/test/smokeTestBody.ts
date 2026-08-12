@@ -541,6 +541,37 @@ console.log('\n=== Escenario 11b: disponibilidad y tarifa de torneo (CoachAvaila
   assertEqual(availabilityAndRate.rate?.rateMode, 'per_day', 'la tarifa guardada aparece en la lectura pública');
 }
 
+console.log('\n=== Escenario 11c: conteo de jugadores reservados por torneo (TrainerProfileScreen) ===');
+{
+  const countUrl = `/coaches/${fixtures.coachAUserId}/tournaments/${fixtures.tournamentId}/booking-count`;
+
+  const baselineRes = await app.inject({ method: 'GET', url: countUrl });
+  assertEqual(baselineRes.statusCode, 200, 'GET booking-count es público (sin token) → 200');
+  const baseline = baselineRes.json().bookedPlayers;
+
+  const reqRes = await requestBooking(fixtures.coachAUserId, inFuture(300));
+  const bookingCount = reqRes.json();
+
+  const afterRequestRes = await app.inject({ method: 'GET', url: countUrl });
+  assertEqual(
+    afterRequestRes.json().bookedPlayers,
+    baseline + 1,
+    'una solicitud "requested" cuenta como jugador reservado actualmente',
+  );
+
+  await app.inject({
+    method: 'POST',
+    url: `/bookings/${bookingCount.id}/reject`,
+    headers: { authorization: `Bearer ${coachAToken}` },
+  });
+  const afterRejectRes = await app.inject({ method: 'GET', url: countUrl });
+  assertEqual(
+    afterRejectRes.json().bookedPlayers,
+    baseline,
+    'una reserva rechazada deja de contar como reservada actualmente',
+  );
+}
+
 console.log('\n=== Escenario 12: captura en vivo de un partido (matches / match_point_events) ===');
 {
   const reqRes = await requestBooking(fixtures.coachAUserId, inFuture(120));
