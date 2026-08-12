@@ -66,7 +66,7 @@ export default function ClubHomeScreen({
   if (!club || !tournaments || !settlements) {
     return (
       <SafeAreaView style={[styles.container, styles.centerState]} edges={['top', 'bottom']}>
-        <ActivityIndicator color={colors.ballLime} />
+        <ActivityIndicator color={colors.courtBlue} />
       </SafeAreaView>
     );
   }

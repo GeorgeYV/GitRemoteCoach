@@ -41,7 +41,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   stars: {
-    color: colors.ballLime,
+    color: colors.courtBlue,
     fontSize: 12,
     marginTop: 1,
   },

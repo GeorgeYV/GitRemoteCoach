@@ -263,7 +263,7 @@ const styles = StyleSheet.create({
     color: colors.textDim,
   },
   slotLabelActive: {
-    color: colors.ballLime,
+    color: colors.courtBlue,
   },
   hint: {
     color: colors.textDim,
@@ -277,7 +277,7 @@ const styles = StyleSheet.create({
   footer: {
     borderTopWidth: 1,
     borderTopColor: colors.borderSoft,
-    backgroundColor: colors.courtBlueDeep,
+    backgroundColor: colors.panel,
     padding: 16,
   },
   footerNote: {

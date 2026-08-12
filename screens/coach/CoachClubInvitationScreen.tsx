@@ -62,7 +62,7 @@ export default function CoachClubInvitationScreen({ coachId, onBack }: { coachId
   if (invitation === null) {
     return (
       <SafeAreaView style={[styles.container, styles.centerState]} edges={['top', 'bottom']}>
-        <ActivityIndicator color={colors.ballLime} />
+        <ActivityIndicator color={colors.courtBlue} />
       </SafeAreaView>
     );
   }
@@ -209,7 +209,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   tournamentName: {
-    color: colors.ballLime,
+    color: colors.courtBlue,
     fontSize: 13,
     fontWeight: '700',
     marginBottom: 14,
@@ -241,7 +241,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   resultTitle: {
-    color: colors.ballLime,
+    color: colors.courtBlue,
     fontSize: 15,
     fontWeight: '800',
   },
@@ -266,7 +266,7 @@ const styles = StyleSheet.create({
   footerWrap: {
     borderTopWidth: 1,
     borderTopColor: colors.borderSoft,
-    backgroundColor: colors.courtBlueDeep,
+    backgroundColor: colors.panel,
     padding: 16,
   },
   footer: {

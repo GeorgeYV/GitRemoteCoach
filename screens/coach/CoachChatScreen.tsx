@@ -111,7 +111,7 @@ export default function CoachChatScreen({ booking, onBack }: { booking: CoachBoo
           </View>
         ) : messages === null ? (
           <View style={styles.centerState}>
-            <ActivityIndicator color={colors.ballLime} />
+            <ActivityIndicator color={colors.courtBlue} />
           </View>
         ) : (
           <ScrollView
@@ -210,7 +210,7 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.borderSoft,
   },
   meetingText: {
-    color: colors.ballLime,
+    color: colors.courtBlue,
     fontSize: 12,
     fontWeight: '700',
   },
@@ -269,7 +269,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     gap: 10,
-    backgroundColor: colors.courtBlueDeep,
+    backgroundColor: colors.panel,
   },
   inputWrapper: {
     flex: 1,

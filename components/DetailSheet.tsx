@@ -109,7 +109,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   timer: {
-    color: colors.ballLime,
+    color: colors.courtBlue,
     fontVariant: ['tabular-nums'],
     fontSize: 12,
     fontWeight: '700',

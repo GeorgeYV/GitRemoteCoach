@@ -106,7 +106,7 @@ export default function CoachReputationScreen({
   if (!profile || !reviews || !stats) {
     return (
       <SafeAreaView style={[styles.container, styles.centerState]} edges={['top', 'bottom']}>
-        <ActivityIndicator color={colors.ballLime} />
+        <ActivityIndicator color={colors.courtBlue} />
       </SafeAreaView>
     );
   }
@@ -230,7 +230,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   ratingValue: {
-    color: colors.ballLime,
+    color: colors.courtBlue,
     fontSize: 16,
     fontWeight: '800',
   },
@@ -250,7 +250,7 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   clubBadgeTitle: {
-    color: colors.ballLime,
+    color: colors.courtBlue,
     fontSize: 13,
     fontWeight: '800',
     marginBottom: 4,

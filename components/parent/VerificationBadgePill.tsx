@@ -23,12 +23,12 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   check: {
-    color: colors.ballLime,
+    color: colors.courtBlue,
     fontSize: 10,
     fontWeight: '800',
   },
   label: {
-    color: colors.ballLime,
+    color: colors.courtBlue,
     fontSize: 10,
     fontWeight: '700',
   },

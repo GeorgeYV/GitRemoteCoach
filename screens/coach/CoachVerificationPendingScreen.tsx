@@ -77,7 +77,7 @@ export default function CoachVerificationPendingScreen({ coachId }: { coachId: s
       <ScrollView contentContainerStyle={styles.content}>
         <View style={[styles.iconCircle, status === 'rejected' && styles.iconCircleNegative]}>
           {!profile && !error ? (
-            <ActivityIndicator color={colors.ballLime} />
+            <ActivityIndicator color={colors.courtBlue} />
           ) : (
             <Text style={[styles.iconCheck, status === 'rejected' && styles.iconCheckNegative]}>
               {status === 'rejected' ? '!' : '✓'}
@@ -162,7 +162,7 @@ const styles = StyleSheet.create({
     borderColor: colors.errorCoral,
   },
   iconCheck: {
-    color: colors.ballLime,
+    color: colors.courtBlue,
     fontSize: 32,
     fontWeight: '800',
   },
@@ -226,7 +226,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   stepLabelActive: {
-    color: colors.ballLime,
+    color: colors.courtBlue,
   },
   stepLine: {
     flex: 1,

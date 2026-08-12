@@ -85,7 +85,7 @@ export default function BookingHistoryScreen() {
   if (!bookings) {
     return (
       <SafeAreaView style={[styles.container, styles.centerState]} edges={['top', 'bottom']}>
-        <ActivityIndicator color={colors.ballLime} />
+        <ActivityIndicator color={colors.courtBlue} />
       </SafeAreaView>
     );
   }
@@ -272,7 +272,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   price: {
-    color: colors.ballLime,
+    color: colors.courtBlue,
     fontSize: 14,
     fontWeight: '800',
   },
@@ -287,13 +287,12 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   statusRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 6,
   },
   rowActions: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginLeft: -8,
   },
   chatLink: {
     paddingVertical: 4,
@@ -318,7 +317,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   reviewLinkLabel: {
-    color: colors.ballLime,
+    color: colors.courtBlue,
     fontSize: 12,
     fontWeight: '700',
   },

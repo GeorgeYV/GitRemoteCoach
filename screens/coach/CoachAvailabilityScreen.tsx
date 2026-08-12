@@ -363,7 +363,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   currencyPrefix: {
-    color: colors.ballLime,
+    color: colors.courtBlue,
     fontSize: 22,
     fontWeight: '800',
   },
@@ -383,11 +383,11 @@ const styles = StyleSheet.create({
   footer: {
     borderTopWidth: 1,
     borderTopColor: colors.borderSoft,
-    backgroundColor: colors.courtBlueDeep,
+    backgroundColor: colors.panel,
     padding: 16,
   },
   savedHint: {
-    color: colors.ballLime,
+    color: colors.courtBlue,
     fontSize: 12,
     fontWeight: '700',
     textAlign: 'center',

@@ -200,7 +200,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   playerBadgeMeta: {
-    color: colors.ballLime,
+    color: colors.courtBlue,
     fontSize: 12,
     fontWeight: '600',
   },
@@ -254,12 +254,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   serverLabelActive: {
-    color: colors.ballLime,
+    color: colors.courtBlue,
   },
   footer: {
     borderTopWidth: 1,
     borderTopColor: colors.borderSoft,
-    backgroundColor: colors.courtBlueDeep,
+    backgroundColor: colors.panel,
     padding: 16,
   },
   footerHint: {

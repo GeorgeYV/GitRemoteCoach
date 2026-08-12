@@ -91,7 +91,7 @@ export default function BookingStatusScreen({
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={[styles.statusCard, confirmed && styles.statusCardConfirmed, negative && styles.statusCardNegative]}>
-          {!booking && !error && <ActivityIndicator color={colors.ballLime} style={styles.statusSpinner} />}
+          {!booking && !error && <ActivityIndicator color={colors.courtBlue} style={styles.statusSpinner} />}
           <Text
             style={[
               styles.statusEyebrow,
@@ -126,7 +126,7 @@ export default function BookingStatusScreen({
         {booking && ALTERNATIVES_STATUSES.includes(booking.status) && (alternatives === null || alternatives.length > 0) && (
           <Section label="Otros entrenadores en este torneo">
             {alternatives === null ? (
-              <ActivityIndicator color={colors.ballLime} />
+              <ActivityIndicator color={colors.courtBlue} />
             ) : (
               <View style={styles.alternativesList}>
                 {alternatives.map((coach) => (
@@ -276,7 +276,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   statusEyebrowConfirmed: {
-    color: colors.ballLime,
+    color: colors.courtBlue,
   },
   statusEyebrowNegative: {
     color: colors.errorCoral,
@@ -369,7 +369,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   alternativeRating: {
-    color: colors.ballLime,
+    color: colors.courtBlue,
     fontSize: 12,
     fontWeight: '600',
   },
@@ -381,7 +381,7 @@ const styles = StyleSheet.create({
   footer: {
     borderTopWidth: 1,
     borderTopColor: colors.borderSoft,
-    backgroundColor: colors.courtBlueDeep,
+    backgroundColor: colors.panel,
     padding: 16,
   },
   doneButton: {

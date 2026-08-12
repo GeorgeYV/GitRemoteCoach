@@ -92,7 +92,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   uploadLabel: {
-    color: colors.ballLime,
+    color: colors.courtBlue,
     fontSize: 12,
     fontWeight: '800',
   },

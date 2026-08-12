@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { MatchProvider, useMatch } from '../context/MatchContext';
 import { colors } from '../lib/theme';
@@ -17,6 +17,7 @@ import {
   listClubInvitations,
   listCoachBookings,
   listPlayers,
+  searchTournaments,
   TournamentSearchResult,
   TournamentSummary,
 } from '../lib/api';
@@ -46,7 +47,6 @@ import CoachSessionHistoryScreen from './coach/CoachSessionHistoryScreen';
 import CoachTournamentSearchScreen from './coach/CoachTournamentSearchScreen';
 import TrainerListScreen from './parent/TrainerListScreen';
 import TrainerProfileScreen from './parent/TrainerProfileScreen';
-import ParentTournamentSearchScreen from './parent/ParentTournamentSearchScreen';
 import BookingConfirmScreen from './parent/BookingConfirmScreen';
 import BookingPaymentScreen from './parent/BookingPaymentScreen';
 import BookingStatusScreen from './parent/BookingStatusScreen';
@@ -91,11 +91,12 @@ interface SelectedTrainer {
   availability: AvailabilityDay[];
 }
 
-export function ParentBookingFlow() {
+export function ParentBookingFlow({ initialTournamentId }: { initialTournamentId?: string } = {}) {
   const router = useRouter();
   const { token } = useAuth();
-  const [step, setStep] = useState<'tournament' | 'list' | 'profile' | 'confirm' | 'status' | 'payment'>('tournament');
+  const [step, setStep] = useState<'list' | 'profile' | 'confirm' | 'status' | 'payment'>('list');
   const [tournament, setTournament] = useState<TournamentSearchResult | null>(null);
+  const [tournamentError, setTournamentError] = useState(false);
   const [coachId, setCoachId] = useState<string | null>(null);
   const [selectedTrainer, setSelectedTrainer] = useState<SelectedTrainer | null>(null);
   const [selection, setSelection] = useState<BookingSlotSelection | null>(null);
@@ -116,25 +117,59 @@ export function ParentBookingFlow() {
       .catch(() => setPlayerId(null));
   }, [token]);
 
-  if (step === 'tournament') {
+  // ParentHomeScreen siempre manda el torneo elegido (tarjeta destacada o fila de "Torneos
+  // activos") — ya no hay pantalla propia de búsqueda acá, así que solo queda resolverlo.
+  // Si el torneo ya no aparece (torneo cerrado, id inválido, o no vino ninguno), se muestra
+  // un estado de error en vez de dejar la pantalla en blanco.
+  useEffect(() => {
+    if (!initialTournamentId) {
+      setTournamentError(true);
+      return;
+    }
+    let cancelled = false;
+    setTournamentError(false);
+    searchTournaments()
+      .then((results) => {
+        if (cancelled) return;
+        const match = results.find((t) => t.id === initialTournamentId);
+        if (match) {
+          setTournament(match);
+        } else {
+          setTournamentError(true);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setTournamentError(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [initialTournamentId]);
+
+  if (tournamentError) {
     return (
-      <ParentTournamentSearchScreen
-        onSelect={(next) => {
-          setTournament(next);
-          setStep('list');
-        }}
-        onBack={() => router.back()}
-      />
+      <View style={[styles.root, styles.centerState]}>
+        <Text style={styles.centerStateText}>No se pudo cargar ese torneo.</Text>
+        <Pressable onPress={() => router.back()}>
+          <Text style={[styles.centerStateText, styles.centerStateLink]}>Volver al inicio</Text>
+        </Pressable>
+      </View>
     );
   }
 
-  if (!tournament) return null;
+  if (!tournament) {
+    return (
+      <View style={[styles.root, styles.centerState]}>
+        <ActivityIndicator color={colors.courtBlue} />
+      </View>
+    );
+  }
 
   if (step === 'list') {
     return (
       <TrainerListScreen
         tournament={tournament}
-        onBack={() => setTournament(null)}
+        onBack={() => router.back()}
         onSelectTrainer={(coach: CoachSearchResult) => {
           setCoachId(coach.id);
           setStep('profile');
@@ -164,7 +199,7 @@ export function ParentBookingFlow() {
     if (playerId === undefined) {
       return (
         <View style={[styles.root, styles.centerState]}>
-          <ActivityIndicator color={colors.ballLime} />
+          <ActivityIndicator color={colors.courtBlue} />
         </View>
       );
     }
@@ -384,7 +419,7 @@ export function CoachHomeFlow({ coachId, coachName }: { coachId: string; coachNa
   if (!bookings) {
     return (
       <View style={[styles.root, styles.centerState]}>
-        <ActivityIndicator color={colors.ballLime} />
+        <ActivityIndicator color={colors.courtBlue} />
       </View>
     );
   }
@@ -487,7 +522,7 @@ export function CoachMatchDayFlow({ booking: initialBooking }: { booking: Bookin
         {matchError ? (
           <Text style={styles.centerStateText}>{matchError}</Text>
         ) : (
-          <ActivityIndicator color={colors.ballLime} />
+          <ActivityIndicator color={colors.courtBlue} />
         )}
       </View>
     );
@@ -545,7 +580,7 @@ export function CoachCapturePreview() {
   if (!matchId) {
     return (
       <View style={[styles.root, styles.centerState]}>
-        <ActivityIndicator color={colors.ballLime} />
+        <ActivityIndicator color={colors.courtBlue} />
       </View>
     );
   }
@@ -661,7 +696,7 @@ export function ClubFlow({ adminUserId }: { adminUserId: string }) {
   if (!club) {
     return (
       <View style={[styles.root, styles.centerState]}>
-        <ActivityIndicator color={colors.ballLime} />
+        <ActivityIndicator color={colors.courtBlue} />
       </View>
     );
   }
@@ -698,5 +733,10 @@ export const styles = StyleSheet.create({
     fontSize: 13,
     textAlign: 'center',
     lineHeight: 19,
+  },
+  centerStateLink: {
+    color: colors.courtBlue,
+    fontWeight: '700',
+    marginTop: 12,
   },
 });

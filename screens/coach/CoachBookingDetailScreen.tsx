@@ -278,14 +278,14 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   detailLineValueEmphasis: {
-    color: colors.ballLime,
+    color: colors.courtBlue,
     fontSize: 15,
     fontWeight: '800',
   },
   footer: {
     borderTopWidth: 1,
     borderTopColor: colors.borderSoft,
-    backgroundColor: colors.courtBlueDeep,
+    backgroundColor: colors.panel,
     padding: 16,
     gap: 10,
   },

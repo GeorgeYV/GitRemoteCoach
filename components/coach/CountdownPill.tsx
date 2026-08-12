@@ -65,7 +65,7 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   valueNormal: {
-    color: colors.ballLime,
+    color: colors.courtBlue,
   },
   valueUrgent: {
     color: colors.errorCoral,

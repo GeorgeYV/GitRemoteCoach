@@ -40,7 +40,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
   },
   labelReleased: {
-    color: colors.ballLime,
+    color: colors.courtBlue,
   },
   labelPending: {
     color: colors.textDim,

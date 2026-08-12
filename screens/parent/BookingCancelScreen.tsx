@@ -189,7 +189,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   price: {
-    color: colors.ballLime,
+    color: colors.courtBlue,
     fontSize: 15,
     fontWeight: '800',
   },
@@ -222,7 +222,7 @@ const styles = StyleSheet.create({
   footer: {
     borderTopWidth: 1,
     borderTopColor: colors.borderSoft,
-    backgroundColor: colors.courtBlueDeep,
+    backgroundColor: colors.panel,
     padding: 16,
     gap: 10,
   },

@@ -65,7 +65,7 @@ export default function ParentProfileScreen() {
           {error ? (
             <Text style={styles.emptyText}>{error}</Text>
           ) : !players ? (
-            <ActivityIndicator color={colors.ballLime} />
+            <ActivityIndicator color={colors.courtBlue} />
           ) : players.length === 0 ? (
             <Text style={styles.emptyText}>Todavía no registraste a ningún jugador.</Text>
           ) : (
@@ -73,7 +73,7 @@ export default function ParentProfileScreen() {
               {players.map((player) => (
                 <View key={player.id} style={styles.playerRow}>
                   <View style={styles.playerIcon}>
-                    <Ionicons name="person-outline" size={16} color={colors.ballLime} />
+                    <Ionicons name="person-outline" size={16} color={colors.courtBlue} />
                   </View>
                   <View style={styles.playerInfo}>
                     <Text style={styles.playerName}>{player.fullName}</Text>

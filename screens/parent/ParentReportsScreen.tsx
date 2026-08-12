@@ -74,7 +74,7 @@ export default function ParentReportsScreen() {
           <Text style={styles.emptyText}>{error}</Text>
         ) : !bookings ? (
           <View style={styles.centerState}>
-            <ActivityIndicator color={colors.ballLime} />
+            <ActivityIndicator color={colors.courtBlue} />
           </View>
         ) : bookings.length === 0 ? (
           <Text style={styles.emptyText}>Todavía no tienes sesiones completadas.</Text>
@@ -83,7 +83,7 @@ export default function ParentReportsScreen() {
             {bookings.map((booking) => (
               <Pressable key={booking.id} style={styles.row} onPress={() => setSelected(booking)}>
                 <View style={styles.rowIcon}>
-                  <Ionicons name="bar-chart-outline" size={18} color={colors.ballLime} />
+                  <Ionicons name="bar-chart-outline" size={18} color={colors.courtBlue} />
                 </View>
                 <View style={styles.rowInfo}>
                   <Text style={styles.trainerName} numberOfLines={1}>
@@ -160,7 +160,7 @@ function ReportDetail({ booking, onBack }: { booking: BookingHistoryEntry; onBac
           <Text style={styles.emptyText}>{error}</Text>
         ) : report === undefined ? (
           <View style={styles.centerState}>
-            <ActivityIndicator color={colors.ballLime} />
+            <ActivityIndicator color={colors.courtBlue} />
           </View>
         ) : report === null ? (
           <Text style={styles.emptyText}>
@@ -318,7 +318,7 @@ const styles = StyleSheet.create({
   statBigNum: {
     fontSize: 22,
     fontWeight: '800',
-    color: colors.ballLime,
+    color: colors.courtBlue,
   },
   statCap: {
     fontSize: 11,

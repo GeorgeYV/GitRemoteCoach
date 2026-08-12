@@ -40,7 +40,7 @@ export default function ClubSettlementsScreen({ clubId, clubName }: { clubId: st
   if (!settlements) {
     return (
       <SafeAreaView style={[styles.container, styles.centerState]} edges={['top', 'bottom']}>
-        <ActivityIndicator color={colors.ballLime} />
+        <ActivityIndicator color={colors.courtBlue} />
       </SafeAreaView>
     );
   }
@@ -125,7 +125,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   summaryValue: {
-    color: colors.ballLime,
+    color: colors.courtBlue,
     fontSize: 22,
     fontWeight: '800',
     marginBottom: 4,

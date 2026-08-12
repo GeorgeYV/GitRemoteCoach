@@ -86,7 +86,7 @@ export default function ScoreHeader({
 
 const styles = StyleSheet.create({
   header: {
-    backgroundColor: colors.courtBlueDeep,
+    backgroundColor: colors.panel,
     paddingTop: 14,
     paddingBottom: 10,
     paddingHorizontal: 18,
@@ -103,7 +103,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     letterSpacing: 1.4,
     textTransform: 'uppercase',
-    color: colors.ballLime,
+    color: colors.courtBlue,
     fontWeight: '700',
     flexShrink: 1,
     marginRight: 10,
@@ -142,7 +142,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   playerNameYou: {
-    color: colors.ballLime,
+    color: colors.courtBlue,
   },
   scoreBlockYou: {
     flexDirection: 'row',
@@ -171,7 +171,7 @@ const styles = StyleSheet.create({
   tiebreakBadge: {
     alignSelf: 'center',
     marginTop: 8,
-    color: colors.ballLime,
+    color: colors.courtBlue,
     fontWeight: '700',
     fontSize: 12,
     letterSpacing: 1,

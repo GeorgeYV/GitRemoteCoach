@@ -26,6 +26,6 @@ const styles = StyleSheet.create({
     color: colors.textDim,
   },
   starFilled: {
-    color: colors.ballLime,
+    color: colors.courtBlue,
   },
 });

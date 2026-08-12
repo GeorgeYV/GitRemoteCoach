@@ -143,8 +143,8 @@ const PREVIEW_COACH_MATCH_BOOKING: BookingWithParticipants = {
 };
 
 /** Mismo criterio que las demás fixtures de esta pantalla: id real (Copa Nacional Juvenil en
- * server/test/seed.ts) para que la disponibilidad real cargue, resto placeholder porque no hay
- * torneo elegido fuera del flujo real (ParentTournamentSearchScreen). */
+ * server/test/seed.ts) para que la disponibilidad real cargue, resto placeholder porque esta
+ * vista previa no pasa por ParentHomeScreen (que es quien elige el torneo en el flujo real). */
 const PREVIEW_TOURNAMENT: TournamentSearchResult = {
   id: '00000000-0000-0000-0000-000000000002',
   name: 'Vista previa',
@@ -229,7 +229,7 @@ export default function DevPreviewSwitcher() {
         ) : screen === 'platformAdminReview' ? (
           <PlatformAdminReviewScreen />
         ) : (
-          <ParentBookingFlow />
+          <ParentBookingFlow initialTournamentId={PREVIEW_TOURNAMENT.id} />
         )}
       </View>
 
@@ -255,7 +255,7 @@ const styles = StyleSheet.create({
   switcher: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    backgroundColor: colors.courtBlueDeep,
+    backgroundColor: colors.panel,
     paddingVertical: 8,
     paddingHorizontal: 6,
     gap: 6,

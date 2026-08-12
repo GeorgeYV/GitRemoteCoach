@@ -76,7 +76,7 @@ export const PARENT_QUICK_REPLIES = [
 export type BookingHistoryStatus = 'requested' | 'confirmed' | 'completed' | 'cancelled' | 'rejected';
 
 export const BOOKING_HISTORY_STATUS_LABELS: Record<BookingHistoryStatus, string> = {
-  requested: 'Esperando confirmación',
+  requested: 'Por confirmar',
   confirmed: 'Confirmada',
   completed: 'Completada',
   cancelled: 'Cancelada',

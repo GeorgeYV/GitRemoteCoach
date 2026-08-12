@@ -42,7 +42,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   rating: {
-    color: colors.ballLime,
+    color: colors.courtBlue,
     fontSize: 13,
     fontWeight: '700',
   },

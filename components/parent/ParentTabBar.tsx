@@ -38,7 +38,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     borderTopWidth: 1,
     borderTopColor: colors.borderSoft,
-    backgroundColor: colors.courtBlueDeep,
+    backgroundColor: colors.panel,
     paddingTop: 10,
     paddingBottom: 6,
   },
@@ -53,6 +53,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   tabLabelActive: {
-    color: colors.ballLime,
+    color: colors.courtBlue,
   },
 });

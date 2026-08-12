@@ -147,7 +147,7 @@ export default function TrainerProfileScreen({
   if (!profile || !availability || price === null) {
     return (
       <SafeAreaView style={[styles.container, styles.centerState]} edges={['top', 'bottom']}>
-        <ActivityIndicator color={colors.ballLime} />
+        <ActivityIndicator color={colors.courtBlue} />
       </SafeAreaView>
     );
   }
@@ -200,7 +200,7 @@ export default function TrainerProfileScreen({
           {reviewsError ? (
             <Text style={styles.reviewsMessage}>{reviewsError}</Text>
           ) : reviews === null ? (
-            <ActivityIndicator color={colors.ballLime} />
+            <ActivityIndicator color={colors.courtBlue} />
           ) : reviews.length === 0 ? (
             <Text style={styles.reviewsMessage}>Todavía no hay reseñas para {firstName}.</Text>
           ) : (
@@ -225,7 +225,7 @@ export default function TrainerProfileScreen({
           {reportError ? (
             <Text style={styles.reviewsMessage}>{reportError}</Text>
           ) : reportSummary === undefined ? (
-            <ActivityIndicator color={colors.ballLime} />
+            <ActivityIndicator color={colors.courtBlue} />
           ) : reportSummary === null ? (
             <Text style={styles.reviewsMessage}>
               {firstName} todavía no tiene partidos con captura en vivo completada.
@@ -326,7 +326,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   price: {
-    color: colors.ballLime,
+    color: colors.courtBlue,
     fontSize: 16,
     fontWeight: '800',
   },
@@ -406,7 +406,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   reviewStars: {
-    color: colors.ballLime,
+    color: colors.courtBlue,
     fontSize: 12,
     marginTop: 1,
   },
@@ -444,7 +444,7 @@ const styles = StyleSheet.create({
   footer: {
     borderTopWidth: 1,
     borderTopColor: colors.borderSoft,
-    backgroundColor: colors.courtBlueDeep,
+    backgroundColor: colors.panel,
     padding: 16,
   },
   footerNote: {

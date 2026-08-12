@@ -26,7 +26,9 @@ export default function PointButtons({
         label="Punto perdido"
         icon="○"
         colorsRange={[colors.errorCoral, colors.errorCoralDeep]}
-        textColor={colors.lineWhite}
+        // lineWhite es ahora tinta oscura (tema claro) — este botón sigue con gradiente rojo
+        // oscuro de fondo, así que su texto necesita quedarse claro, no lineWhite.
+        textColor="#FFFFFF"
         disabled={disabled}
         onPress={() => onPoint('player2')}
       />

@@ -22,7 +22,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   label: {
-    color: colors.ballLime,
+    color: colors.courtBlue,
     fontSize: 10,
     fontWeight: '700',
   },

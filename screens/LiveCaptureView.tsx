@@ -71,7 +71,7 @@ export default function LiveCaptureView({ roundLabel }: { roundLabel: string }) 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.courtBlue,
+    backgroundColor: colors.bg,
   },
   captureArea: {
     flex: 1,

@@ -111,7 +111,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   breakdownValueTotal: {
-    color: colors.ballLime,
+    color: colors.courtBlue,
     fontSize: 15,
     fontWeight: '800',
   },

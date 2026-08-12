@@ -28,6 +28,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   wordmarkAccent: {
-    color: colors.ballLime,
+    color: colors.courtBlue,
   },
 });

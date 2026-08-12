@@ -32,7 +32,7 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    backgroundColor: colors.courtBlueDeep,
+    backgroundColor: colors.panel,
     paddingVertical: 12,
     paddingHorizontal: 8,
     borderTopWidth: 1,
@@ -44,7 +44,7 @@ const styles = StyleSheet.create({
   val: {
     fontSize: 16,
     fontWeight: '800',
-    color: colors.ballLime,
+    color: colors.courtBlue,
   },
   lbl: {
     fontSize: 10,

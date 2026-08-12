@@ -72,7 +72,7 @@ export default function TrainerListScreen({
         </View>
       ) : !visibleTrainers ? (
         <View style={styles.emptyState}>
-          <ActivityIndicator color={colors.ballLime} />
+          <ActivityIndicator color={colors.courtBlue} />
         </View>
       ) : (
         <>

@@ -3,8 +3,8 @@ import { StyleSheet, Text, View } from 'react-native';
 import { colors, withOpacity } from '../../lib/theme';
 import { BOOKING_HISTORY_STATUS_LABELS, BookingHistoryStatus } from '../../mock/parentFlow';
 
-const TONE: Record<BookingHistoryStatus, 'positive' | 'neutral' | 'negative'> = {
-  requested: 'neutral',
+const TONE: Record<BookingHistoryStatus, 'positive' | 'neutral' | 'negative' | 'warning'> = {
+  requested: 'warning',
   confirmed: 'positive',
   completed: 'neutral',
   cancelled: 'negative',
@@ -40,6 +40,10 @@ const styles = StyleSheet.create({
     backgroundColor: withOpacity(colors.errorCoral, 0.12),
     borderColor: withOpacity(colors.errorCoral, 0.4),
   },
+  pill_warning: {
+    backgroundColor: withOpacity(colors.amber, 0.14),
+    borderColor: withOpacity(colors.amber, 0.4),
+  },
   label: {
     fontSize: 10,
     fontWeight: '700',
@@ -47,12 +51,15 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
   },
   label_positive: {
-    color: colors.ballLime,
+    color: colors.courtBlue,
   },
   label_neutral: {
     color: colors.textDim,
   },
   label_negative: {
     color: colors.errorCoral,
+  },
+  label_warning: {
+    color: colors.amber,
   },
 });

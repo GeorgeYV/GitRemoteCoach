@@ -62,7 +62,7 @@ export default function ClubTournamentListScreen({
         </View>
       ) : !tournaments ? (
         <View style={styles.emptyState}>
-          <ActivityIndicator color={colors.ballLime} />
+          <ActivityIndicator color={colors.courtBlue} />
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.list}>
@@ -185,7 +185,7 @@ const styles = StyleSheet.create({
     borderTopColor: colors.borderSoft,
   },
   selectLabel: {
-    color: colors.ballLime,
+    color: colors.courtBlue,
     fontSize: 12,
     fontWeight: '700',
   },

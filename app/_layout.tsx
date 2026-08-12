@@ -1,11 +1,33 @@
+import {
+  Roboto_400Regular,
+  Roboto_500Medium,
+  Roboto_600SemiBold,
+  Roboto_700Bold,
+  Roboto_800ExtraBold,
+  useFonts,
+} from '@expo-google-fonts/roboto';
 import { Stack, useRouter } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import * as Notifications from 'expo-notifications';
 import React, { useEffect } from 'react';
-import { ActivityIndicator, Platform, View } from 'react-native';
+import { ActivityIndicator, Platform, Text, TextInput, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from '../context/AuthContext';
 import { colors } from '../lib/theme';
+
+SplashScreen.preventAutoHideAsync().catch(() => {});
+
+// Tipografía del tema claro "Cancha dura" (ver diseno-a-cancha-dura.svg) — se fija como
+// default global en vez de tocar el fontFamily de cada Text/TextInput de la app.
+type TextWithDefaultProps = typeof Text & { defaultProps?: { style?: unknown } };
+type TextInputWithDefaultProps = typeof TextInput & { defaultProps?: { style?: unknown } };
+const TextWithProps = Text as TextWithDefaultProps;
+const TextInputWithProps = TextInput as TextInputWithDefaultProps;
+TextWithProps.defaultProps = TextWithProps.defaultProps || {};
+TextWithProps.defaultProps.style = [{ fontFamily: 'Roboto_400Regular' }, TextWithProps.defaultProps.style];
+TextInputWithProps.defaultProps = TextInputWithProps.defaultProps || {};
+TextInputWithProps.defaultProps.style = [{ fontFamily: 'Roboto_400Regular' }, TextInputWithProps.defaultProps.style];
 
 /**
  * Tap en una notificación → home. Sin deep-link al contenido específico todavía
@@ -58,12 +80,30 @@ function RootNavigator() {
 }
 
 export default function RootLayout() {
+  const [fontsLoaded, fontError] = useFonts({
+    Roboto_400Regular,
+    Roboto_500Medium,
+    Roboto_600SemiBold,
+    Roboto_700Bold,
+    Roboto_800ExtraBold,
+  });
+
+  useEffect(() => {
+    if (fontsLoaded || fontError) {
+      SplashScreen.hideAsync().catch(() => {});
+    }
+  }, [fontsLoaded, fontError]);
+
+  if (!fontsLoaded && !fontError) {
+    return null;
+  }
+
   return (
     <SafeAreaProvider>
       <AuthProvider>
         <RootNavigator />
       </AuthProvider>
-      <StatusBar style="light" />
+      <StatusBar style="dark" />
     </SafeAreaProvider>
   );
 }

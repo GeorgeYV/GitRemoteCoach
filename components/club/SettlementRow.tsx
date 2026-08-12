@@ -58,7 +58,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   amount: {
-    color: colors.ballLime,
+    color: colors.courtBlue,
     fontSize: 20,
     fontWeight: '800',
   },

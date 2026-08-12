@@ -147,7 +147,7 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.borderSoft,
   },
   wordmark: {
-    color: colors.ballLime,
+    color: colors.courtBlue,
     fontSize: 18,
     fontWeight: '800',
   },
@@ -183,7 +183,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   statValue: {
-    color: colors.ballLime,
+    color: colors.courtBlue,
     fontSize: 16,
     fontWeight: '800',
     marginBottom: 4,
@@ -218,7 +218,7 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   invitationTitle: {
-    color: colors.ballLime,
+    color: colors.courtBlue,
     fontSize: 14,
     fontWeight: '800',
     marginBottom: 2,

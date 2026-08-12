@@ -115,7 +115,7 @@ export default function CoachPreMatchReminderScreen({
           action={
             !editingMeeting ? (
               <Pressable style={styles.editButton} onPress={() => setEditingMeeting(true)}>
-                <Ionicons name="create-outline" size={14} color={colors.ballLime} />
+                <Ionicons name="create-outline" size={14} color={colors.courtBlue} />
                 <Text style={styles.editButtonLabel}>Editar</Text>
               </Pressable>
             ) : undefined
@@ -304,7 +304,7 @@ const styles = StyleSheet.create({
     borderColor: colors.errorCoral,
   },
   countdownEyebrow: {
-    color: colors.ballLime,
+    color: colors.courtBlue,
     fontSize: 12,
     fontWeight: '700',
     textTransform: 'uppercase',
@@ -349,7 +349,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   editButtonLabel: {
-    color: colors.ballLime,
+    color: colors.courtBlue,
     fontSize: 12,
     fontWeight: '700',
   },
@@ -427,7 +427,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   locationCourt: {
-    color: colors.ballLime,
+    color: colors.courtBlue,
     fontSize: 13,
     fontWeight: '700',
     marginBottom: 10,
@@ -480,7 +480,7 @@ const styles = StyleSheet.create({
   footer: {
     borderTopWidth: 1,
     borderTopColor: colors.borderSoft,
-    backgroundColor: colors.courtBlueDeep,
+    backgroundColor: colors.panel,
     padding: 16,
     gap: 10,
   },

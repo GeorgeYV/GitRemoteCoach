@@ -87,7 +87,7 @@ export default function CoachRequestInboxScreen({ coachId, onBack }: { coachId: 
         </View>
       ) : requests === null ? (
         <View style={styles.emptyState}>
-          <ActivityIndicator color={colors.ballLime} />
+          <ActivityIndicator color={colors.courtBlue} />
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.list}>

@@ -45,7 +45,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
   },
   label_positive: {
-    color: colors.ballLime,
+    color: colors.courtBlue,
   },
   label_neutral: {
     color: colors.textDim,

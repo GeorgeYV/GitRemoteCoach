@@ -74,7 +74,7 @@ export default function CoachSessionHistoryScreen({ coachId, onBack }: { coachId
   if (!bookings) {
     return (
       <SafeAreaView style={[styles.container, styles.centerState]} edges={['top', 'bottom']}>
-        <ActivityIndicator color={colors.ballLime} />
+        <ActivityIndicator color={colors.courtBlue} />
       </SafeAreaView>
     );
   }
@@ -239,7 +239,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   price: {
-    color: colors.ballLime,
+    color: colors.courtBlue,
     fontSize: 14,
     fontWeight: '800',
   },

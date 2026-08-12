@@ -32,7 +32,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   labelAvailable: {
-    color: colors.ballLime,
+    color: colors.courtBlue,
   },
   labelBooked: {
     color: colors.textDim,

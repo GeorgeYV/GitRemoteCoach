@@ -23,7 +23,7 @@ const styles = StyleSheet.create({
   value: {
     fontSize: 22,
     fontWeight: '800',
-    color: colors.ballLime,
+    color: colors.courtBlue,
   },
   label: {
     fontSize: 11,

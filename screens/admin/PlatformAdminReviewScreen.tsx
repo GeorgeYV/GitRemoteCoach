@@ -82,7 +82,7 @@ export default function PlatformAdminReviewScreen() {
         </View>
       ) : !groups ? (
         <View style={styles.emptyState}>
-          <ActivityIndicator color={colors.ballLime} />
+          <ActivityIndicator color={colors.courtBlue} />
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.content}>

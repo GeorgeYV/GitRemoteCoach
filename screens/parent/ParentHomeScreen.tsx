@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ParentTabBar from '../../components/parent/ParentTabBar';
+import IconTextInput from '../../components/shared/IconTextInput';
 import InitialAvatar from '../../components/shared/InitialAvatar';
 import { useAuth } from '../../context/AuthContext';
 import { listPlayers, searchTournaments, TournamentSearchResult } from '../../lib/api';
@@ -29,6 +30,7 @@ export default function ParentHomeScreen() {
   const { user, token } = useAuth();
   const [childName, setChildName] = useState<string | null>(null);
   const [tournaments, setTournaments] = useState<TournamentSearchResult[] | null>(null);
+  const [query, setQuery] = useState('');
 
   useEffect(() => {
     if (!token) return;
@@ -43,13 +45,26 @@ export default function ParentHomeScreen() {
       .catch(() => setTournaments([]));
   }, []);
 
-  function goToTrainers() {
+  function goToTrainers(tournamentId?: string) {
+    if (tournamentId) {
+      router.push({ pathname: '/trainers', params: { tournamentId } });
+      return;
+    }
     router.push('/trainers');
   }
 
   const firstName = user?.fullName.split(' ')[0] ?? '';
   const featured = tournaments?.[0] ?? null;
   const rest = tournaments?.slice(1) ?? [];
+  const normalizedQuery = query.trim().toLowerCase();
+  const visibleRest = normalizedQuery
+    ? rest.filter(
+        (t) =>
+          t.name.toLowerCase().includes(normalizedQuery) ||
+          t.venue.toLowerCase().includes(normalizedQuery) ||
+          t.city.toLowerCase().includes(normalizedQuery)
+      )
+    : rest;
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -80,7 +95,7 @@ export default function ParentHomeScreen() {
                 {featured.venue} · {featured.city}
               </Text>
               <Text style={styles.featuredMeta}>{dateRangeLabel(featured.startDate, featured.endDate)}</Text>
-              <Pressable style={styles.ctaButton} onPress={goToTrainers}>
+              <Pressable style={styles.ctaButton} onPress={() => goToTrainers(featured.id)}>
                 <View style={styles.ctaContent}>
                   <Text style={styles.ctaLabel}>Ver entrenadores</Text>
                   <Ionicons name="arrow-forward-outline" size={16} color={colors.courtBlueDeep} />
@@ -90,20 +105,29 @@ export default function ParentHomeScreen() {
           </>
         )}
 
-        <Pressable style={styles.searchBar} onPress={goToTrainers}>
-          <Ionicons name="search-outline" size={16} color={colors.textDim} />
-          <Text style={styles.searchPlaceholder}>Buscar por nombre o sede del torneo</Text>
-        </Pressable>
+        <IconTextInput
+          icon="search-outline"
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Buscar por nombre o sede del torneo"
+          containerStyle={styles.searchBar}
+        />
 
         <Text style={styles.sectionLabel}>Torneos activos</Text>
         {tournaments === null ? (
           <Text style={styles.tournamentMeta}>Cargando torneos…</Text>
-        ) : rest.length === 0 && !featured ? (
+        ) : visibleRest.length === 0 && !featured ? (
           <Text style={styles.tournamentMeta}>No hay torneos activos por ahora.</Text>
+        ) : visibleRest.length === 0 && normalizedQuery ? (
+          <Text style={styles.tournamentMeta}>No encontramos torneos con ese nombre, sede o ciudad.</Text>
         ) : (
           <View style={styles.tournamentList}>
-            {rest.map((tournament) => (
-              <TournamentRow key={tournament.id} tournament={tournament} onPress={goToTrainers} />
+            {visibleRest.map((tournament) => (
+              <TournamentRow
+                key={tournament.id}
+                tournament={tournament}
+                onPress={() => goToTrainers(tournament.id)}
+              />
             ))}
           </View>
         )}
@@ -143,7 +167,7 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.borderSoft,
   },
   wordmark: {
-    color: colors.ballLime,
+    color: colors.courtBlue,
     fontSize: 18,
     fontWeight: '800',
   },
@@ -233,10 +257,6 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     marginBottom: 24,
     gap: 8,
-  },
-  searchPlaceholder: {
-    color: colors.textDim,
-    fontSize: 13,
   },
   tournamentList: {
     gap: 10,

@@ -110,7 +110,7 @@ export default function ClubInviteCoachScreen({
         </View>
       ) : !results ? (
         <View style={styles.emptyState}>
-          <ActivityIndicator color={colors.ballLime} />
+          <ActivityIndicator color={colors.courtBlue} />
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.list}>
@@ -143,7 +143,7 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
   },
   backLabel: {
-    color: colors.ballLime,
+    color: colors.courtBlue,
     fontSize: 13,
     fontWeight: '700',
     marginBottom: 10,
@@ -190,7 +190,7 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
   },
   successText: {
-    color: colors.ballLime,
+    color: colors.courtBlue,
     fontSize: 12,
     fontWeight: '700',
     textAlign: 'center',

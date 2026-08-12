@@ -87,7 +87,7 @@ function SummaryCard({ bigNum, cap }: { bigNum: string | number; cap: string }) 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.courtBlueDeep,
+    backgroundColor: colors.panel,
   },
   content: {
     padding: 22,
@@ -120,7 +120,7 @@ const styles = StyleSheet.create({
   bigNum: {
     fontSize: 24,
     fontWeight: '800',
-    color: colors.ballLime,
+    color: colors.courtBlue,
   },
   cap: {
     fontSize: 11,
