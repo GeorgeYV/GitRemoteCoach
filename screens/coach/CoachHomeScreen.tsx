@@ -66,7 +66,12 @@ export default function CoachHomeScreen({
         <Text style={styles.headline}>Este es el resumen de tu actividad como entrenador</Text>
 
         <View style={styles.statsRow}>
-          <StatChip value={String(pendingRequests)} label="Solicitudes" onPress={onOpenRequests} />
+          <StatChip
+            value={String(pendingRequests)}
+            label="Solicitudes"
+            onPress={onOpenRequests}
+            urgent={pendingRequests > 0}
+          />
           <StatChip value={money(pendingEarnings)} label="Por liberar" onPress={onOpenEarnings} />
           <StatChip value={`★ ${rating}`} label="Reputación" onPress={onOpenReputation} />
         </View>
@@ -121,10 +126,20 @@ export default function CoachHomeScreen({
   );
 }
 
-function StatChip({ value, label, onPress }: { value: string; label: string; onPress?: () => void }) {
+function StatChip({
+  value,
+  label,
+  onPress,
+  urgent,
+}: {
+  value: string;
+  label: string;
+  onPress?: () => void;
+  urgent?: boolean;
+}) {
   return (
-    <Pressable style={styles.statChip} onPress={onPress}>
-      <Text style={styles.statValue} numberOfLines={1}>
+    <Pressable style={[styles.statChip, urgent && styles.statChipUrgent]} onPress={onPress}>
+      <Text style={[styles.statValue, urgent && styles.statValueUrgent]} numberOfLines={1}>
         {value}
       </Text>
       <Text style={styles.statLabel}>{label}</Text>
@@ -187,6 +202,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '800',
     marginBottom: 4,
+  },
+  statChipUrgent: {
+    backgroundColor: withOpacity(colors.amber, 0.14),
+    borderColor: withOpacity(colors.amber, 0.4),
+  },
+  statValueUrgent: {
+    color: colors.amber,
   },
   statLabel: {
     color: colors.textDim,

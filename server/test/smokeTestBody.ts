@@ -771,7 +771,7 @@ console.log('\n=== Escenario 13: auth (registro / login / sesión) ===');
   assertEqual(meNoTokenRes.statusCode, 401, 'GET /auth/me sin token devuelve 401');
 }
 
-console.log('\n=== Escenario 14: push notifications (accept/reject de reserva avisan al padre) ===');
+console.log('\n=== Escenario 14: push notifications (nueva solicitud avisa al coach, accept/reject avisan al padre) ===');
 {
   const deviceToken = 'ExponentPushToken[smoke-test-device]';
 
@@ -786,9 +786,27 @@ console.log('\n=== Escenario 14: push notifications (accept/reject de reserva av
   });
   assertEqual(registerRes.statusCode, 204, 'POST /push-tokens con sesión devuelve 204');
 
+  const coachDeviceToken = 'ExponentPushToken[smoke-test-coach-device]';
+  const coachRegisterRes = await app.inject({
+    method: 'POST',
+    url: '/push-tokens',
+    headers: { authorization: `Bearer ${coachBToken}` },
+    payload: { token: coachDeviceToken },
+  });
+  assertEqual(coachRegisterRes.statusCode, 204, 'POST /push-tokens del entrenador devuelve 204');
+
+  pushState.sent.length = 0;
   const acceptReq = await requestBooking(fixtures.coachBUserId, inFuture(50));
   const bookingToAccept = acceptReq.json();
-  pushState.sent.length = 0; // limpia cualquier push de escenarios anteriores antes de medir
+  assertEqual(pushState.sent.length, 1, 'solicitar una reserva dispara exactamente un push al entrenador');
+  assertEqual(pushState.sent[0]?.to, coachDeviceToken, 'el push de nueva solicitud va al device token del entrenador');
+  assertEqual(
+    pushState.sent[0]?.title,
+    'Nueva solicitud de reserva',
+    'el título del push de nueva solicitud es el esperado',
+  );
+
+  pushState.sent.length = 0; // limpia antes de medir el push de aceptación
   await app.inject({
     method: 'POST',
     url: `/bookings/${bookingToAccept.id}/accept`,

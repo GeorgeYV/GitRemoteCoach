@@ -24,10 +24,20 @@ export async function requestBooking(params: RequestBookingParams): Promise<Book
   }
   const responseDeadline = new Date(Date.now() + businessRules.coachResponseWindowHours * 3600_000);
   const { note, ...rest } = params;
-  return bookingRepository.createBookingRequest(
+  const booking = await bookingRepository.createBookingRequest(
     { ...rest, responseDeadline, parentNote: note },
     pool,
   );
+
+  // coachId es directamente el user_id del coach (coach_profiles.user_id) — sin join extra, a
+  // diferencia del parentUserId de accept/reject que sí necesita resolverse vía player.guardian.
+  await notificationService.notifyUser(params.coachId, {
+    title: 'Nueva solicitud de reserva',
+    body: 'Un padre quiere reservar contigo — respondé antes de que expire la solicitud.',
+    data: { bookingId: booking.id },
+  });
+
+  return booking;
 }
 
 /**
