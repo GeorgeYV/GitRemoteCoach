@@ -543,19 +543,33 @@ console.log('\n=== Escenario 11b: disponibilidad y tarifa de torneo (CoachAvaila
 
 console.log('\n=== Escenario 11c: conteo de jugadores reservados por torneo (TrainerProfileScreen) ===');
 {
-  const countUrl = `/coaches/${fixtures.coachAUserId}/tournaments/${fixtures.tournamentId}/booking-count`;
+  // Usa activeTournamentId (no fixtures.tournamentId) — ese ya tiene reservas de fixtures.playerId
+  // en otros escenarios, y como el conteo es por jugador DISTINTO, una segunda reserva del mismo
+  // jugador ahí no movería el número. activeTournamentId arranca limpio para este coach+jugador.
+  const countUrl = `/coaches/${fixtures.coachAUserId}/tournaments/${fixtures.activeTournamentId}/booking-count`;
 
   const baselineRes = await app.inject({ method: 'GET', url: countUrl });
   assertEqual(baselineRes.statusCode, 200, 'GET booking-count es público (sin token) → 200');
-  const baseline = baselineRes.json().bookedPlayers;
+  assertEqual(baselineRes.json().bookedPlayers, 0, 'sin reservas todavía, el conteo arranca en 0');
 
-  const reqRes = await requestBooking(fixtures.coachAUserId, inFuture(300));
+  const reqRes = await app.inject({
+    method: 'POST',
+    url: '/bookings',
+    headers: { authorization: `Bearer ${parentToken}` },
+    payload: {
+      playerId: fixtures.playerId,
+      coachId: fixtures.coachAUserId,
+      tournamentId: fixtures.activeTournamentId,
+      matchDatetime: inFuture(300),
+      agreedRate: 1000,
+    },
+  });
   const bookingCount = reqRes.json();
 
   const afterRequestRes = await app.inject({ method: 'GET', url: countUrl });
   assertEqual(
     afterRequestRes.json().bookedPlayers,
-    baseline + 1,
+    1,
     'una solicitud "requested" cuenta como jugador reservado actualmente',
   );
 
@@ -567,7 +581,7 @@ console.log('\n=== Escenario 11c: conteo de jugadores reservados por torneo (Tra
   const afterRejectRes = await app.inject({ method: 'GET', url: countUrl });
   assertEqual(
     afterRejectRes.json().bookedPlayers,
-    baseline,
+    0,
     'una reserva rechazada deja de contar como reservada actualmente',
   );
 }
