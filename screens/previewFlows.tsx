@@ -293,7 +293,7 @@ export function ParentBookingFlow({ initialTournamentId }: { initialTournamentId
 
 /** Local three-step flow: home dashboard → booking detail → cancel, all sharing one local booking list. */
 export function CoachHomeFlow({ coachId, coachName }: { coachId: string; coachName: string }) {
-  const { token } = useAuth();
+  const { token, logout } = useAuth();
   const [bookings, setBookings] = useState<BookingWithParticipants[] | null>(null);
   const [rating, setRating] = useState('—');
   const [pendingInvitation, setPendingInvitation] = useState<ClubCoachInvitationWithNames | null>(null);
@@ -462,6 +462,7 @@ export function CoachHomeFlow({ coachId, coachName }: { coachId: string; coachNa
       onOpenEarnings={() => setStep('earnings')}
       onOpenReputation={() => setStep('reputation')}
       onOpenInvitation={() => setStep('invitation')}
+      onLogout={logout}
     />
   );
 }

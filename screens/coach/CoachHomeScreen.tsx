@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -31,6 +32,7 @@ export default function CoachHomeScreen({
   onOpenEarnings,
   onOpenReputation,
   onOpenInvitation,
+  onLogout,
 }: {
   coachName: string;
   rating: string;
@@ -45,6 +47,7 @@ export default function CoachHomeScreen({
   onOpenEarnings?: () => void;
   onOpenReputation?: () => void;
   onOpenInvitation?: () => void;
+  onLogout?: () => void;
 }) {
   const quickLinkHandlers: Record<(typeof QUICK_LINKS)[number]['key'], (() => void) | undefined> = {
     availability: onOpenAvailability,
@@ -120,6 +123,15 @@ export default function CoachHomeScreen({
               <Text style={styles.chevron}>›</Text>
             </Pressable>
           ))}
+          {onLogout && (
+            <Pressable style={styles.linkRow} onPress={onLogout}>
+              <View style={styles.linkInfo}>
+                <Text style={[styles.linkLabel, styles.logoutLabel]}>Salir</Text>
+                <Text style={styles.linkHint}>Cerrar tu sesión actual</Text>
+              </View>
+              <Ionicons name="log-out-outline" size={18} color={colors.errorCoral} />
+            </Pressable>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -329,5 +341,8 @@ const styles = StyleSheet.create({
   linkHint: {
     color: colors.textDim,
     fontSize: 12,
+  },
+  logoutLabel: {
+    color: colors.errorCoral,
   },
 });

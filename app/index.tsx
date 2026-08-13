@@ -96,12 +96,19 @@ export default function AuthenticatedHome() {
   // Stack.Protected en app/_layout.tsx garantiza que esta ruta solo se monta con sesión activa.
   if (!user) return null;
 
+  // Parent (ParentProfileScreen) y coach (CoachHomeScreen, fila "Salir" al final de Accesos
+  // rápidos) ya tienen su propio logout dentro del flujo — este chip flotante se sobreponía a la
+  // cabecera de esas pantallas. club_admin y platform_admin todavía no tienen uno propio.
+  const showLogoutChip = user.primaryRole !== 'parent' && user.primaryRole !== 'coach';
+
   return (
     <View style={styles.container}>
       <RoleHome user={user} />
-      <Pressable style={[styles.logoutChip, { top: insets.top + 8 }]} onPress={logout}>
-        <Text style={styles.logoutChipLabel}>Salir</Text>
-      </Pressable>
+      {showLogoutChip && (
+        <Pressable style={[styles.logoutChip, { top: insets.top + 8 }]} onPress={logout}>
+          <Text style={styles.logoutChipLabel}>Salir</Text>
+        </Pressable>
+      )}
     </View>
   );
 }
