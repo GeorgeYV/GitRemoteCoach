@@ -11,6 +11,7 @@ import { AvailabilityDay, BookingSlotSelection, buildMatchDatetime } from '../..
 
 export default function BookingConfirmScreen({
   playerId,
+  playerName,
   coachId,
   tournament,
   trainerName,
@@ -20,6 +21,7 @@ export default function BookingConfirmScreen({
   onContinue,
 }: {
   playerId: string;
+  playerName?: string;
   coachId: string;
   tournament: TournamentSearchResult;
   trainerName: string;
@@ -79,6 +81,11 @@ export default function BookingConfirmScreen({
           <Text style={styles.tournamentMeta} numberOfLines={1}>
             {tournament.name}
           </Text>
+          {playerName && (
+            <Text style={styles.playerMeta} numberOfLines={1}>
+              Jugador: {playerName}
+            </Text>
+          )}
         </View>
       </View>
 
@@ -193,6 +200,11 @@ const styles = StyleSheet.create({
   tournamentMeta: {
     color: colors.textDim,
     fontSize: 12,
+    marginTop: 2,
+  },
+  playerMeta: {
+    color: colors.textDim,
+    fontSize: 11,
     marginTop: 2,
   },
   content: {

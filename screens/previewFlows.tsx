@@ -17,6 +17,7 @@ import {
   listClubInvitations,
   listCoachBookings,
   listPlayers,
+  Player,
   searchTournaments,
   TournamentSearchResult,
   TournamentSummary,
@@ -31,6 +32,7 @@ import {
 } from '../mock/parentFlow';
 import LiveCaptureView from './LiveCaptureView';
 import MatchSummaryView from './MatchSummaryView';
+import PlayerPickerScreen from './parent/PlayerPickerScreen';
 import PlayerRegistrationScreen from './parent/PlayerRegistrationScreen';
 import CoachAvailabilityScreen from './coach/CoachAvailabilityScreen';
 import CoachBookingCancelScreen from './coach/CoachBookingCancelScreen';
@@ -102,19 +104,25 @@ export function ParentBookingFlow({ initialTournamentId }: { initialTournamentId
   const [selection, setSelection] = useState<BookingSlotSelection | null>(null);
   const [note, setNote] = useState('');
   const [bookingId, setBookingId] = useState<string | null>(null);
-  // undefined = todavía resolviendo; null = confirmado que el padre no tiene hijos/as todavía.
-  const [playerId, setPlayerId] = useState<string | null | undefined>(undefined);
+  // undefined = todavía resolviendo; luego queda la lista real (puede estar vacía).
+  const [players, setPlayers] = useState<Player[] | undefined>(undefined);
+  // A quién se le reserva. Se autocompleta cuando solo hay un hijo/a; con 2+ hay que elegir
+  // (PlayerPickerScreen) antes de seguir a BookingConfirmScreen.
+  const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
 
   useEffect(() => {
     // Sin token solo pasa en /dev-preview (fuera del guard de auth de app/_layout.tsx) — ahí no
     // hay sesión con la que pedir GET /players, así que se resuelve directo a "sin hijos/as".
     if (!token) {
-      setPlayerId(null);
+      setPlayers([]);
       return;
     }
     listPlayers(token)
-      .then((players) => setPlayerId(players[0]?.id ?? null))
-      .catch(() => setPlayerId(null));
+      .then((result) => {
+        setPlayers(result);
+        if (result.length === 1) setSelectedPlayerId(result[0].id);
+      })
+      .catch(() => setPlayers([]));
   }, [token]);
 
   // ParentHomeScreen siempre manda el torneo elegido (tarjeta destacada o fila de "Torneos
@@ -196,7 +204,7 @@ export function ParentBookingFlow({ initialTournamentId }: { initialTournamentId
   if (step === 'confirm') {
     if (!selectedTrainer) return null;
 
-    if (playerId === undefined) {
+    if (players === undefined) {
       return (
         <View style={[styles.root, styles.centerState]}>
           <ActivityIndicator color={colors.courtBlue} />
@@ -204,18 +212,32 @@ export function ParentBookingFlow({ initialTournamentId }: { initialTournamentId
       );
     }
 
-    if (playerId === null) {
+    if (players.length === 0) {
       return (
         <PlayerRegistrationScreen
           onBack={() => setStep('profile')}
-          onSubmit={(player) => setPlayerId(player.id)}
+          onSubmit={(player) => {
+            setPlayers([player]);
+            setSelectedPlayerId(player.id);
+          }}
+        />
+      );
+    }
+
+    if (!selectedPlayerId) {
+      return (
+        <PlayerPickerScreen
+          players={players}
+          onBack={() => setStep('profile')}
+          onSelect={(player) => setSelectedPlayerId(player.id)}
         />
       );
     }
 
     return (
       <BookingConfirmScreen
-        playerId={playerId}
+        playerId={selectedPlayerId}
+        playerName={players.find((p) => p.id === selectedPlayerId)?.fullName}
         coachId={selectedTrainer.coachId}
         tournament={tournament}
         trainerName={selectedTrainer.name}
