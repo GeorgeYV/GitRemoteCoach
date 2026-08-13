@@ -23,7 +23,7 @@ import {
 } from '../../lib/api';
 import { buildDaySlotsFromRange } from '../../lib/dateSlots';
 import { colors, radius } from '../../lib/theme';
-import { AvailabilityDay } from '../../mock/parentFlow';
+import { AvailabilityDay, buildMatchDatetime } from '../../mock/parentFlow';
 
 const LEVEL_LABELS: Record<PlayingLevel, string> = {
   recreativo: 'Recreativo',
@@ -39,6 +39,12 @@ const VERIFICATION_LABELS: Record<VerificationStatus, string> = {
 
 /** slotDate llega como datetime ISO completo (pg serializa DATE como Date → JSON), no como
  * 'YYYY-MM-DD' — hay que recortarlo antes de matchear contra los días reales del torneo. */
+/** Un slot que el coach marcó disponible pero cuyo horario ya pasó no debe ofrecerse — si no, el
+ * padre lo elige y el backend lo rechaza recién al enviar la solicitud (ver buildMatchDatetime). */
+function isSlotStillFuture(dayLabel: string, isoDate: string, period: 'morning' | 'afternoon'): boolean {
+  return new Date(buildMatchDatetime({ dayLabel, isoDate, period })).getTime() > Date.now();
+}
+
 function toAvailabilityDays(
   tournament: TournamentSearchResult,
   availability: CoachTournamentAvailability[],
@@ -49,8 +55,8 @@ function toAvailabilityDays(
     return {
       dayLabel,
       isoDate,
-      morningAvailable: slot?.morning ?? false,
-      afternoonAvailable: slot?.afternoon ?? false,
+      morningAvailable: (slot?.morning ?? false) && isSlotStillFuture(dayLabel, isoDate, 'morning'),
+      afternoonAvailable: (slot?.afternoon ?? false) && isSlotStillFuture(dayLabel, isoDate, 'afternoon'),
     };
   });
 }
