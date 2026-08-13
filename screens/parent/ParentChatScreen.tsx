@@ -15,7 +15,7 @@ import ChatBubble from '../../components/parent/ChatBubble';
 import IconTextInput from '../../components/shared/IconTextInput';
 import TrainerAvatarPlaceholder from '../../components/shared/TrainerAvatarPlaceholder';
 import { useAuth } from '../../context/AuthContext';
-import { ApiError, BookingMessage, listBookingMessages, sendBookingMessage } from '../../lib/api';
+import { ApiError, BookingMessage, listBookingMessages, markBookingMessagesRead, sendBookingMessage } from '../../lib/api';
 import { colors, withOpacity } from '../../lib/theme';
 import { ChatMessage } from '../../mock/coachFlow';
 import { BookingHistoryEntry, PARENT_QUICK_REPLIES } from '../../mock/parentFlow';
@@ -56,6 +56,11 @@ export default function ParentChatScreen({ booking, onBack }: { booking: Booking
     return () => {
       cancelled = true;
     };
+  }, [bookingId, token]);
+
+  useEffect(() => {
+    if (!token) return;
+    markBookingMessagesRead(token, bookingId).catch(() => {});
   }, [bookingId, token]);
 
   async function sendMessage(text: string) {

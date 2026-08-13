@@ -86,16 +86,23 @@ export async function listBookingsForParent(guardianUserId: string): Promise<Boo
   return bookingRepository.listBookingsForParent(guardianUserId);
 }
 
-/** ParentTabBar badge: "por confirmar" (transitorio) + decididas que el padre no ha visto. */
+/** ParentTabBar badge: "por confirmar" (transitorio) + decididas que el padre no ha visto +
+ * reservas con mensajes de chat sin leer. */
 export async function getParentBookingBadgeSummary(
   guardianUserId: string,
-): Promise<{ pending: number; decidedUnseen: number }> {
+): Promise<{ pending: number; decidedUnseen: number; unreadMessages: number }> {
   return bookingRepository.getBadgeSummaryForParent(guardianUserId);
 }
 
 /** BookingHistoryScreen la llama al montar — limpia el badge de decididas-no-vistas. */
 export async function markParentBookingDecisionsSeen(guardianUserId: string): Promise<void> {
   await bookingRepository.markDecisionsSeenForParent(guardianUserId);
+}
+
+/** ParentChatScreen/CoachChatScreen la llaman al montar — limpia el punto de "mensaje nuevo"
+ * de esa reserva para quien la abrió. */
+export async function markBookingMessagesRead(bookingId: string, role: 'coach' | 'parent'): Promise<void> {
+  await bookingRepository.markMessagesRead(bookingId, role);
 }
 
 export async function rejectBooking(bookingId: string): Promise<Booking> {

@@ -754,6 +754,10 @@ CREATE TABLE bookings (
   -- BookingHistoryScreen — null o anterior a decided_at significa "todavía no la vio", usado
   -- para el badge de la pestaña Reservas. No se toca en 'requested' ni en otras transiciones.
   parent_decision_seen_at       TIMESTAMPTZ,
+  -- Cuándo cada lado abrió por última vez el chat de esta reserva (ParentChatScreen/CoachChatScreen)
+  -- — usado para el punto de "mensaje nuevo" por fila en BookingHistoryScreen/CoachSessionHistoryScreen.
+  coach_messages_read_at        TIMESTAMPTZ,
+  parent_messages_read_at       TIMESTAMPTZ,
 
   CONSTRAINT chk_bookings_settled_has_settlement
     CHECK (club_commission_status = 'generated' OR settlement_id IS NOT NULL),

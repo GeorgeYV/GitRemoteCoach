@@ -1147,6 +1147,145 @@ console.log('\n=== Escenario 19: chat de una reserva (GET/POST /bookings/:id/mes
   assertEqual(strangerGetRes.statusCode, 403, 'GET de alguien ajeno a la reserva devuelve 403');
 }
 
+console.log('\n=== Escenario 19b: mensajes nuevos — push, hasUnreadMessages y mark-read ===');
+{
+  const parentDeviceToken = 'ExponentPushToken[smoke-test-parent-messages]';
+  const coachDeviceToken = 'ExponentPushToken[smoke-test-coach-messages]';
+  await app.inject({
+    method: 'POST',
+    url: '/push-tokens',
+    headers: { authorization: `Bearer ${parentToken}` },
+    payload: { token: parentDeviceToken },
+  });
+  await app.inject({
+    method: 'POST',
+    url: '/push-tokens',
+    headers: { authorization: `Bearer ${coachAToken}` },
+    payload: { token: coachDeviceToken },
+  });
+
+  const parentBookingsUrl = `/parents/${fixtures.parentUserId}/bookings`;
+  const coachBookingsUrl = `/coaches/${fixtures.coachAUserId}/bookings`;
+  const badgeUrl = `/parents/${fixtures.parentUserId}/bookings/badge-summary`;
+
+  function findBooking(list: any[], id: string) {
+    return list.find((b: any) => b.id === id);
+  }
+
+  // Antes de crear la reserva nueva — acceptBooking ya deja un mensaje de sistema ("Reserva
+  // confirmada..."), y ese también cuenta como "no visto" para el padre (sender_type != 'parent'),
+  // así que el baseline hay que tomarlo antes de aceptar, no después.
+  const baseline = (
+    await (await app.inject({ method: 'GET', url: badgeUrl, headers: { authorization: `Bearer ${parentToken}` } })).json()
+  ).unreadMessages;
+
+  const reqRes = await requestBooking(fixtures.coachAUserId, inFuture(500));
+  const booking19b = reqRes.json();
+  await app.inject({
+    method: 'POST',
+    url: `/bookings/${booking19b.id}/accept`,
+    headers: { authorization: `Bearer ${coachAToken}` },
+  });
+
+  // El coach escribe primero → debe avisarle al padre (push) y marcar la reserva como no-vista para el padre.
+  pushState.sent.length = 0;
+  await app.inject({
+    method: 'POST',
+    url: `/bookings/${booking19b.id}/messages`,
+    headers: { authorization: `Bearer ${coachAToken}` },
+    payload: { body: 'Hola, ¿confirmamos el punto de encuentro?' },
+  });
+  assertEqual(pushState.sent.length, 1, 'el mensaje del coach dispara exactamente un push');
+  assertEqual(pushState.sent[0]?.to, parentDeviceToken, 'el push de nuevo mensaje va al device token del padre');
+  assertEqual(pushState.sent[0]?.title, 'Nuevo mensaje', 'el título del push de nuevo mensaje es el esperado');
+
+  const parentListAfterCoachMsg = await (
+    await app.inject({ method: 'GET', url: parentBookingsUrl, headers: { authorization: `Bearer ${parentToken}` } })
+  ).json();
+  assertEqual(
+    findBooking(parentListAfterCoachMsg, booking19b.id).hasUnreadMessages,
+    true,
+    'un mensaje del coach marca hasUnreadMessages = true del lado del padre',
+  );
+
+  const badgeAfterCoachMsg = await (
+    await app.inject({ method: 'GET', url: badgeUrl, headers: { authorization: `Bearer ${parentToken}` } })
+  ).json();
+  assertEqual(
+    badgeAfterCoachMsg.unreadMessages,
+    baseline + 1,
+    'el badge de "no leídos" del padre sube al recibir el mensaje del coach',
+  );
+
+  // El padre abre el chat (mark-read) → se limpia de su lado, sin tocar el lado del coach.
+  const noAuthMarkReadRes = await app.inject({ method: 'POST', url: `/bookings/${booking19b.id}/messages/mark-read` });
+  assertEqual(noAuthMarkReadRes.statusCode, 401, 'POST mark-read sin Bearer token devuelve 401');
+
+  const strangerMarkReadRes = await app.inject({
+    method: 'POST',
+    url: `/bookings/${booking19b.id}/messages/mark-read`,
+    headers: { authorization: `Bearer ${coachBToken}` },
+  });
+  assertEqual(strangerMarkReadRes.statusCode, 403, 'POST mark-read de alguien ajeno a la reserva devuelve 403');
+
+  const parentMarkReadRes = await app.inject({
+    method: 'POST',
+    url: `/bookings/${booking19b.id}/messages/mark-read`,
+    headers: { authorization: `Bearer ${parentToken}` },
+  });
+  assertEqual(parentMarkReadRes.statusCode, 204, 'POST mark-read del padre devuelve 204');
+
+  const parentListAfterMarkRead = await (
+    await app.inject({ method: 'GET', url: parentBookingsUrl, headers: { authorization: `Bearer ${parentToken}` } })
+  ).json();
+  assertEqual(
+    findBooking(parentListAfterMarkRead, booking19b.id).hasUnreadMessages,
+    false,
+    'tras mark-read, hasUnreadMessages vuelve a false del lado del padre',
+  );
+
+  const badgeAfterMarkRead = await (
+    await app.inject({ method: 'GET', url: badgeUrl, headers: { authorization: `Bearer ${parentToken}` } })
+  ).json();
+  assertEqual(badgeAfterMarkRead.unreadMessages, baseline, 'el badge de "no leídos" del padre vuelve a bajar tras mark-read');
+
+  // Ahora el padre escribe → debe avisarle al coach y marcar la reserva como no-vista para el coach.
+  pushState.sent.length = 0;
+  await app.inject({
+    method: 'POST',
+    url: `/bookings/${booking19b.id}/messages`,
+    headers: { authorization: `Bearer ${parentToken}` },
+    payload: { body: 'Sí, nos vemos ahí' },
+  });
+  assertEqual(pushState.sent.length, 1, 'el mensaje del padre dispara exactamente un push');
+  assertEqual(pushState.sent[0]?.to, coachDeviceToken, 'el push de nuevo mensaje va al device token del coach');
+
+  const coachListAfterParentMsg = await (
+    await app.inject({ method: 'GET', url: coachBookingsUrl, headers: { authorization: `Bearer ${coachAToken}` } })
+  ).json();
+  assertEqual(
+    findBooking(coachListAfterParentMsg, booking19b.id).hasUnreadMessages,
+    true,
+    'un mensaje del padre marca hasUnreadMessages = true del lado del coach',
+  );
+
+  const coachMarkReadRes = await app.inject({
+    method: 'POST',
+    url: `/bookings/${booking19b.id}/messages/mark-read`,
+    headers: { authorization: `Bearer ${coachAToken}` },
+  });
+  assertEqual(coachMarkReadRes.statusCode, 204, 'POST mark-read del coach devuelve 204');
+
+  const coachListAfterMarkRead = await (
+    await app.inject({ method: 'GET', url: coachBookingsUrl, headers: { authorization: `Bearer ${coachAToken}` } })
+  ).json();
+  assertEqual(
+    findBooking(coachListAfterMarkRead, booking19b.id).hasUnreadMessages,
+    false,
+    'tras mark-read, hasUnreadMessages vuelve a false del lado del coach',
+  );
+}
+
 console.log('\n=== Escenario 20: autorización cruzada — nadie puede actuar por otro usuario ===');
 {
   const intruderRes = await app.inject({

@@ -15,7 +15,7 @@ import ChatBubble from '../../components/coach/ChatBubble';
 import IconTextInput from '../../components/shared/IconTextInput';
 import InitialAvatar from '../../components/shared/InitialAvatar';
 import { useAuth } from '../../context/AuthContext';
-import { ApiError, BookingMessage, listBookingMessages, sendBookingMessage } from '../../lib/api';
+import { ApiError, BookingMessage, listBookingMessages, markBookingMessagesRead, sendBookingMessage } from '../../lib/api';
 import { colors, withOpacity } from '../../lib/theme';
 import { ChatMessage, CoachBooking, QUICK_REPLIES } from '../../mock/coachFlow';
 
@@ -55,6 +55,11 @@ export default function CoachChatScreen({ booking, onBack }: { booking: CoachBoo
     return () => {
       cancelled = true;
     };
+  }, [bookingId, token]);
+
+  useEffect(() => {
+    if (!token) return;
+    markBookingMessagesRead(token, bookingId).catch(() => {});
   }, [bookingId, token]);
 
   async function sendMessage(text: string) {

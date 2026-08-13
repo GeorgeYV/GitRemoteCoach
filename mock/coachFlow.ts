@@ -145,4 +145,5 @@ export interface CoachBooking {
   /** true solo cuando el estado real (no el colapsado) es 'paid' — el único momento en que
    * POST /bookings/:id/complete puede liberar el pago. */
   readyToComplete: boolean;
+  hasUnreadMessages?: boolean;
 }

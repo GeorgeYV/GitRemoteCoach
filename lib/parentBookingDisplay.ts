@@ -29,5 +29,6 @@ export function toBookingHistoryEntry(booking: BookingForParent): BookingHistory
     price: Number(booking.agreedRate),
     status: STATUS_MAP[booking.status],
     reviewed: booking.reviewed,
+    hasUnreadMessages: booking.hasUnreadMessages,
   };
 }

@@ -140,6 +140,7 @@ const PREVIEW_COACH_MATCH_BOOKING: BookingWithParticipants = {
   parentName: 'Vista previa',
   tournamentName: '—',
   tournamentVenue: '—',
+  hasUnreadMessages: false,
 };
 
 /** Mismo criterio que las demás fixtures de esta pantalla: id real (Copa Nacional Juvenil en

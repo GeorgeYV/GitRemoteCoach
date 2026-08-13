@@ -48,6 +48,7 @@ function mapRowWithParticipants(row: any): BookingWithParticipants {
     parentName: row.parent_name,
     tournamentName: row.tournament_name,
     tournamentVenue: row.tournament_venue,
+    hasUnreadMessages: row.has_unread_messages,
   };
 }
 
@@ -60,6 +61,7 @@ function mapRowForParent(row: any): BookingForParent {
     tournamentName: row.tournament_name,
     tournamentVenue: row.tournament_venue,
     reviewed: row.reviewed,
+    hasUnreadMessages: row.has_unread_messages,
   };
 }
 
@@ -222,20 +224,33 @@ export async function countActivePlayersForCoachTournament(
 export async function getBadgeSummaryForParent(
   guardianUserId: string,
   db: Queryable = pool,
-): Promise<{ pending: number; decidedUnseen: number }> {
+): Promise<{ pending: number; decidedUnseen: number; unreadMessages: number }> {
   const { rows } = await db.query(
     `SELECT
        COUNT(CASE WHEN b.status = 'requested' THEN 1 END) AS pending,
        COUNT(CASE WHEN b.status IN ('accepted', 'paid', 'rejected')
                        AND b.decided_at IS NOT NULL
                        AND (b.parent_decision_seen_at IS NULL OR b.parent_decision_seen_at < b.decided_at)
-                  THEN 1 END) AS decided_unseen
+                  THEN 1 END) AS decided_unseen,
+       COUNT(CASE WHEN coach_msgs.last_at IS NOT NULL
+                       AND coach_msgs.last_at > COALESCE(b.parent_messages_read_at, TIMESTAMP '1970-01-01')
+                  THEN 1 END) AS unread_messages
      FROM bookings b
      JOIN players p ON p.id = b.player_id
+     LEFT JOIN (
+       SELECT booking_id, MAX(created_at) AS last_at
+       FROM booking_messages
+       WHERE sender_type != 'parent'
+       GROUP BY booking_id
+     ) coach_msgs ON coach_msgs.booking_id = b.id
      WHERE p.guardian_user_id = $1`,
     [guardianUserId],
   );
-  return { pending: Number(rows[0].pending), decidedUnseen: Number(rows[0].decided_unseen) };
+  return {
+    pending: Number(rows[0].pending),
+    decidedUnseen: Number(rows[0].decided_unseen),
+    unreadMessages: Number(rows[0].unread_messages),
+  };
 }
 
 /** Se llama al abrir BookingHistoryScreen — marca todas las decisiones ya tomadas como vistas,
@@ -248,6 +263,18 @@ export async function markDecisionsSeenForParent(guardianUserId: string, db: Que
        AND player_id IN (SELECT id FROM players WHERE guardian_user_id = $1)`,
     [guardianUserId],
   );
+}
+
+/** Se llama al abrir ParentChatScreen/CoachChatScreen — limpia el punto de "mensaje nuevo" de
+ * esa reserva para quien la abrió. Cada lado tiene su propia columna: leer como coach no marca
+ * como visto lo que el propio coach escribió, y viceversa. */
+export async function markMessagesRead(
+  bookingId: string,
+  role: 'coach' | 'parent',
+  db: Queryable = pool,
+): Promise<void> {
+  const column = role === 'coach' ? 'coach_messages_read_at' : 'parent_messages_read_at';
+  await db.query(`UPDATE bookings SET ${column} = now() WHERE id = $1`, [bookingId]);
 }
 
 export async function findPendingCommissionsForTournament(
@@ -270,12 +297,22 @@ export async function listBookingsForCoach(
   db: Queryable = pool,
 ): Promise<BookingWithParticipants[]> {
   const { rows } = await db.query(
+    // LEFT JOIN a una subquery derivada (no correlacionada) en vez de un EXISTS en el SELECT
+    // list — mismo motivo que reviewed en listBookingsForParent, pg-mem no resuelve esa forma.
     `SELECT b.*, p.full_name AS player_name, p.age_category, u.full_name AS parent_name,
-            t.name AS tournament_name, t.venue AS tournament_venue
+            t.name AS tournament_name, t.venue AS tournament_venue,
+            (parent_msgs.last_at IS NOT NULL
+             AND parent_msgs.last_at > COALESCE(b.coach_messages_read_at, TIMESTAMP '1970-01-01')) AS has_unread_messages
      FROM bookings b
      JOIN players p ON p.id = b.player_id
      JOIN users u ON u.id = p.guardian_user_id
      JOIN tournaments t ON t.id = b.tournament_id
+     LEFT JOIN (
+       SELECT booking_id, MAX(created_at) AS last_at
+       FROM booking_messages
+       WHERE sender_type != 'coach'
+       GROUP BY booking_id
+     ) parent_msgs ON parent_msgs.booking_id = b.id
      WHERE b.coach_id = $1
      ORDER BY b.match_datetime DESC`,
     [coachId],
@@ -295,12 +332,20 @@ export async function listBookingsForParent(
     // de la consulta externa (b.id) — mismo tipo de limitación ya documentada ahí.
     `SELECT b.*, cu.full_name AS coach_name, p.full_name AS player_name, p.age_category,
             t.name AS tournament_name, t.venue AS tournament_venue,
-            (rv.id IS NOT NULL) AS reviewed
+            (rv.id IS NOT NULL) AS reviewed,
+            (coach_msgs.last_at IS NOT NULL
+             AND coach_msgs.last_at > COALESCE(b.parent_messages_read_at, TIMESTAMP '1970-01-01')) AS has_unread_messages
      FROM bookings b
      JOIN players p ON p.id = b.player_id
      JOIN users cu ON cu.id = b.coach_id
      JOIN tournaments t ON t.id = b.tournament_id
      LEFT JOIN reviews rv ON rv.booking_id = b.id
+     LEFT JOIN (
+       SELECT booking_id, MAX(created_at) AS last_at
+       FROM booking_messages
+       WHERE sender_type != 'parent'
+       GROUP BY booking_id
+     ) coach_msgs ON coach_msgs.booking_id = b.id
      WHERE p.guardian_user_id = $1
      ORDER BY b.match_datetime DESC`,
     [guardianUserId],

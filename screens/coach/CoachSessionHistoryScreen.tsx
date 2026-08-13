@@ -9,6 +9,7 @@ import { toCoachBooking } from '../../lib/coachBookingDisplay';
 import { colors, radius } from '../../lib/theme';
 import { CoachBooking } from '../../mock/coachFlow';
 import CoachBookingCancelScreen from './CoachBookingCancelScreen';
+import CoachChatScreen from './CoachChatScreen';
 
 /** 'requested' vive en el inbox de solicitudes, no en el historial de sesiones ya decididas. */
 const DECIDED_STATUSES: BookingWithParticipants['status'][] = [
@@ -25,6 +26,7 @@ export default function CoachSessionHistoryScreen({ coachId, onBack }: { coachId
   const [bookings, setBookings] = useState<CoachBooking[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [cancelTarget, setCancelTarget] = useState<CoachBooking | null>(null);
+  const [chatTarget, setChatTarget] = useState<CoachBooking | null>(null);
 
   useEffect(() => {
     if (!token) {
@@ -61,6 +63,10 @@ export default function CoachSessionHistoryScreen({ coachId, onBack }: { coachId
         onConfirm={confirmCancel}
       />
     );
+  }
+
+  if (chatTarget) {
+    return <CoachChatScreen booking={chatTarget} onBack={() => setChatTarget(null)} />;
   }
 
   if (error) {
@@ -100,7 +106,12 @@ export default function CoachSessionHistoryScreen({ coachId, onBack }: { coachId
         <Section label="Próximas" hidden={upcoming.length === 0}>
           <View style={styles.list}>
             {upcoming.map((booking) => (
-              <BookingRow key={booking.id} booking={booking} onCancel={() => setCancelTarget(booking)} />
+              <BookingRow
+                key={booking.id}
+                booking={booking}
+                onCancel={() => setCancelTarget(booking)}
+                onChat={() => setChatTarget(booking)}
+              />
             ))}
           </View>
         </Section>
@@ -133,7 +144,15 @@ function Section({ label, hidden, children }: { label: string; hidden?: boolean;
   );
 }
 
-function BookingRow({ booking, onCancel }: { booking: CoachBooking; onCancel?: () => void }) {
+function BookingRow({
+  booking,
+  onCancel,
+  onChat,
+}: {
+  booking: CoachBooking;
+  onCancel?: () => void;
+  onChat?: () => void;
+}) {
   return (
     <View style={styles.row}>
       <InitialAvatar initial={booking.playerInitial} size={44} />
@@ -152,11 +171,19 @@ function BookingRow({ booking, onCancel }: { booking: CoachBooking; onCancel?: (
         </Text>
         <View style={styles.statusRow}>
           <CoachBookingStatusPill status={booking.status} />
-          {onCancel && (
-            <Pressable style={styles.cancelLink} onPress={onCancel}>
-              <Text style={styles.cancelLinkLabel}>Cancelar</Text>
-            </Pressable>
-          )}
+          <View style={styles.rowActions}>
+            {onChat && (
+              <Pressable style={styles.chatLink} onPress={onChat}>
+                {booking.hasUnreadMessages && <View style={styles.unreadDot} />}
+                <Text style={styles.chatLinkLabel}>Chat</Text>
+              </Pressable>
+            )}
+            {onCancel && (
+              <Pressable style={styles.cancelLink} onPress={onCancel}>
+                <Text style={styles.cancelLinkLabel}>Cancelar</Text>
+              </Pressable>
+            )}
+          </View>
         </View>
       </View>
     </View>
@@ -254,9 +281,30 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   statusRow: {
+    gap: 6,
+  },
+  rowActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    marginLeft: -8,
+  },
+  chatLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  chatLinkLabel: {
+    color: colors.textSoft,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  unreadDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: colors.amber,
   },
   cancelLink: {
     paddingVertical: 4,

@@ -189,6 +189,7 @@ function BookingRow({
           <View style={styles.rowActions}>
             {onChat && (
               <Pressable style={styles.chatLink} onPress={onChat}>
+                {booking.hasUnreadMessages && <View style={styles.unreadDot} />}
                 <Text style={styles.chatLinkLabel}>Chat</Text>
               </Pressable>
             )}
@@ -300,6 +301,9 @@ const styles = StyleSheet.create({
     marginLeft: -8,
   },
   chatLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
     paddingVertical: 4,
     paddingHorizontal: 8,
   },
@@ -307,6 +311,12 @@ const styles = StyleSheet.create({
     color: colors.textSoft,
     fontSize: 12,
     fontWeight: '700',
+  },
+  unreadDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: colors.amber,
   },
   cancelLink: {
     paddingVertical: 4,

@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import * as bookingRepository from '../repositories/bookingRepository.js';
 import * as bookingMessageService from '../services/bookingMessageService.js';
+import * as bookingService from '../services/bookingService.js';
 import { ForbiddenError, ValidationError } from '../lib/errors.js';
 
 const sendMessageSchema = z.object({
@@ -41,5 +42,19 @@ export async function bookingMessageRoutes(app: FastifyInstance): Promise<void> 
       body: parsed.data.body,
     });
     reply.code(201).send(message);
+  });
+
+  // ParentChatScreen/CoachChatScreen la llaman al montar — limpia el punto de "mensaje nuevo".
+  app.post('/bookings/:id/messages/mark-read', { preHandler: app.authenticate }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const { sub } = req.user as { sub: string };
+    const { coachId, guardianUserId } = await bookingRepository.getBookingParticipants(id);
+    let role: 'coach' | 'parent';
+    if (sub === coachId) role = 'coach';
+    else if (sub === guardianUserId) role = 'parent';
+    else throw new ForbiddenError('No eres parte de esta reserva');
+
+    await bookingService.markBookingMessagesRead(id, role);
+    reply.code(204);
   });
 }

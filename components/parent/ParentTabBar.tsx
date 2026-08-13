@@ -26,8 +26,8 @@ export default function ParentTabBar({ active }: { active: ParentTabKey }) {
     if (!user || !token) return;
     let cancelled = false;
     getParentBookingBadgeSummary(token, user.id)
-      .then(({ pending, decidedUnseen }) => {
-        if (!cancelled) setBadgeCount(pending + decidedUnseen);
+      .then(({ pending, decidedUnseen, unreadMessages }) => {
+        if (!cancelled) setBadgeCount(pending + decidedUnseen + unreadMessages);
       })
       .catch(() => {});
     return () => {

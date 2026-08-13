@@ -167,6 +167,7 @@ export interface BookingWithParticipants extends Booking {
   parentName: string;
   tournamentName: string;
   tournamentVenue: string;
+  hasUnreadMessages: boolean;
 }
 
 /** GET /bookings/:id — BookingStatusScreen (poll hasta que el coach acepte). */
@@ -200,6 +201,7 @@ export interface BookingForParent extends Booking {
   tournamentName: string;
   tournamentVenue: string;
   reviewed: boolean;
+  hasUnreadMessages: boolean;
 }
 
 /** GET /parents/:id/bookings — BookingHistoryScreen. */
@@ -211,7 +213,7 @@ export function listParentBookings(authToken: string, parentUserId: string): Pro
 export function getParentBookingBadgeSummary(
   authToken: string,
   parentUserId: string,
-): Promise<{ pending: number; decidedUnseen: number }> {
+): Promise<{ pending: number; decidedUnseen: number; unreadMessages: number }> {
   return request(`/parents/${parentUserId}/bookings/badge-summary`, {
     headers: { Authorization: `Bearer ${authToken}` },
   });
@@ -338,6 +340,14 @@ export function sendBookingMessage(
     method: 'POST',
     headers: { Authorization: `Bearer ${authToken}` },
     body: JSON.stringify(params),
+  });
+}
+
+/** POST /bookings/:id/messages/mark-read — ParentChatScreen, CoachChatScreen, al montar. */
+export function markBookingMessagesRead(authToken: string, bookingId: string): Promise<void> {
+  return request(`/bookings/${bookingId}/messages/mark-read`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${authToken}` },
   });
 }
 

@@ -72,6 +72,7 @@ export interface BookingWithParticipants extends Booking {
   parentName: string;
   tournamentName: string;
   tournamentVenue: string;
+  hasUnreadMessages: boolean;
 }
 
 /** Lo que devuelve el listado por padre (BookingHistoryScreen) — nombre del entrenador y del
@@ -83,6 +84,7 @@ export interface BookingForParent extends Booking {
   tournamentName: string;
   tournamentVenue: string;
   reviewed: boolean;
+  hasUnreadMessages: boolean;
 }
 
 export interface PaymentTransaction {

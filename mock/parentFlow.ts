@@ -97,6 +97,7 @@ export interface BookingHistoryEntry {
   status: BookingHistoryStatus;
   /** Only meaningful once status is 'completed' — whether the parent already left a review. */
   reviewed?: boolean;
+  hasUnreadMessages?: boolean;
 }
 
 export interface TrainerProfile {
