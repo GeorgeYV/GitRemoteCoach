@@ -4,7 +4,7 @@ import type { BookingHistoryEntry, BookingHistoryStatus } from '../mock/parentFl
 /** Colapsa el enum real de 8 estados al modelo de 5 estados que ya usa BookingHistoryScreen. */
 const STATUS_MAP: Record<BookingForParent['status'], BookingHistoryStatus> = {
   requested: 'requested',
-  accepted: 'confirmed',
+  accepted: 'accepted',
   paid: 'confirmed',
   completed: 'completed',
   rejected: 'rejected',

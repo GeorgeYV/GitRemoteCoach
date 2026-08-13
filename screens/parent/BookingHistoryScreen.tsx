@@ -10,11 +10,13 @@ import { toBookingHistoryEntry } from '../../lib/parentBookingDisplay';
 import { colors, radius } from '../../lib/theme';
 import { BookingHistoryEntry } from '../../mock/parentFlow';
 import BookingCancelScreen from './BookingCancelScreen';
+import BookingPaymentScreen from './BookingPaymentScreen';
 import BookingReviewScreen from './BookingReviewScreen';
 import ParentChatScreen from './ParentChatScreen';
 
-/** Only requests still awaiting the coach or already-paid bookings can be cancelled by the parent. */
-const CANCELLABLE_STATUSES = ['requested', 'confirmed'];
+/** Only requests still awaiting the coach, accepted-but-unpaid, or already-paid bookings can be
+ * cancelled by the parent. */
+const CANCELLABLE_STATUSES = ['requested', 'accepted', 'confirmed'];
 
 export default function BookingHistoryScreen() {
   const { user, token } = useAuth();
@@ -23,6 +25,7 @@ export default function BookingHistoryScreen() {
   const [cancelTarget, setCancelTarget] = useState<BookingHistoryEntry | null>(null);
   const [reviewTarget, setReviewTarget] = useState<BookingHistoryEntry | null>(null);
   const [chatTarget, setChatTarget] = useState<BookingHistoryEntry | null>(null);
+  const [payTarget, setPayTarget] = useState<BookingHistoryEntry | null>(null);
 
   useEffect(() => {
     if (!user || !token) {
@@ -63,6 +66,13 @@ export default function BookingHistoryScreen() {
     setReviewTarget(null);
   }
 
+  function confirmPayment() {
+    if (!payTarget) return;
+    const targetId = payTarget.id;
+    setBookings((prev) => prev?.map((b) => (b.id === targetId ? { ...b, status: 'confirmed' } : b)) ?? null);
+    setPayTarget(null);
+  }
+
   if (cancelTarget) {
     return (
       <BookingCancelScreen booking={cancelTarget} onBack={() => setCancelTarget(null)} onConfirm={confirmCancel} />
@@ -77,6 +87,22 @@ export default function BookingHistoryScreen() {
 
   if (chatTarget) {
     return <ParentChatScreen booking={chatTarget} onBack={() => setChatTarget(null)} />;
+  }
+
+  if (payTarget) {
+    return (
+      <BookingPaymentScreen
+        bookingId={payTarget.id}
+        dateTimeLabel={`${payTarget.date} · ${payTarget.time}`}
+        venue={payTarget.venue}
+        note=""
+        trainerName={payTarget.trainerName}
+        tournamentName={payTarget.tournamentName}
+        price={payTarget.price}
+        onBack={() => setPayTarget(null)}
+        onConfirm={confirmPayment}
+      />
+    );
   }
 
   if (error) {
@@ -116,6 +142,7 @@ export default function BookingHistoryScreen() {
                 booking={booking}
                 onCancel={() => setCancelTarget(booking)}
                 onChat={() => setChatTarget(booking)}
+                onPay={booking.status === 'accepted' ? () => setPayTarget(booking) : undefined}
               />
             ))}
           </View>
@@ -162,11 +189,13 @@ function BookingRow({
   onCancel,
   onReview,
   onChat,
+  onPay,
 }: {
   booking: BookingHistoryEntry;
   onCancel?: () => void;
   onReview?: () => void;
   onChat?: () => void;
+  onPay?: () => void;
 }) {
   return (
     <View style={styles.row}>
@@ -187,6 +216,11 @@ function BookingRow({
         <View style={styles.statusRow}>
           <BookingStatusPill status={booking.status} />
           <View style={styles.rowActions}>
+            {onPay && (
+              <Pressable style={styles.payLink} onPress={onPay}>
+                <Text style={styles.payLinkLabel}>Pagar</Text>
+              </Pressable>
+            )}
             {onChat && (
               <Pressable style={styles.chatLink} onPress={onChat}>
                 {booking.hasUnreadMessages && <View style={styles.unreadDot} />}
@@ -299,6 +333,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginLeft: -8,
+  },
+  payLink: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  payLinkLabel: {
+    color: colors.amber,
+    fontSize: 12,
+    fontWeight: '700',
   },
   chatLink: {
     flexDirection: 'row',

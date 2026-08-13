@@ -5,25 +5,27 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import PaymentMethodRow from '../../components/parent/PaymentMethodRow';
 import TrainerAvatarPlaceholder from '../../components/shared/TrainerAvatarPlaceholder';
 import { useAuth } from '../../context/AuthContext';
-import { ApiError, payBooking, TournamentSearchResult } from '../../lib/api';
+import { ApiError, payBooking } from '../../lib/api';
 import { colors, radius } from '../../lib/theme';
-import { BOOKING_PERIOD_LABELS, BookingSlotSelection, mockPaymentMethods } from '../../mock/parentFlow';
+import { mockPaymentMethods } from '../../mock/parentFlow';
 
 export default function BookingPaymentScreen({
   bookingId,
-  selection,
+  dateTimeLabel,
+  venue,
   note,
   trainerName,
-  tournament,
+  tournamentName,
   price,
   onBack,
   onConfirm,
 }: {
   bookingId: string;
-  selection: BookingSlotSelection;
+  dateTimeLabel: string;
+  venue: string;
   note: string;
   trainerName: string;
-  tournament: TournamentSearchResult;
+  tournamentName: string;
   price: number;
   onBack: () => void;
   onConfirm: () => void;
@@ -70,12 +72,12 @@ export default function BookingPaymentScreen({
               <TrainerAvatarPlaceholder size={48} />
               <View style={styles.summaryInfo}>
                 <Text style={styles.trainerName}>{trainerName}</Text>
-                <Text style={styles.summaryMeta}>{tournament.name}</Text>
+                <Text style={styles.summaryMeta}>{tournamentName}</Text>
               </View>
             </View>
             <View style={styles.summaryDivider} />
-            <SummaryLine label="Día y horario" value={`${selection.dayLabel} · ${BOOKING_PERIOD_LABELS[selection.period]}`} />
-            <SummaryLine label="Sede" value={tournament.venue} />
+            <SummaryLine label="Día y horario" value={dateTimeLabel} />
+            <SummaryLine label="Sede" value={venue} />
             {note ? <SummaryLine label="Nota" value={note} /> : null}
             <View style={styles.summaryDivider} />
             <SummaryLine label="Total a pagar" value={`$${price}`} emphasize />

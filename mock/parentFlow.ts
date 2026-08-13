@@ -72,11 +72,14 @@ export const PARENT_QUICK_REPLIES = [
   '¡Gracias!',
 ];
 
-/** Mirrors the subset of the server's booking_status enum (db/schema.sql) a parent needs to see. */
-export type BookingHistoryStatus = 'requested' | 'confirmed' | 'completed' | 'cancelled' | 'rejected';
+/** Mirrors the subset of the server's booking_status enum (db/schema.sql) a parent needs to see.
+ * 'accepted' is kept distinct from 'confirmed' (== paid) — collapsing them hid the "still needs
+ * payment" signal entirely, leaving accepted-but-unpaid bookings with no visible next action. */
+export type BookingHistoryStatus = 'requested' | 'accepted' | 'confirmed' | 'completed' | 'cancelled' | 'rejected';
 
 export const BOOKING_HISTORY_STATUS_LABELS: Record<BookingHistoryStatus, string> = {
   requested: 'Por confirmar',
+  accepted: 'Por pagar',
   confirmed: 'Confirmada',
   completed: 'Completada',
   cancelled: 'Cancelada',
