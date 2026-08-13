@@ -5,7 +5,7 @@ import ParentTabBar from '../../components/parent/ParentTabBar';
 import BookingStatusPill from '../../components/parent/BookingStatusPill';
 import InitialAvatar from '../../components/shared/InitialAvatar';
 import { useAuth } from '../../context/AuthContext';
-import { ApiError, listParentBookings } from '../../lib/api';
+import { ApiError, listParentBookings, markParentBookingDecisionsSeen } from '../../lib/api';
 import { toBookingHistoryEntry } from '../../lib/parentBookingDisplay';
 import { colors, radius } from '../../lib/theme';
 import { BookingHistoryEntry } from '../../mock/parentFlow';
@@ -42,6 +42,11 @@ export default function BookingHistoryScreen() {
     return () => {
       cancelled = true;
     };
+  }, [user, token]);
+
+  useEffect(() => {
+    if (!user || !token) return;
+    markParentBookingDecisionsSeen(token, user.id).catch(() => {});
   }, [user, token]);
 
   function confirmCancel(_reason: string) {

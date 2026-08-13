@@ -86,6 +86,18 @@ export async function listBookingsForParent(guardianUserId: string): Promise<Boo
   return bookingRepository.listBookingsForParent(guardianUserId);
 }
 
+/** ParentTabBar badge: "por confirmar" (transitorio) + decididas que el padre no ha visto. */
+export async function getParentBookingBadgeSummary(
+  guardianUserId: string,
+): Promise<{ pending: number; decidedUnseen: number }> {
+  return bookingRepository.getBadgeSummaryForParent(guardianUserId);
+}
+
+/** BookingHistoryScreen la llama al montar — limpia el badge de decididas-no-vistas. */
+export async function markParentBookingDecisionsSeen(guardianUserId: string): Promise<void> {
+  await bookingRepository.markDecisionsSeenForParent(guardianUserId);
+}
+
 export async function rejectBooking(bookingId: string): Promise<Booking> {
   const updated = await bookingRepository.updateStatus(
     bookingId,

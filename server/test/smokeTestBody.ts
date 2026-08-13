@@ -1031,6 +1031,61 @@ console.log('\n=== Escenario 18: listado de reservas de un padre (BookingHistory
   assertEqual(otherParentRes.json(), [], 'un padre sin reservas devuelve lista vacía');
 }
 
+console.log('\n=== Escenario 18b: badge de reservas del padre (ParentTabBar) ===');
+{
+  const badgeUrl = `/parents/${fixtures.parentUserId}/bookings/badge-summary`;
+
+  const noAuthRes = await app.inject({ method: 'GET', url: badgeUrl });
+  assertEqual(noAuthRes.statusCode, 401, 'GET badge-summary sin Bearer token devuelve 401');
+
+  const wrongParentRes = await app.inject({
+    method: 'GET',
+    url: badgeUrl,
+    headers: { authorization: `Bearer ${app.jwt.sign({ sub: '00000000-0000-0000-0000-000000000099', role: 'parent' })}` },
+  });
+  assertEqual(wrongParentRes.statusCode, 403, 'GET badge-summary con el token de otro padre devuelve 403');
+
+  const baseline = (
+    await (await app.inject({ method: 'GET', url: badgeUrl, headers: { authorization: `Bearer ${parentToken}` } })).json()
+  );
+
+  const reqRes = await requestBooking(fixtures.coachBUserId, inFuture(400));
+  const badgeBooking = reqRes.json();
+  const afterRequestRes = await app.inject({ method: 'GET', url: badgeUrl, headers: { authorization: `Bearer ${parentToken}` } });
+  assertEqual(
+    afterRequestRes.json().pending,
+    baseline.pending + 1,
+    'una solicitud "requested" nueva suma al conteo de "por confirmar"',
+  );
+
+  await app.inject({
+    method: 'POST',
+    url: `/bookings/${badgeBooking.id}/accept`,
+    headers: { authorization: `Bearer ${coachBToken}` },
+  });
+  const afterAcceptRes = await app.inject({ method: 'GET', url: badgeUrl, headers: { authorization: `Bearer ${parentToken}` } });
+  assertEqual(afterAcceptRes.json().pending, baseline.pending, 'al aceptar, vuelve a bajar del conteo "por confirmar"');
+  assertEqual(
+    afterAcceptRes.json().decidedUnseen,
+    baseline.decidedUnseen + 1,
+    'al aceptar, sube el conteo de decididas-no-vistas',
+  );
+
+  const noAuthMarkRes = await app.inject({ method: 'POST', url: `/parents/${fixtures.parentUserId}/bookings/mark-decisions-seen` });
+  assertEqual(noAuthMarkRes.statusCode, 401, 'POST mark-decisions-seen sin Bearer token devuelve 401');
+
+  const markRes = await app.inject({
+    method: 'POST',
+    url: `/parents/${fixtures.parentUserId}/bookings/mark-decisions-seen`,
+    headers: { authorization: `Bearer ${parentToken}` },
+  });
+  assertEqual(markRes.statusCode, 204, 'POST mark-decisions-seen devuelve 204');
+
+  const afterMarkRes = await app.inject({ method: 'GET', url: badgeUrl, headers: { authorization: `Bearer ${parentToken}` } });
+  assertEqual(afterMarkRes.json().decidedUnseen, 0, 'tras marcar como vistas, el conteo de decididas-no-vistas queda en 0');
+  assertEqual(afterMarkRes.json().pending, baseline.pending, 'marcar como vistas no toca el conteo de "por confirmar"');
+}
+
 console.log('\n=== Escenario 19: chat de una reserva (GET/POST /bookings/:id/messages) ===');
 {
   const bookingId = (globalThis as any).__booking1Id as string;

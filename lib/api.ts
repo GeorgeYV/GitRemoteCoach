@@ -207,6 +207,24 @@ export function listParentBookings(authToken: string, parentUserId: string): Pro
   return request(`/parents/${parentUserId}/bookings`, { headers: { Authorization: `Bearer ${authToken}` } });
 }
 
+/** GET /parents/:id/bookings/badge-summary — ParentTabBar. */
+export function getParentBookingBadgeSummary(
+  authToken: string,
+  parentUserId: string,
+): Promise<{ pending: number; decidedUnseen: number }> {
+  return request(`/parents/${parentUserId}/bookings/badge-summary`, {
+    headers: { Authorization: `Bearer ${authToken}` },
+  });
+}
+
+/** POST /parents/:id/bookings/mark-decisions-seen — BookingHistoryScreen, al montar. */
+export function markParentBookingDecisionsSeen(authToken: string, parentUserId: string): Promise<void> {
+  return request(`/parents/${parentUserId}/bookings/mark-decisions-seen`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${authToken}` },
+  });
+}
+
 /** POST /bookings/:id/accept — CoachRequestInboxScreen. */
 export function acceptBookingRequest(authToken: string, bookingId: string): Promise<Booking> {
   return request(`/bookings/${bookingId}/accept`, {

@@ -216,6 +216,40 @@ export async function countActivePlayersForCoachTournament(
   return Number(rows[0].count);
 }
 
+/** BookingHistoryScreen tab badge: cuántas reservas del padre están "por confirmar" (transitorio,
+ * se resuelve solo cuando el coach responde) y cuántas ya fueron decididas (aceptada/rechazada)
+ * pero el padre todavía no vio esa decisión — esta segunda parte se limpia con markDecisionsSeenForParent. */
+export async function getBadgeSummaryForParent(
+  guardianUserId: string,
+  db: Queryable = pool,
+): Promise<{ pending: number; decidedUnseen: number }> {
+  const { rows } = await db.query(
+    `SELECT
+       COUNT(CASE WHEN b.status = 'requested' THEN 1 END) AS pending,
+       COUNT(CASE WHEN b.status IN ('accepted', 'paid', 'rejected')
+                       AND b.decided_at IS NOT NULL
+                       AND (b.parent_decision_seen_at IS NULL OR b.parent_decision_seen_at < b.decided_at)
+                  THEN 1 END) AS decided_unseen
+     FROM bookings b
+     JOIN players p ON p.id = b.player_id
+     WHERE p.guardian_user_id = $1`,
+    [guardianUserId],
+  );
+  return { pending: Number(rows[0].pending), decidedUnseen: Number(rows[0].decided_unseen) };
+}
+
+/** Se llama al abrir BookingHistoryScreen — marca todas las decisiones ya tomadas como vistas,
+ * para que el badge de decididas-no-vistas se limpie (las "por confirmar" no se tocan acá, se
+ * resuelven solas cuando el coach responde). */
+export async function markDecisionsSeenForParent(guardianUserId: string, db: Queryable = pool): Promise<void> {
+  await db.query(
+    `UPDATE bookings SET parent_decision_seen_at = now()
+     WHERE status IN ('accepted', 'paid', 'rejected')
+       AND player_id IN (SELECT id FROM players WHERE guardian_user_id = $1)`,
+    [guardianUserId],
+  );
+}
+
 export async function findPendingCommissionsForTournament(
   tournamentId: string,
   db: Queryable = pool,

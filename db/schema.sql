@@ -750,6 +750,10 @@ CREATE TABLE bookings (
   decided_at                    TIMESTAMPTZ,
   completed_at                  TIMESTAMPTZ,
   cancelled_at                  TIMESTAMPTZ,
+  -- Cuándo el padre vio por última vez la decisión del entrenador (aceptar/rechazar) en
+  -- BookingHistoryScreen — null o anterior a decided_at significa "todavía no la vio", usado
+  -- para el badge de la pestaña Reservas. No se toca en 'requested' ni en otras transiciones.
+  parent_decision_seen_at       TIMESTAMPTZ,
 
   CONSTRAINT chk_bookings_settled_has_settlement
     CHECK (club_commission_status = 'generated' OR settlement_id IS NOT NULL),
