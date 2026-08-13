@@ -546,15 +546,15 @@ WHEN (NEW.status = 'accepted' AND OLD.status = 'pending')
 EXECUTE FUNCTION fn_club_coach_invitations_apply_acceptance();
 
 -- Disponibilidad del entrenador por día dentro de un torneo
--- (CoachAvailabilityScreen). Una fila por día; morning/afternoon en
--- lugar de horas exactas porque así es como se captura y se muestra hoy.
+-- (CoachAvailabilityScreen). Una fila por día; un solo flag `available` en
+-- vez de morning/afternoon — la hora exacta de la sesión se coordina por
+-- chat después de aceptar, igual que ya pasa con el punto de encuentro.
 CREATE TABLE coach_tournament_availability (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   coach_id      UUID NOT NULL REFERENCES coach_profiles (user_id) ON DELETE CASCADE,
   tournament_id UUID NOT NULL REFERENCES tournaments (id) ON DELETE CASCADE,
   slot_date     DATE NOT NULL,
-  morning       BOOLEAN NOT NULL DEFAULT FALSE,
-  afternoon     BOOLEAN NOT NULL DEFAULT FALSE,
+  available     BOOLEAN NOT NULL DEFAULT FALSE,
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (coach_id, tournament_id, slot_date)
 );
@@ -565,7 +565,7 @@ CREATE TABLE coach_tournament_availability (
 -- cubiertos por la UNIQUE (coach_id, tournament_id, slot_date) de arriba.
 CREATE INDEX idx_coach_tournament_availability_tournament_id
   ON coach_tournament_availability (tournament_id, slot_date)
-  WHERE morning OR afternoon;
+  WHERE available;
 
 -- ---------------------------------------------------------------------
 -- Trigger: valida que slot_date caiga dentro de las fechas del torneo
@@ -784,14 +784,17 @@ CREATE INDEX idx_bookings_pending_commission
 CREATE INDEX idx_bookings_pending_response
   ON bookings (response_deadline)
   WHERE status = 'requested';
--- Evita una segunda solicitud activa para el mismo entrenador/horario
--- (cinturón de seguridad de DB contra condiciones de carrera; la
--- validación de aplicación es la primera línea de defensa).
+-- Evita que el mismo jugador tenga dos solicitudes activas para el mismo
+-- entrenador/horario (cinturón de seguridad de DB contra condiciones de
+-- carrera). Incluye player_id a propósito: un coach puede aceptar varios
+-- alumnos distintos el mismo día/horario (la disponibilidad ya no es por
+-- franja horaria, ver #25), así que la colisión real a evitar es
+-- "mismo jugador reservando dos veces", no "dos jugadores el mismo día".
 -- 'payment_failed' cuenta como muerto igual que rejected/expired/
 -- cancelled: si no lo excluimos, un pago fallido bloquearía ese
--- coach+horario para siempre y nadie más podría reservarlo.
+-- coach+jugador+horario para siempre y nadie más podría reservarlo.
 CREATE UNIQUE INDEX idx_bookings_no_duplicate_active
-  ON bookings (coach_id, match_datetime)
+  ON bookings (coach_id, match_datetime, player_id)
   WHERE status NOT IN ('rejected', 'expired', 'cancelled', 'payment_failed');
 -- Historial de partidos completados de un entrenador, más reciente primero
 -- (perfil de entrenador / estadísticas de actividad, ver nota #16).
@@ -1370,7 +1373,7 @@ CREATE INDEX idx_push_tokens_user_id ON push_tokens (user_id);
 --     garantizar una vez en DB que repetir en cada pantalla), y (b)
 --     mantiene updated_at al día, para no depender de que cada UPDATE de
 --     la aplicación se acuerde de setearlo. idx_coach_tournament_availability_tournament_id
---     pasó a (tournament_id, slot_date) WHERE morning OR afternoon —
+--     pasó a (tournament_id, slot_date) WHERE available —
 --     antes solo cubría tournament_id, pero la query real del matching
 --     (¿quién está libre en este torneo, este día?) también filtra por
 --     fecha y descarta días marcados sin disponibilidad. Las búsquedas

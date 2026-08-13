@@ -181,11 +181,46 @@ console.log('\n=== Escenario 3: cancelación del entrenador sobre reserva pagada
   assertEqual(cancelled.flaggedForCoachPenalty, true, 'queda marcada para posible penalización');
 }
 
-console.log('\n=== Escenario 4: reserva duplicada (mismo entrenador/horario) ===');
+console.log('\n=== Escenario 4: reserva duplicada (mismo jugador/entrenador/horario) vs. multi-alumno ===');
 {
   const dupRes = await requestBooking(fixtures.coachAUserId, (globalThis as any).__booking1MatchDatetime);
-  assertEqual(dupRes.statusCode, 409, 'segunda solicitud para mismo coach+horario devuelve 409');
+  assertEqual(dupRes.statusCode, 409, 'segunda solicitud del mismo jugador para mismo coach+horario devuelve 409');
   assertEqual(dupRes.json().error, 'duplicate_booking', 'código de error = duplicate_booking');
+
+  // Un coach ahora puede aceptar varios alumnos distintos el mismo día/horario (ver #196) — un
+  // jugador DISTINTO reservando exactamente el mismo coach+horario ya no debe chocar.
+  const otherParentRes = await app.inject({
+    method: 'POST',
+    url: '/auth/register',
+    payload: {
+      email: 'otro.padre.multi@example.com',
+      password: 'super-secreta-123',
+      fullName: 'Otro Padre Multi',
+      primaryRole: 'parent',
+    },
+  });
+  const { token: otherParentToken } = otherParentRes.json();
+  const otherPlayerRes = await app.inject({
+    method: 'POST',
+    url: '/players',
+    headers: { authorization: `Bearer ${otherParentToken}` },
+    payload: { fullName: 'Otro Alumno Multi', birthDate: '2013-01-01', ageCategory: 'U14' },
+  });
+  const otherPlayerId = otherPlayerRes.json().id;
+
+  const multiRes = await app.inject({
+    method: 'POST',
+    url: '/bookings',
+    headers: { authorization: `Bearer ${otherParentToken}` },
+    payload: {
+      playerId: otherPlayerId,
+      coachId: fixtures.coachAUserId,
+      tournamentId: fixtures.tournamentId,
+      matchDatetime: (globalThis as any).__booking1MatchDatetime,
+      agreedRate: 1000,
+    },
+  });
+  assertEqual(multiRes.statusCode, 201, 'un jugador distinto sí puede reservar el mismo coach+horario');
 }
 
 console.log('\n=== Escenario 5: pago rechazado por la pasarela, luego reintento exitoso ===');
@@ -484,7 +519,7 @@ console.log('\n=== Escenario 11: invitación de club (CoachClubInvitationScreen)
 console.log('\n=== Escenario 11b: disponibilidad y tarifa de torneo (CoachAvailabilityScreen) ===');
 {
   const availabilityPayload = {
-    days: [{ slotDate: '2026-09-10', morning: true, afternoon: false }],
+    days: [{ slotDate: '2026-09-10', available: true }],
   };
   const ratePayload = { rateMode: 'per_day', amount: 45 };
 
@@ -535,8 +570,8 @@ console.log('\n=== Escenario 11b: disponibilidad y tarifa de torneo (CoachAvaila
   const availabilityAndRate = getRes.json();
   assertTrue(
     Array.isArray(availabilityAndRate.availability) &&
-      availabilityAndRate.availability.some((d: any) => String(d.slotDate).startsWith('2026-09-10')),
-    'la disponibilidad guardada aparece en la lectura pública',
+      availabilityAndRate.availability.some((d: any) => String(d.slotDate).startsWith('2026-09-10') && d.available === true),
+    'la disponibilidad guardada (día completo, sin mañana/tarde) aparece en la lectura pública',
   );
   assertEqual(availabilityAndRate.rate?.rateMode, 'per_day', 'la tarifa guardada aparece en la lectura pública');
 }
@@ -584,6 +619,34 @@ console.log('\n=== Escenario 11c: conteo de jugadores reservados por torneo (Tra
     0,
     'una reserva rechazada deja de contar como reservada actualmente',
   );
+}
+
+console.log('\n=== Escenario 11d: nombres de jugadores reservados por torneo (TrainerListScreen) ===');
+{
+  // coachBUserId + activeTournamentId: sin reservas previas de otros escenarios, arranca limpio.
+  const playersUrl = `/coaches/${fixtures.coachBUserId}/tournaments/${fixtures.activeTournamentId}/booked-players`;
+
+  const baselineRes = await app.inject({ method: 'GET', url: playersUrl });
+  assertEqual(baselineRes.statusCode, 200, 'GET booked-players es público (sin token) → 200');
+  assertEqual(baselineRes.json().players, [], 'sin reservas todavía, la lista de jugadores arranca vacía');
+
+  await app.inject({
+    method: 'POST',
+    url: '/bookings',
+    headers: { authorization: `Bearer ${parentToken}` },
+    payload: {
+      playerId: fixtures.playerId,
+      coachId: fixtures.coachBUserId,
+      tournamentId: fixtures.activeTournamentId,
+      matchDatetime: inFuture(310),
+      agreedRate: 1000,
+    },
+  });
+
+  const afterRequestRes = await app.inject({ method: 'GET', url: playersUrl });
+  const players = afterRequestRes.json().players;
+  assertEqual(players.length, 1, 'la solicitud recién creada aparece en la lista de jugadores reservados');
+  assertEqual(players[0].playerName, 'Valentina Guardián', 'trae el nombre real del jugador (JOIN con players)');
 }
 
 console.log('\n=== Escenario 12: captura en vivo de un partido (matches / match_point_events) ===');

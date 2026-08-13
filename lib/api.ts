@@ -537,8 +537,7 @@ export interface CoachTournamentAvailability {
   coachId: string;
   tournamentId: string;
   slotDate: string;
-  morning: boolean;
-  afternoon: boolean;
+  available: boolean;
   updatedAt: string;
 }
 
@@ -566,12 +565,26 @@ export function getCoachTournamentBookingCount(
   return request(`/coaches/${coachId}/tournaments/${tournamentId}/booking-count`);
 }
 
+export interface BookedPlayer {
+  playerId: string;
+  playerName: string;
+}
+
+/** GET /coaches/:coachId/tournaments/:tournamentId/booked-players — TrainerListScreen: quiénes
+ * (no solo cuántos) ya reservaron con este coach en este torneo. */
+export function getCoachTournamentBookedPlayers(
+  coachId: string,
+  tournamentId: string,
+): Promise<{ players: BookedPlayer[] }> {
+  return request(`/coaches/${coachId}/tournaments/${tournamentId}/booked-players`);
+}
+
 /** PUT /coaches/:coachId/tournaments/:tournamentId/availability — CoachAvailabilityScreen "Guardar disponibilidad". */
 export function setCoachTournamentAvailability(
   authToken: string,
   coachId: string,
   tournamentId: string,
-  days: Array<{ slotDate: string; morning: boolean; afternoon: boolean }>,
+  days: Array<{ slotDate: string; available: boolean }>,
 ): Promise<CoachTournamentAvailability[]> {
   return request(`/coaches/${coachId}/tournaments/${tournamentId}/availability`, {
     method: 'PUT',

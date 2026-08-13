@@ -7,13 +7,7 @@ import TrainerAvatarPlaceholder from '../../components/shared/TrainerAvatarPlace
 import { useAuth } from '../../context/AuthContext';
 import { ApiError, requestBooking, TournamentSearchResult } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
-import {
-  AvailabilityDay,
-  BOOKING_PERIOD_LABELS,
-  BookingPeriod,
-  BookingSlotSelection,
-  buildMatchDatetime,
-} from '../../mock/parentFlow';
+import { AvailabilityDay, BookingSlotSelection, buildMatchDatetime } from '../../mock/parentFlow';
 
 export default function BookingConfirmScreen({
   playerId,
@@ -40,8 +34,8 @@ export default function BookingConfirmScreen({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  function selectSlot(day: AvailabilityDay, period: BookingPeriod) {
-    setSelection({ dayLabel: day.dayLabel, isoDate: day.isoDate, period });
+  function selectDay(day: AvailabilityDay) {
+    setSelection({ dayLabel: day.dayLabel, isoDate: day.isoDate });
   }
 
   async function handleContinue() {
@@ -89,44 +83,38 @@ export default function BookingConfirmScreen({
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        <Section label="Elige día y horario">
+        <Section label="Elige el día">
           <View style={styles.daysGrid}>
-            {availability.map((day) => (
-              <View key={day.dayLabel} style={styles.dayColumn}>
-                <Text style={styles.dayLabel}>{day.dayLabel}</Text>
-                {(['morning', 'afternoon'] as BookingPeriod[]).map((period) => {
-                  const available = period === 'morning' ? day.morningAvailable : day.afternoonAvailable;
-                  const active = selection?.dayLabel === day.dayLabel && selection.period === period;
-                  return (
-                    <Pressable
-                      key={period}
-                      disabled={!available}
-                      onPress={() => selectSlot(day, period)}
+            {availability.map((day) => {
+              const active = selection?.dayLabel === day.dayLabel;
+              return (
+                <View key={day.dayLabel} style={styles.dayColumn}>
+                  <Text style={styles.dayLabel}>{day.dayLabel}</Text>
+                  <Pressable
+                    disabled={!day.available}
+                    onPress={() => selectDay(day)}
+                    style={[
+                      styles.slotPill,
+                      !day.available && styles.slotPillDisabled,
+                      active && styles.slotPillActive,
+                    ]}
+                  >
+                    <Text
                       style={[
-                        styles.slotPill,
-                        !available && styles.slotPillDisabled,
-                        active && styles.slotPillActive,
+                        styles.slotLabel,
+                        !day.available && styles.slotLabelDisabled,
+                        active && styles.slotLabelActive,
                       ]}
                     >
-                      <Text
-                        style={[
-                          styles.slotLabel,
-                          !available && styles.slotLabelDisabled,
-                          active && styles.slotLabelActive,
-                        ]}
-                      >
-                        {BOOKING_PERIOD_LABELS[period]}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            ))}
+                      Disponible
+                    </Text>
+                  </Pressable>
+                </View>
+              );
+            })}
           </View>
           <Text style={styles.hint}>
-            {selection
-              ? `${selection.dayLabel} · ${BOOKING_PERIOD_LABELS[selection.period]}`
-              : 'Elige un día y horario disponible para continuar'}
+            {selection ? selection.dayLabel : 'Elige un día disponible para continuar'}
           </Text>
         </Section>
 

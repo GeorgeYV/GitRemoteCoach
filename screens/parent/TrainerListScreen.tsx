@@ -2,7 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import TrainerAvatarPlaceholder from '../../components/shared/TrainerAvatarPlaceholder';
-import { ApiError, CoachSearchResult, searchCoaches, TournamentSearchResult } from '../../lib/api';
+import {
+  ApiError,
+  BookedPlayer,
+  CoachSearchResult,
+  getCoachTournamentBookedPlayers,
+  searchCoaches,
+  TournamentSearchResult,
+} from '../../lib/api';
 import { dateRangeLabel } from '../../lib/dateSlots';
 import { colors, radius } from '../../lib/theme';
 
@@ -20,6 +27,7 @@ export default function TrainerListScreen({
   const [minRatingOnly, setMinRatingOnly] = useState(false);
   const [trainers, setTrainers] = useState<CoachSearchResult[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [bookedPlayersByCoach, setBookedPlayersByCoach] = useState<Record<string, BookedPlayer[]>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -36,6 +44,27 @@ export default function TrainerListScreen({
       cancelled = true;
     };
   }, []);
+
+  // Un coach puede aceptar varios alumnos el mismo torneo — el padre necesita ver quiénes ya
+  // reservaron antes de elegir. Una llamada por coach visible (la lista es corta) en vez de una
+  // pantalla aparte, para no interrumpir el flujo de elegir entrenador.
+  useEffect(() => {
+    if (!trainers || trainers.length === 0) return;
+    let cancelled = false;
+    Promise.all(
+      trainers.map((t) =>
+        getCoachTournamentBookedPlayers(t.id, tournament.id)
+          .then((result) => [t.id, result.players] as const)
+          .catch(() => [t.id, []] as const),
+      ),
+    ).then((entries) => {
+      if (cancelled) return;
+      setBookedPlayersByCoach(Object.fromEntries(entries));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [trainers, tournament.id]);
 
   const visibleTrainers = trainers?.filter((t) => !minRatingOnly || Number(t.ratingAvg) >= MIN_RATING_THRESHOLD) ?? null;
 
@@ -80,7 +109,12 @@ export default function TrainerListScreen({
 
           <ScrollView contentContainerStyle={styles.list}>
             {visibleTrainers.map((trainer) => (
-              <TrainerCard key={trainer.id} trainer={trainer} onPress={() => onSelectTrainer?.(trainer)} />
+              <TrainerCard
+                key={trainer.id}
+                trainer={trainer}
+                bookedPlayers={bookedPlayersByCoach[trainer.id]}
+                onPress={() => onSelectTrainer?.(trainer)}
+              />
             ))}
 
             {visibleTrainers.length === 0 && (
@@ -97,7 +131,15 @@ export default function TrainerListScreen({
   );
 }
 
-function TrainerCard({ trainer, onPress }: { trainer: CoachSearchResult; onPress?: () => void }) {
+function TrainerCard({
+  trainer,
+  bookedPlayers,
+  onPress,
+}: {
+  trainer: CoachSearchResult;
+  bookedPlayers?: BookedPlayer[];
+  onPress?: () => void;
+}) {
   const metaParts = [trainer.city, trainer.specialty, `${trainer.yearsExperience} años`].filter(Boolean);
   return (
     <Pressable style={styles.card} onPress={onPress}>
@@ -110,6 +152,14 @@ function TrainerCard({ trainer, onPress }: { trainer: CoachSearchResult; onPress
           </Text>
         </View>
       </View>
+      {bookedPlayers && bookedPlayers.length > 0 && (
+        <View style={styles.bookedRow}>
+          <Text style={styles.bookedText}>
+            {bookedPlayers.length} alumno{bookedPlayers.length === 1 ? '' : 's'} ya reservado
+            {bookedPlayers.length === 1 ? '' : 's'}: {bookedPlayers.map((p) => p.playerName).join(', ')}
+          </Text>
+        </View>
+      )}
     </Pressable>
   );
 }
@@ -222,5 +272,16 @@ const styles = StyleSheet.create({
   trainerMeta: {
     color: colors.textDim,
     fontSize: 12,
+  },
+  bookedRow: {
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderSoft,
+  },
+  bookedText: {
+    color: colors.amber,
+    fontSize: 11,
+    lineHeight: 16,
   },
 });

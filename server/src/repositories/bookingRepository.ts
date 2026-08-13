@@ -99,7 +99,7 @@ export async function createBookingRequest(
     // err.constraint porque algunos drivers/motores no lo reportan igual.
     if (err.code === UNIQUE_VIOLATION) {
       throw new ConflictError(
-        'Ya existe una solicitud activa para este entrenador en ese horario',
+        'Ya existe una solicitud activa para este jugador con este entrenador en ese horario',
         'duplicate_booking',
       );
     }
@@ -216,6 +216,28 @@ export async function countActivePlayersForCoachTournament(
     [coachId, tournamentId],
   );
   return Number(rows[0].count);
+}
+
+/** TrainerListScreen: nombres (no solo el conteo) de los jugadores que ya reservaron con este
+ * coach en este torneo — un coach ahora puede aceptar varios alumnos el mismo día, así que el
+ * padre necesita ver quiénes antes de elegir. GROUP BY en vez de DISTINCT ON (no estándar,
+ * pg-mem de los smoke tests no lo soporta) evita duplicar un jugador con más de una reserva
+ * activa con el mismo coach en el torneo. */
+export async function listActivePlayersForCoachTournament(
+  coachId: string,
+  tournamentId: string,
+  db: Queryable = pool,
+): Promise<Array<{ playerId: string; playerName: string }>> {
+  const { rows } = await db.query(
+    `SELECT p.id AS player_id, p.full_name AS player_name
+     FROM bookings b
+     JOIN players p ON p.id = b.player_id
+     WHERE b.coach_id = $1 AND b.tournament_id = $2 AND b.status IN ('requested', 'accepted', 'paid')
+     GROUP BY p.id, p.full_name
+     ORDER BY p.full_name`,
+    [coachId, tournamentId],
+  );
+  return rows.map((row) => ({ playerId: row.player_id, playerName: row.player_name }));
 }
 
 /** BookingHistoryScreen tab badge: cuántas reservas del padre están "por confirmar" (transitorio,

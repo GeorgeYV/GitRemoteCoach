@@ -6,7 +6,7 @@ import TrainerAvatarPlaceholder from '../../components/shared/TrainerAvatarPlace
 import { useAuth } from '../../context/AuthContext';
 import { AlternativeCoach, ApiError, Booking, getBooking, getBookingAlternatives, TournamentSearchResult } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
-import { BOOKING_PERIOD_LABELS, BookingSlotSelection } from '../../mock/parentFlow';
+import { BookingSlotSelection } from '../../mock/parentFlow';
 
 const ALTERNATIVES_STATUSES: Booking['status'][] = ['rejected', 'expired'];
 
@@ -114,7 +114,7 @@ export default function BookingStatusScreen({
               </View>
             </View>
             <View style={styles.detailDivider} />
-            <DetailLine label="Día y horario" value={`${selection.dayLabel} · ${BOOKING_PERIOD_LABELS[selection.period]}`} />
+            <DetailLine label="Día" value={selection.dayLabel} />
             <DetailLine label="Sede" value={tournament.venue} />
             <DetailLine
               label={booking?.totalAmountPaid ? 'Total pagado' : 'Tarifa acordada'}

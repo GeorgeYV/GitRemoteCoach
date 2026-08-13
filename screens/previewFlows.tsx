@@ -25,7 +25,6 @@ import { isUpcoming, toCoachBooking } from '../lib/coachBookingDisplay';
 import { mockMatchConfig, mockRoundLabel } from '../mock/players';
 import {
   AvailabilityDay,
-  BOOKING_PERIOD_LABELS,
   BookingSlotSelection,
   mockCarlosMedinaProfile,
   REAL_COMPLETED_BOOKING_ID,
@@ -258,7 +257,7 @@ export function ParentBookingFlow({ initialTournamentId }: { initialTournamentId
   return (
     <BookingPaymentScreen
       bookingId={bookingId}
-      dateTimeLabel={`${selection.dayLabel} · ${BOOKING_PERIOD_LABELS[selection.period]}`}
+      dateTimeLabel={selection.dayLabel}
       venue={tournament.venue}
       note={note}
       trainerName={selectedTrainer.name}

@@ -23,35 +23,27 @@ export interface AvailabilityDay {
   /** Fecha ISO real del día (ver lib/dateSlots.ts#buildDaySlotsFromRange) — necesaria para
    * construir el matchDatetime real al reservar, ya no se busca por dayLabel en una tabla fija. */
   isoDate: string;
-  morningAvailable: boolean;
-  afternoonAvailable: boolean;
+  available: boolean;
 }
-
-export type BookingPeriod = 'morning' | 'afternoon';
-
-export const BOOKING_PERIOD_LABELS: Record<BookingPeriod, string> = {
-  morning: 'Mañana',
-  afternoon: 'Tarde',
-};
 
 export interface BookingSlotSelection {
   dayLabel: string;
   isoDate: string;
-  period: BookingPeriod;
 }
 
 /** UUID real de una reserva completada con Carlos — usada para probar reseñas y chat
  * (GET/POST /bookings/:id/messages, POST /bookings/:id/review) contra el backend real. */
 export const REAL_COMPLETED_BOOKING_ID = '44444444-4444-4444-8444-444444444444';
 
-const BOOKING_PERIOD_TO_TIME: Record<BookingPeriod, string> = {
-  morning: '10:00:00',
-  afternoon: '16:00:00',
-};
+/** Hora fija de la sesión — el coach ya no elige mañana/tarde, solo el día; la hora/punto de
+ * encuentro real se coordina por chat una vez aceptada la reserva (igual que ya pasa con el
+ * lugar exacto). Un valor fijo aquí es lo que le da sentido a matchDatetime como campo de
+ * unicidad de la reserva sin reintroducir una franja horaria que ya se decidió simplificar. */
+const DEFAULT_MATCH_TIME = '09:00:00';
 
-/** Traduce la selección de día/horario a un ISO datetime real para POST /bookings. */
+/** Traduce el día elegido a un ISO datetime real para POST /bookings. */
 export function buildMatchDatetime(selection: BookingSlotSelection): string {
-  return `${selection.isoDate}T${BOOKING_PERIOD_TO_TIME[selection.period]}.000Z`;
+  return `${selection.isoDate}T${DEFAULT_MATCH_TIME}.000Z`;
 }
 
 export interface PaymentMethod {
@@ -173,11 +165,11 @@ export const mockCarlosMedinaProfile: TrainerProfile = {
     { value: '4/6', label: 'Quiebres' },
   ],
   availability: [
-    { dayLabel: 'Vie 5', isoDate: '2026-08-05', morningAvailable: true, afternoonAvailable: false },
-    { dayLabel: 'Sáb 6', isoDate: '2026-08-06', morningAvailable: true, afternoonAvailable: true },
-    { dayLabel: 'Dom 7', isoDate: '2026-08-07', morningAvailable: false, afternoonAvailable: true },
-    { dayLabel: 'Lun 8', isoDate: '2026-08-08', morningAvailable: true, afternoonAvailable: true },
-    { dayLabel: 'Mar 9', isoDate: '2026-08-09', morningAvailable: true, afternoonAvailable: false },
+    { dayLabel: 'Vie 5', isoDate: '2026-08-05', available: true },
+    { dayLabel: 'Sáb 6', isoDate: '2026-08-06', available: true },
+    { dayLabel: 'Dom 7', isoDate: '2026-08-07', available: false },
+    { dayLabel: 'Lun 8', isoDate: '2026-08-08', available: true },
+    { dayLabel: 'Mar 9', isoDate: '2026-08-09', available: true },
   ],
   officialClub: 'Club Deportivo Bosques',
 };

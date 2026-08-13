@@ -281,8 +281,7 @@ export interface CoachTournamentAvailability {
   tournamentId: string;
   /** Fecha del día del torneo al que aplica esta disponibilidad (YYYY-MM-DD). */
   slotDate: string;
-  morning: boolean;
-  afternoon: boolean;
+  available: boolean;
   updatedAt: string;
 }
 

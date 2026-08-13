@@ -21,7 +21,7 @@ export async function getAvailabilityAndRate(coachId: string, tournamentId: stri
 export async function setAvailability(
   coachId: string,
   tournamentId: string,
-  days: Array<{ slotDate: string; morning: boolean; afternoon: boolean }>,
+  days: Array<{ slotDate: string; available: boolean }>,
 ): Promise<CoachTournamentAvailability[]> {
   return withTransaction(async (client) => {
     const saved: CoachTournamentAvailability[] = [];
@@ -45,4 +45,11 @@ export async function setRate(
  * este torneo en concreto. */
 export async function getBookedPlayersCount(coachId: string, tournamentId: string): Promise<number> {
   return bookingRepository.countActivePlayersForCoachTournament(coachId, tournamentId);
+}
+
+/** TrainerListScreen: ahora que un coach puede aceptar varios alumnos el mismo torneo/día, el
+ * padre necesita ver quiénes ya reservaron con cada entrenador antes de elegir uno — no solo el
+ * conteo agregado que ya usa TrainerProfileScreen. */
+export async function getBookedPlayers(coachId: string, tournamentId: string) {
+  return bookingRepository.listActivePlayersForCoachTournament(coachId, tournamentId);
 }

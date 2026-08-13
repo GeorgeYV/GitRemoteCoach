@@ -10,24 +10,23 @@ function mapAvailabilityRow(row: any): CoachTournamentAvailability {
     coachId: row.coach_id,
     tournamentId: row.tournament_id,
     slotDate: row.slot_date,
-    morning: row.morning,
-    afternoon: row.afternoon,
+    available: row.available,
     updatedAt: row.updated_at,
   };
 }
 
 /** Alta o actualización de la disponibilidad de un día puntual (CoachAvailabilityScreen). */
 export async function upsertAvailabilityDay(
-  params: { coachId: string; tournamentId: string; slotDate: string; morning: boolean; afternoon: boolean },
+  params: { coachId: string; tournamentId: string; slotDate: string; available: boolean },
   db: Queryable = pool,
 ): Promise<CoachTournamentAvailability> {
   const { rows } = await db.query(
-    `INSERT INTO coach_tournament_availability (coach_id, tournament_id, slot_date, morning, afternoon)
-     VALUES ($1, $2, $3, $4, $5)
+    `INSERT INTO coach_tournament_availability (coach_id, tournament_id, slot_date, available)
+     VALUES ($1, $2, $3, $4)
      ON CONFLICT (coach_id, tournament_id, slot_date)
-     DO UPDATE SET morning = $4, afternoon = $5, updated_at = now()
+     DO UPDATE SET available = $4, updated_at = now()
      RETURNING *`,
-    [params.coachId, params.tournamentId, params.slotDate, params.morning, params.afternoon],
+    [params.coachId, params.tournamentId, params.slotDate, params.available],
   );
   return mapAvailabilityRow(rows[0]);
 }

@@ -39,10 +39,10 @@ const VERIFICATION_LABELS: Record<VerificationStatus, string> = {
 
 /** slotDate llega como datetime ISO completo (pg serializa DATE como Date → JSON), no como
  * 'YYYY-MM-DD' — hay que recortarlo antes de matchear contra los días reales del torneo. */
-/** Un slot que el coach marcó disponible pero cuyo horario ya pasó no debe ofrecerse — si no, el
+/** Un día que el coach marcó disponible pero cuyo horario ya pasó no debe ofrecerse — si no, el
  * padre lo elige y el backend lo rechaza recién al enviar la solicitud (ver buildMatchDatetime). */
-function isSlotStillFuture(dayLabel: string, isoDate: string, period: 'morning' | 'afternoon'): boolean {
-  return new Date(buildMatchDatetime({ dayLabel, isoDate, period })).getTime() > Date.now();
+function isDayStillFuture(dayLabel: string, isoDate: string): boolean {
+  return new Date(buildMatchDatetime({ dayLabel, isoDate })).getTime() > Date.now();
 }
 
 function toAvailabilityDays(
@@ -55,8 +55,7 @@ function toAvailabilityDays(
     return {
       dayLabel,
       isoDate,
-      morningAvailable: (slot?.morning ?? false) && isSlotStillFuture(dayLabel, isoDate, 'morning'),
-      afternoonAvailable: (slot?.afternoon ?? false) && isSlotStillFuture(dayLabel, isoDate, 'afternoon'),
+      available: (slot?.available ?? false) && isDayStillFuture(dayLabel, isoDate),
     };
   });
 }
@@ -256,8 +255,7 @@ export default function TrainerProfileScreen({
             {availability.map((day) => (
               <View key={day.dayLabel} style={styles.availabilityColumn}>
                 <Text style={styles.availabilityDay}>{day.dayLabel}</Text>
-                <AvailabilitySlotPill label="Mañana" available={day.morningAvailable} />
-                <AvailabilitySlotPill label="Tarde" available={day.afternoonAvailable} />
+                <AvailabilitySlotPill label="Disponible" available={day.available} />
               </View>
             ))}
           </View>

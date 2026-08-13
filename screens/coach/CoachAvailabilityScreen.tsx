@@ -22,12 +22,11 @@ import { RATE_MODE_LABELS, RateMode } from '../../mock/coachFlow';
 interface DaySlot {
   dayLabel: string;
   isoDate: string;
-  morning: boolean;
-  afternoon: boolean;
+  available: boolean;
 }
 
 function buildDaySlotsFromRange(startDate: string, endDate: string): DaySlot[] {
-  return buildDateSlotsFromRange(startDate, endDate).map((slot) => ({ ...slot, morning: false, afternoon: false }));
+  return buildDateSlotsFromRange(startDate, endDate).map((slot) => ({ ...slot, available: false }));
 }
 
 const RATE_MODE_TO_API: Record<RateMode, ApiRateMode> = {
@@ -81,7 +80,7 @@ export default function CoachAvailabilityScreen({
         setDays((prev) =>
           prev.map((day) => {
             const savedDay = availability.find((a) => a.slotDate.slice(0, 10) === day.isoDate);
-            return savedDay ? { ...day, morning: savedDay.morning, afternoon: savedDay.afternoon } : day;
+            return savedDay ? { ...day, available: savedDay.available } : day;
           }),
         );
       }
@@ -95,9 +94,9 @@ export default function CoachAvailabilityScreen({
     };
   }, [user, tournament.id]);
 
-  function toggleSlot(dayIndex: number, period: 'morning' | 'afternoon') {
+  function toggleDay(dayIndex: number) {
     setSaved(false);
-    setDays((prev) => prev.map((d, i) => (i === dayIndex ? { ...d, [period]: !d[period] } : d)));
+    setDays((prev) => prev.map((d, i) => (i === dayIndex ? { ...d, available: !d.available } : d)));
   }
 
   function changeRateMode(mode: RateMode) {
@@ -122,7 +121,7 @@ export default function CoachAvailabilityScreen({
         token,
         user.id,
         tournament.id,
-        days.map((d) => ({ slotDate: d.isoDate, morning: d.morning, afternoon: d.afternoon })),
+        days.map((d) => ({ slotDate: d.isoDate, available: d.available })),
       );
       await setCoachTournamentRate(token, user.id, tournament.id, {
         rateMode: RATE_MODE_TO_API[rateMode],
@@ -136,7 +135,7 @@ export default function CoachAvailabilityScreen({
     }
   }
 
-  const selectedDaysCount = days.filter((d) => d.morning || d.afternoon).length;
+  const selectedDaysCount = days.filter((d) => d.available).length;
   const canSave = selectedDaysCount > 0 && rateAmount.trim().length > 0 && !submitting;
 
   return (
@@ -165,20 +164,19 @@ export default function CoachAvailabilityScreen({
       )}
 
       <ScrollView contentContainerStyle={styles.content}>
-        <Section label="Días y horarios disponibles">
+        <Section label="Días disponibles">
           <View style={styles.daysGrid}>
             {days.map((day, i) => (
               <View key={day.dayLabel} style={styles.dayColumn}>
                 <Text style={styles.dayLabel}>{day.dayLabel}</Text>
-                <TogglePill label="Mañana" active={day.morning} onPress={() => toggleSlot(i, 'morning')} />
-                <TogglePill label="Tarde" active={day.afternoon} onPress={() => toggleSlot(i, 'afternoon')} />
+                <TogglePill label="Disponible" active={day.available} onPress={() => toggleDay(i)} />
               </View>
             ))}
           </View>
           <Text style={styles.daysHint}>
             {selectedDaysCount > 0
               ? `Disponible ${selectedDaysCount} de ${days.length} días`
-              : 'Marca al menos un horario para que los padres puedan reservar contigo'}
+              : 'Marca al menos un día para que los padres puedan reservar contigo'}
           </Text>
         </Section>
 

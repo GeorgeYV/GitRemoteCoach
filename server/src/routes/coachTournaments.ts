@@ -9,8 +9,7 @@ const setAvailabilitySchema = z.object({
   days: z.array(
     z.object({
       slotDate: z.string().date(),
-      morning: z.boolean(),
-      afternoon: z.boolean(),
+      available: z.boolean(),
     }),
   ),
 });
@@ -37,6 +36,13 @@ export async function coachTournamentRoutes(app: FastifyInstance): Promise<void>
     const { coachId, tournamentId } = req.params as { coachId: string; tournamentId: string };
     const bookedPlayers = await coachTournamentService.getBookedPlayersCount(coachId, tournamentId);
     return { bookedPlayers };
+  });
+
+  // Lectura pública: TrainerListScreen la usa para mostrarle a un padre quiénes (no solo cuántos) ya reservaron.
+  app.get('/coaches/:coachId/tournaments/:tournamentId/booked-players', async (req) => {
+    const { coachId, tournamentId } = req.params as { coachId: string; tournamentId: string };
+    const players = await coachTournamentService.getBookedPlayers(coachId, tournamentId);
+    return { players };
   });
 
   app.put(
