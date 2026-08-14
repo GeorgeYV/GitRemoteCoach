@@ -10,9 +10,11 @@ import { colors, radius, withOpacity } from '../../lib/theme';
 export default function LoginScreen({
   onSuccess,
   onNavigateToRegister,
+  onNavigateToForgotPassword,
 }: {
   onSuccess?: () => void;
   onNavigateToRegister?: () => void;
+  onNavigateToForgotPassword?: () => void;
 }) {
   const { user, login, logout } = useAuth();
   const [email, setEmail] = useState('');
@@ -95,6 +97,12 @@ export default function LoginScreen({
             </View>
           )}
         </Pressable>
+
+        {onNavigateToForgotPassword && (
+          <Pressable style={styles.linkButton} onPress={onNavigateToForgotPassword}>
+            <Text style={styles.linkText}>¿Olvidaste tu contraseña?</Text>
+          </Pressable>
+        )}
 
         {onNavigateToRegister && (
           <Pressable style={styles.linkButton} onPress={onNavigateToRegister}>

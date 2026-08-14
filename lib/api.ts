@@ -72,6 +72,19 @@ export function getCurrentUser(token: string): Promise<PublicUser> {
   return request('/auth/me', { headers: { Authorization: `Bearer ${token}` } });
 }
 
+/** POST /auth/forgot-password — ForgotPasswordScreen paso 1. Siempre resuelve 200
+ * (enumeration-safe), aunque el correo no exista. */
+export function requestPasswordReset(email: string): Promise<{ message: string }> {
+  return request('/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) });
+}
+
+/** POST /auth/reset-password — ForgotPasswordScreen paso 2. */
+export function resetPassword(params: { email: string; code: string; newPassword: string }): Promise<{
+  message: string;
+}> {
+  return request('/auth/reset-password', { method: 'POST', body: JSON.stringify(params) });
+}
+
 /** POST /push-tokens — AuthContext, tras login/registro y al hidratar una sesión existente. */
 export function registerPushToken(authToken: string, expoPushToken: string): Promise<void> {
   return request('/push-tokens', {

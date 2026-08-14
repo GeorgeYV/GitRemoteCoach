@@ -11,6 +11,8 @@ export const env = {
   stripeSecretKey: required('STRIPE_SECRET_KEY'),
   stripeWebhookSecret: required('STRIPE_WEBHOOK_SECRET'),
   jwtSecret: required('JWT_SECRET'),
+  resendApiKey: required('RESEND_API_KEY'),
+  emailFromAddress: required('EMAIL_FROM_ADDRESS'),
   port: Number(process.env.PORT ?? 3000),
 };
 
@@ -31,4 +33,8 @@ export const businessRules = {
   /** Comisión de la plataforma, aplicada tanto en el flujo normal como
    *  sobre el monto no reembolsado de una cancelación tardía. */
   platformCommissionRate: 0.15,
+  /** Vigencia del código de "olvidé mi contraseña" antes de expirar. */
+  passwordResetCodeTtlMinutes: 15,
+  /** Intentos fallidos permitidos antes de invalidar el código. */
+  passwordResetMaxAttempts: 5,
 };

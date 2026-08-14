@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import * as authService from '../services/authService.js';
+import * as passwordResetService from '../services/passwordResetService.js';
 import { ValidationError } from '../lib/errors.js';
 
 const SELF_SERVICE_ROLES = ['parent', 'coach', 'club_admin'] as const;
@@ -15,6 +16,16 @@ const registerSchema = z.object({
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
+});
+
+const forgotPasswordSchema = z.object({
+  email: z.string().email(),
+});
+
+const resetPasswordSchema = z.object({
+  email: z.string().email(),
+  code: z.string().length(6),
+  newPassword: z.string().min(8),
 });
 
 export async function authRoutes(app: FastifyInstance): Promise<void> {
@@ -40,5 +51,23 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   app.get('/auth/me', { preHandler: app.authenticate }, async (req) => {
     const { sub } = req.user as { sub: string };
     return authService.getById(sub);
+  });
+
+  // Enumeration-safe: siempre 200 sin importar si el correo existe (el servicio decide en
+  // silencio si de verdad hay algo que enviar).
+  app.post('/auth/forgot-password', async (req) => {
+    const parsed = forgotPasswordSchema.safeParse(req.body);
+    if (!parsed.success) throw new ValidationError(parsed.error.message);
+
+    await passwordResetService.requestPasswordReset(parsed.data.email);
+    return { message: 'Si el correo existe, se envió un código' };
+  });
+
+  app.post('/auth/reset-password', async (req) => {
+    const parsed = resetPasswordSchema.safeParse(req.body);
+    if (!parsed.success) throw new ValidationError(parsed.error.message);
+
+    await passwordResetService.resetPassword(parsed.data);
+    return { message: 'Contraseña actualizada' };
   });
 }

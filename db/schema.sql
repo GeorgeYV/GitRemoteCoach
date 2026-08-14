@@ -90,6 +90,20 @@ CREATE TABLE users (
 
 CREATE INDEX idx_users_primary_role ON users (primary_role);
 
+-- Códigos de un solo uso para "olvidé mi contraseña" (ver decisión #31): un padre/entrenador
+-- puede tener varios códigos históricos, solo el más reciente sin usar/vencer es válido.
+CREATE TABLE password_reset_tokens (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id    UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  code_hash  TEXT NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  used_at    TIMESTAMPTZ,
+  attempts   INT NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_password_reset_tokens_user_id ON password_reset_tokens (user_id);
+
 -- ---------------------------------------------------------------------
 -- Entrenadores
 -- ---------------------------------------------------------------------
@@ -1450,4 +1464,15 @@ CREATE INDEX idx_push_tokens_user_id ON push_tokens (user_id);
 --     un reintento duplicaría la fila y corrompería cualquier suma sobre
 --     esta tabla. idx_payment_transactions_pending es la cola para el
 --     job de reconciliación de pagos asíncronos aún sin resolver.
+--
+-- 31. password_reset_tokens.code_hash usa sha256 (no scrypt/hashPassword):
+--     el código es entropía fresca generada por el servidor en cada
+--     solicitud, no un secreto elegido por el usuario, así que un hash
+--     rápido es suficiente y evita el costo de scrypt en cada intento de
+--     verificación. attempts + el límite de intentos en la aplicación
+--     (no en DB) compensan que el código es un espacio pequeño (6 dígitos)
+--     y que la API no tiene rate limiting general — igual límite MVP que
+--     el resto de este archivo (ver #5, #11). No hay UNIQUE en code_hash:
+--     un mismo usuario puede acumular varias filas (una por solicitud);
+--     solo la más reciente sin usar/vencer es válida (ver servicio).
 -- =====================================================================

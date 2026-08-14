@@ -42,3 +42,7 @@ export async function create(
   );
   return mapRow(rows[0]);
 }
+
+export async function updatePasswordHash(userId: string, passwordHash: string, db: Queryable = pool): Promise<void> {
+  await db.query(`UPDATE users SET password_hash = $2, updated_at = now() WHERE id = $1`, [userId, passwordHash]);
+}

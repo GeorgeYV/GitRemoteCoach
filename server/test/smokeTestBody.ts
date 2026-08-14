@@ -1,10 +1,12 @@
 import { createTestPool } from './setupDb.js';
 import { createFakeStripe } from './fakeStripe.js';
 import { createFakePushSender } from './fakePush.js';
+import { createFakeEmailSender } from './fakeEmail.js';
 import { seedFixtures } from './seed.js';
 import { setPoolForTesting } from '../src/lib/db.js';
 import { setStripeClientForTesting } from '../src/lib/stripe.js';
 import { setPushSenderForTesting } from '../src/lib/pushNotifications.js';
+import { setEmailSenderForTesting } from '../src/lib/emailClient.js';
 import { buildApp } from '../src/app.js';
 import { runExpireBookingsJob } from '../src/jobs/expireBookings.js';
 import { findTournamentsReadyForSettlement } from '../src/services/settlementService.js';
@@ -41,6 +43,9 @@ setStripeClientForTesting(fakeStripe);
 
 const { sender: fakePushSender, state: pushState } = createFakePushSender();
 setPushSenderForTesting(fakePushSender);
+
+const { sender: fakeEmailSender, state: emailState } = createFakeEmailSender();
+setEmailSenderForTesting(fakeEmailSender);
 
 const fixtures = await seedFixtures(testPool);
 const app = buildApp();
@@ -846,6 +851,59 @@ console.log('\n=== Escenario 13: auth (registro / login / sesión) ===');
 
   const meNoTokenRes = await app.inject({ method: 'GET', url: '/auth/me' });
   assertEqual(meNoTokenRes.statusCode, 401, 'GET /auth/me sin token devuelve 401');
+}
+
+console.log('\n=== Escenario 13b: recuperación de contraseña (forgot/reset) ===');
+{
+  const forgotEmail = 'nueva.mama@example.com'; // registrado en el Escenario 13
+  const forgotPassword = 'super-secreta-123';
+
+  const unknownRes = await app.inject({
+    method: 'POST',
+    url: '/auth/forgot-password',
+    payload: { email: 'no-existe@example.com' },
+  });
+  assertEqual(unknownRes.statusCode, 200, 'forgot-password con correo desconocido igual devuelve 200');
+  assertEqual(emailState.sent.length, 0, 'correo desconocido no dispara ningún envío');
+
+  const forgotRes = await app.inject({ method: 'POST', url: '/auth/forgot-password', payload: { email: forgotEmail } });
+  assertEqual(forgotRes.statusCode, 200, 'POST /auth/forgot-password devuelve 200');
+  assertEqual(emailState.sent.length, 1, 'correo registrado dispara exactamente un envío');
+  assertEqual(emailState.sent[0].to, forgotEmail, 'el correo se envía al destinatario correcto');
+
+  const codeMatch = emailState.sent[0].html.match(/\d{6}/);
+  assertTrue(codeMatch !== null, 'el cuerpo del correo trae un código de 6 dígitos');
+  const code = codeMatch![0];
+
+  const wrongCodeRes = await app.inject({
+    method: 'POST',
+    url: '/auth/reset-password',
+    payload: { email: forgotEmail, code: '000000', newPassword: 'otra-clave-nueva-1' },
+  });
+  assertEqual(wrongCodeRes.statusCode, 400, 'reset-password con código incorrecto devuelve 400');
+
+  const resetRes = await app.inject({
+    method: 'POST',
+    url: '/auth/reset-password',
+    payload: { email: forgotEmail, code, newPassword: 'otra-clave-nueva-1' },
+  });
+  assertEqual(resetRes.statusCode, 200, 'reset-password con código correcto devuelve 200');
+
+  const oldPasswordLoginRes = await app.inject({
+    method: 'POST',
+    url: '/auth/login',
+    payload: { email: forgotEmail, password: forgotPassword },
+  });
+  assertEqual(oldPasswordLoginRes.statusCode, 401, 'la contraseña anterior ya no funciona tras el reset');
+
+  const newPasswordLoginRes = await app.inject({
+    method: 'POST',
+    url: '/auth/login',
+    payload: { email: forgotEmail, password: 'otra-clave-nueva-1' },
+  });
+  assertEqual(newPasswordLoginRes.statusCode, 200, 'la contraseña nueva funciona tras el reset');
+
+  emailState.sent.length = 0;
 }
 
 console.log('\n=== Escenario 14: push notifications (nueva solicitud avisa al coach, accept/reject avisan al padre) ===');
