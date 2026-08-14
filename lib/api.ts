@@ -85,6 +85,41 @@ export function resetPassword(params: { email: string; code: string; newPassword
   return request('/auth/reset-password', { method: 'POST', body: JSON.stringify(params) });
 }
 
+export type GoogleSignInResult =
+  | { status: 'loggedIn'; user: PublicUser; token: string }
+  | { status: 'pendingRegistration'; pendingToken: string; email: string; name: string };
+
+/** POST /auth/google — LoginScreen, tras completar el intercambio OAuth con expo-auth-session.
+ * Discrimina la respuesta del backend (o ya hay sesión, o falta elegir rol para una cuenta nueva). */
+export async function signInWithGoogle(params: {
+  code: string;
+  redirectUri: string;
+  codeVerifier: string;
+}): Promise<GoogleSignInResult> {
+  const body = await request<{
+    user?: PublicUser;
+    token?: string;
+    pendingRegistration?: boolean;
+    pendingToken?: string;
+    email?: string;
+    name?: string;
+  }>('/auth/google', { method: 'POST', body: JSON.stringify(params) });
+
+  if (body.pendingRegistration) {
+    return { status: 'pendingRegistration', pendingToken: body.pendingToken!, email: body.email!, name: body.name! };
+  }
+  return { status: 'loggedIn', user: body.user!, token: body.token! };
+}
+
+/** POST /auth/google/complete-registration — LoginScreen, paso de "¿qué rol tienes?" tras una
+ * identidad de Google nueva. */
+export function completeGoogleRegistration(params: {
+  pendingToken: string;
+  primaryRole: Exclude<UserRole, 'platform_admin'>;
+}): Promise<AuthSession> {
+  return request('/auth/google/complete-registration', { method: 'POST', body: JSON.stringify(params) });
+}
+
 /** POST /push-tokens — AuthContext, tras login/registro y al hidratar una sesión existente. */
 export function registerPushToken(authToken: string, expoPushToken: string): Promise<void> {
   return request('/push-tokens', {

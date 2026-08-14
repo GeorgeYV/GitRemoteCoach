@@ -10,6 +10,7 @@ import { Stack, useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import * as Notifications from 'expo-notifications';
+import * as WebBrowser from 'expo-web-browser';
 import React, { useEffect } from 'react';
 import { ActivityIndicator, Platform, Text, TextInput, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -17,6 +18,10 @@ import { AuthProvider, useAuth } from '../context/AuthContext';
 import { colors } from '../lib/theme';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
+
+// Necesario para que el popup de "Continuar con Google" (LoginScreen, vía expo-auth-session) se
+// cierre solo y le devuelva el control a la pestaña que lo abrió, en el target web.
+WebBrowser.maybeCompleteAuthSession();
 
 // Tipografía del tema claro "Cancha dura" (ver diseno-a-cancha-dura.svg) — se fija como
 // default global en vez de tocar el fontFamily de cada Text/TextInput de la app.

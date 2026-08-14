@@ -1,11 +1,23 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import React, { useState } from 'react';
+import * as AuthSession from 'expo-auth-session';
+import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import BrandLogo from '../../components/shared/BrandLogo';
 import IconTextInput from '../../components/shared/IconTextInput';
 import { useAuth } from '../../context/AuthContext';
+import { UserRole } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
+
+const GOOGLE_DISCOVERY_ISSUER = 'https://accounts.google.com';
+
+/** Mismas opciones que RegisterScreen.tsx — solo se preguntan acá si "Continuar con Google"
+ * resulta ser una identidad nueva (ver AuthContext.googleSignIn). */
+const ROLE_OPTIONS: { value: Exclude<UserRole, 'platform_admin'>; label: string }[] = [
+  { value: 'parent', label: 'Soy padre/madre' },
+  { value: 'coach', label: 'Soy entrenador' },
+  { value: 'club_admin', label: 'Soy club/federación' },
+];
 
 export default function LoginScreen({
   onSuccess,
@@ -16,13 +28,72 @@ export default function LoginScreen({
   onNavigateToRegister?: () => void;
   onNavigateToForgotPassword?: () => void;
 }) {
-  const { user, login, logout } = useAuth();
+  const { user, login, logout, googleSignIn, completeGoogleRegistration } = useAuth();
+  const [step, setStep] = useState<'credentials' | 'google-complete-profile'>('credentials');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const canSubmit = email.trim().length > 0 && password.length > 0 && !submitting;
+  const [pendingGoogle, setPendingGoogle] = useState<{ pendingToken: string; email: string; name: string } | null>(
+    null,
+  );
+  const [pendingRole, setPendingRole] = useState<Exclude<UserRole, 'platform_admin'> | null>(null);
+
+  const discovery = AuthSession.useAutoDiscovery(GOOGLE_DISCOVERY_ISSUER);
+  const redirectUri = AuthSession.makeRedirectUri();
+  const [request, response, promptAsync] = AuthSession.useAuthRequest(
+    {
+      clientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID ?? '',
+      scopes: ['openid', 'email', 'profile'],
+      redirectUri,
+      responseType: AuthSession.ResponseType.Code,
+      usePKCE: true,
+    },
+    discovery,
+  );
+
+  useEffect(() => {
+    if (response?.type === 'success' && request?.codeVerifier) {
+      handleGoogleCode(response.params.code, request.codeVerifier);
+    } else if (response?.type === 'error') {
+      setError('No se pudo continuar con Google');
+    }
+    // response/request cambian juntos cuando promptAsync() resuelve — no hace falta más deps.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [response]);
+
+  async function handleGoogleCode(code: string, codeVerifier: string) {
+    setSubmitting(true);
+    setError(null);
+    try {
+      const result = await googleSignIn({ code, redirectUri, codeVerifier });
+      if (result.status === 'pendingRegistration') {
+        setPendingGoogle(result);
+        setStep('google-complete-profile');
+      } else {
+        onSuccess?.();
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo continuar con Google');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleCompleteGoogleRegistration() {
+    if (!pendingGoogle || !pendingRole) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      await completeGoogleRegistration({ pendingToken: pendingGoogle.pendingToken, primaryRole: pendingRole });
+      onSuccess?.();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo crear la cuenta');
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   async function handleSubmit() {
     setSubmitting(true);
@@ -37,6 +108,8 @@ export default function LoginScreen({
     }
   }
 
+  const canSubmit = email.trim().length > 0 && password.length > 0 && !submitting;
+
   if (user) {
     return (
       <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -50,6 +123,66 @@ export default function LoginScreen({
               <Ionicons name="log-out-outline" size={18} color={colors.courtBlueDeep} />
               <Text style={styles.submitLabel}>Cerrar sesión</Text>
             </View>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (step === 'google-complete-profile' && pendingGoogle) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+        <View style={styles.header}>
+          <BrandLogo />
+          <Text style={styles.headerTitle}>Un último paso</Text>
+          <Text style={styles.headerSubtitle}>
+            {pendingGoogle.name ? `${pendingGoogle.name}, ¿` : '¿'}cuál es tu rol en Remote Coach?
+          </Text>
+        </View>
+
+        <View style={styles.content}>
+          <View style={styles.roleRow}>
+            {ROLE_OPTIONS.map((opt) => {
+              const active = pendingRole === opt.value;
+              return (
+                <Pressable
+                  key={opt.value}
+                  onPress={() => setPendingRole(opt.value)}
+                  style={[styles.roleChip, active && styles.roleChipActive]}
+                >
+                  <Text style={[styles.roleChipLabel, active && styles.roleChipLabelActive]}>{opt.label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          {error && <Text style={styles.errorText}>{error}</Text>}
+
+          <Pressable
+            style={[styles.submitButton, (!pendingRole || submitting) && styles.submitButtonDisabled]}
+            disabled={!pendingRole || submitting}
+            onPress={handleCompleteGoogleRegistration}
+          >
+            {submitting ? (
+              <ActivityIndicator color={colors.courtBlueDeep} />
+            ) : (
+              <View style={styles.submitContent}>
+                <Ionicons name="checkmark-outline" size={18} color={colors.courtBlueDeep} />
+                <Text style={styles.submitLabel}>Continuar</Text>
+              </View>
+            )}
+          </Pressable>
+
+          <Pressable
+            style={styles.linkButton}
+            onPress={() => {
+              setStep('credentials');
+              setPendingGoogle(null);
+              setPendingRole(null);
+              setError(null);
+            }}
+          >
+            <Text style={styles.linkText}>Cancelar</Text>
           </Pressable>
         </View>
       </SafeAreaView>
@@ -96,6 +229,21 @@ export default function LoginScreen({
               <Text style={styles.submitLabel}>Entrar</Text>
             </View>
           )}
+        </Pressable>
+
+        <View style={styles.dividerRow}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerLabel}>O</Text>
+          <View style={styles.dividerLine} />
+        </View>
+
+        <Pressable
+          style={[styles.googleButton, (!request || submitting) && styles.googleButtonDisabled]}
+          disabled={!request || submitting}
+          onPress={() => promptAsync()}
+        >
+          <Ionicons name="logo-google" size={18} color={colors.lineWhite} />
+          <Text style={styles.googleButtonLabel}>Continuar con Google</Text>
         </Pressable>
 
         {onNavigateToForgotPassword && (
@@ -169,6 +317,65 @@ const styles = StyleSheet.create({
     color: colors.courtBlueDeep,
     fontSize: 15,
     fontWeight: '800',
+  },
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.borderSoft,
+  },
+  dividerLabel: {
+    color: colors.textDim,
+    fontSize: 11,
+    fontWeight: '700',
+    marginHorizontal: 10,
+  },
+  googleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderRadius: radius,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    backgroundColor: colors.panel,
+    paddingVertical: 14,
+    marginTop: 16,
+  },
+  googleButtonDisabled: {
+    opacity: 0.5,
+  },
+  googleButtonLabel: {
+    color: colors.lineWhite,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  roleRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 18,
+  },
+  roleChip: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+  },
+  roleChipActive: {
+    backgroundColor: colors.ballLime,
+  },
+  roleChipLabel: {
+    color: colors.textSoft,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  roleChipLabelActive: {
+    color: colors.courtBlueDeep,
   },
   linkButton: {
     marginTop: 16,

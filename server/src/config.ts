@@ -13,6 +13,8 @@ export const env = {
   jwtSecret: required('JWT_SECRET'),
   resendApiKey: required('RESEND_API_KEY'),
   emailFromAddress: required('EMAIL_FROM_ADDRESS'),
+  googleClientId: required('GOOGLE_CLIENT_ID'),
+  googleClientSecret: required('GOOGLE_CLIENT_SECRET'),
   port: Number(process.env.PORT ?? 3000),
 };
 

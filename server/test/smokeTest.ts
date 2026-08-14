@@ -9,6 +9,8 @@ process.env.STRIPE_WEBHOOK_SECRET = 'whsec_fake';
 process.env.JWT_SECRET = 'test-jwt-secret';
 process.env.RESEND_API_KEY = 're_test_fake';
 process.env.EMAIL_FROM_ADDRESS = 'test@example.com';
+process.env.GOOGLE_CLIENT_ID = 'google-client-id-fake';
+process.env.GOOGLE_CLIENT_SECRET = 'google-client-secret-fake';
 process.env.PORT = '0';
 
 await import('./smokeTestBody.js');

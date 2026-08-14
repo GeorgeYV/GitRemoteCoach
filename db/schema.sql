@@ -90,6 +90,23 @@ CREATE TABLE users (
 
 CREATE INDEX idx_users_primary_role ON users (primary_role);
 
+ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL;
+
+-- Identidades externas vinculadas a una cuenta (ver decisión #32) — una cuenta creada solo por
+-- Google tiene password_hash NULL en la tabla de arriba.
+CREATE TYPE oauth_provider AS ENUM ('google');
+
+CREATE TABLE oauth_identities (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id          UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  provider         oauth_provider NOT NULL,
+  provider_user_id TEXT NOT NULL,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (provider, provider_user_id)
+);
+
+CREATE INDEX idx_oauth_identities_user_id ON oauth_identities (user_id);
+
 -- Códigos de un solo uso para "olvidé mi contraseña" (ver decisión #31): un padre/entrenador
 -- puede tener varios códigos históricos, solo el más reciente sin usar/vencer es válido.
 CREATE TABLE password_reset_tokens (
@@ -1475,4 +1492,19 @@ CREATE INDEX idx_push_tokens_user_id ON push_tokens (user_id);
 --     el resto de este archivo (ver #5, #11). No hay UNIQUE en code_hash:
 --     un mismo usuario puede acumular varias filas (una por solicitud);
 --     solo la más reciente sin usar/vencer es válida (ver servicio).
+--
+-- 32. oauth_identities separa "con qué proveedor externo puede entrar este
+--     usuario" de la tabla users en vez de agregar columnas
+--     google_id/apple_id directamente ahí: un usuario podría vincular más
+--     de un proveedor a futuro (mismo espíritu que #9: no mezclar
+--     conceptos en una sola tabla), y agregar Apple más adelante es solo
+--     ALTER TYPE oauth_provider ADD VALUE 'apple' + una fila, sin tocar
+--     users. UNIQUE es (provider, provider_user_id) — el id que entrega el
+--     proveedor externo — no (provider, user_id), porque lo que hay que
+--     impedir es que dos cuentas de Google distintas terminen apuntando
+--     ambas al mismo usuario por error, no limitar cuántos proveedores
+--     tiene un usuario. users.password_hash pasa a ser NULL-able porque
+--     una cuenta creada solo por Google nunca tiene contraseña propia —
+--     login() debe descartar ese caso antes de intentar verificarla (ver
+--     authService.ts), no intentarlo y fallar.
 -- =====================================================================

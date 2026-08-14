@@ -6,7 +6,8 @@ import type { PublicUser, UserRole } from '../types.js';
 type Queryable = Pool | PoolClient;
 
 export interface UserRecord extends PublicUser {
-  passwordHash: string;
+  /** NULL en cuentas creadas solo por Google (ver decisión #32 en db/schema.sql). */
+  passwordHash: string | null;
 }
 
 function mapRow(row: any): UserRecord {
@@ -31,7 +32,7 @@ export async function findById(id: string, db: Queryable = pool): Promise<UserRe
 }
 
 export async function create(
-  params: { email: string; passwordHash: string; fullName: string; primaryRole: UserRole },
+  params: { email: string; passwordHash: string | null; fullName: string; primaryRole: UserRole },
   db: Queryable = pool,
 ): Promise<UserRecord> {
   const { rows } = await db.query(

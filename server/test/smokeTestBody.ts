@@ -2,11 +2,13 @@ import { createTestPool } from './setupDb.js';
 import { createFakeStripe } from './fakeStripe.js';
 import { createFakePushSender } from './fakePush.js';
 import { createFakeEmailSender } from './fakeEmail.js';
+import { createFakeGoogleAuthenticator } from './fakeGoogleAuth.js';
 import { seedFixtures } from './seed.js';
 import { setPoolForTesting } from '../src/lib/db.js';
 import { setStripeClientForTesting } from '../src/lib/stripe.js';
 import { setPushSenderForTesting } from '../src/lib/pushNotifications.js';
 import { setEmailSenderForTesting } from '../src/lib/emailClient.js';
+import { setGoogleAuthenticatorForTesting } from '../src/lib/googleAuth.js';
 import { buildApp } from '../src/app.js';
 import { runExpireBookingsJob } from '../src/jobs/expireBookings.js';
 import { findTournamentsReadyForSettlement } from '../src/services/settlementService.js';
@@ -46,6 +48,9 @@ setPushSenderForTesting(fakePushSender);
 
 const { sender: fakeEmailSender, state: emailState } = createFakeEmailSender();
 setEmailSenderForTesting(fakeEmailSender);
+
+const { authenticator: fakeGoogleAuthenticator, state: googleAuthState } = createFakeGoogleAuthenticator();
+setGoogleAuthenticatorForTesting(fakeGoogleAuthenticator);
 
 const fixtures = await seedFixtures(testPool);
 const app = buildApp();
@@ -1813,6 +1818,73 @@ console.log('\n=== Escenario 25: estadísticas agregadas de partidos de un coach
   assertEqual(summary.firstServePct, 100, 'todos los puntos del propio saque de player1 fueron primer saque adentro');
   assertEqual(summary.breaksConverted, 1, 'player1 quebró el saque de player2 en el juego 2');
   assertEqual(summary.returnGamesPlayed, 1, 'player1 solo devolvió el saque en el juego 2');
+}
+
+console.log('\n=== Escenario 26: Google sign-in (cuenta nueva, re-login, vinculación, correo sin verificar) ===');
+{
+  const newIdentity = {
+    googleId: 'google-sub-nueva-mama',
+    email: 'nueva.por.google@example.com',
+    emailVerified: true,
+    name: 'Nueva Por Google',
+  };
+  googleAuthState.identities.set('fake-code-nueva', newIdentity);
+
+  const firstRes = await app.inject({
+    method: 'POST',
+    url: '/auth/google',
+    payload: { code: 'fake-code-nueva', redirectUri: 'http://localhost:8081', codeVerifier: 'verifier' },
+  });
+  assertEqual(firstRes.statusCode, 200, 'POST /auth/google con identidad nueva devuelve 200');
+  const firstBody = firstRes.json();
+  assertEqual(firstBody.pendingRegistration, true, 'identidad nueva responde pendingRegistration: true');
+  assertEqual(firstBody.email, newIdentity.email, 'trae el correo de la cuenta de Google');
+
+  const completeRes = await app.inject({
+    method: 'POST',
+    url: '/auth/google/complete-registration',
+    payload: { pendingToken: firstBody.pendingToken, primaryRole: 'parent' },
+  });
+  assertEqual(completeRes.statusCode, 200, 'complete-registration con rol válido devuelve 200');
+  const completed = completeRes.json();
+  assertEqual(completed.user.email, newIdentity.email, 'la cuenta creada trae el correo de Google');
+  assertEqual(completed.user.primaryRole, 'parent', 'la cuenta se crea con el rol elegido');
+  assertTrue(typeof completed.token === 'string' && completed.token.length > 0, 'devuelve un token de sesión real');
+
+  const passwordLoginRes = await app.inject({
+    method: 'POST',
+    url: '/auth/login',
+    payload: { email: newIdentity.email, password: 'cualquier-cosa-123' },
+  });
+  assertEqual(
+    passwordLoginRes.statusCode,
+    401,
+    'una cuenta creada solo por Google no puede iniciar sesión con contraseña (no revienta con 500)',
+  );
+
+  const secondRes = await app.inject({
+    method: 'POST',
+    url: '/auth/google',
+    payload: { code: 'fake-code-nueva', redirectUri: 'http://localhost:8081', codeVerifier: 'verifier' },
+  });
+  assertEqual(secondRes.statusCode, 200, 'POST /auth/google de nuevo con la misma identidad devuelve 200');
+  const secondBody = secondRes.json();
+  assertEqual(secondBody.user?.id, completed.user.id, 'la segunda vez entra directo a la misma cuenta (sin duplicar)');
+
+  const unverifiedIdentity = {
+    googleId: 'google-sub-sin-verificar',
+    email: 'sin.verificar@example.com',
+    emailVerified: false,
+    name: 'Sin Verificar',
+  };
+  googleAuthState.identities.set('fake-code-sin-verificar', unverifiedIdentity);
+  const unverifiedRes = await app.inject({
+    method: 'POST',
+    url: '/auth/google',
+    payload: { code: 'fake-code-sin-verificar', redirectUri: 'http://localhost:8081', codeVerifier: 'verifier' },
+  });
+  assertEqual(unverifiedRes.statusCode, 400, 'identidad de Google con correo sin verificar devuelve 400');
+  assertEqual(unverifiedRes.json().error, 'google_email_unverified', 'código de error correcto');
 }
 
 console.log(`\n=== Resultado: ${passed} pasaron, ${failed} fallaron ===`);

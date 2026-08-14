@@ -2,11 +2,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import {
   ApiError,
+  completeGoogleRegistration as completeGoogleRegistrationRequest,
   getCurrentUser,
   loginUser,
   PublicUser,
   registerPushToken,
   registerUser,
+  signInWithGoogle,
   unregisterPushToken,
   UserRole,
 } from '../lib/api';
@@ -25,6 +27,15 @@ interface AuthContextValue {
     email: string;
     password: string;
     fullName: string;
+    primaryRole: Exclude<UserRole, 'platform_admin'>;
+  }) => Promise<void>;
+  googleSignIn: (params: {
+    code: string;
+    redirectUri: string;
+    codeVerifier: string;
+  }) => Promise<{ status: 'loggedIn' } | { status: 'pendingRegistration'; pendingToken: string; email: string; name: string }>;
+  completeGoogleRegistration: (params: {
+    pendingToken: string;
     primaryRole: Exclude<UserRole, 'platform_admin'>;
   }) => Promise<void>;
   logout: () => void;
@@ -98,6 +109,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setError(null);
       try {
         await persistSession(await registerUser(params));
+      } catch (err) {
+        setError(err instanceof ApiError ? err.message : 'No se pudo crear la cuenta');
+        throw err;
+      }
+    },
+    googleSignIn: async (params) => {
+      setError(null);
+      try {
+        const result = await signInWithGoogle(params);
+        if (result.status === 'loggedIn') {
+          await persistSession({ user: result.user, token: result.token });
+          return { status: 'loggedIn' };
+        }
+        return result;
+      } catch (err) {
+        setError(err instanceof ApiError ? err.message : 'No se pudo continuar con Google');
+        throw err;
+      }
+    },
+    completeGoogleRegistration: async (params) => {
+      setError(null);
+      try {
+        await persistSession(await completeGoogleRegistrationRequest(params));
       } catch (err) {
         setError(err instanceof ApiError ? err.message : 'No se pudo crear la cuenta');
         throw err;
