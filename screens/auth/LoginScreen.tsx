@@ -1,5 +1,4 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import * as AuthSession from 'expo-auth-session';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -7,9 +6,8 @@ import BrandLogo from '../../components/shared/BrandLogo';
 import IconTextInput from '../../components/shared/IconTextInput';
 import { useAuth } from '../../context/AuthContext';
 import { UserRole } from '../../lib/api';
+import { useGoogleAuthRequest } from '../../lib/googleAuthSession';
 import { colors, radius, withOpacity } from '../../lib/theme';
-
-const GOOGLE_DISCOVERY_ISSUER = 'https://accounts.google.com';
 
 /** Mismas opciones que RegisterScreen.tsx — solo se preguntan acá si "Continuar con Google"
  * resulta ser una identidad nueva (ver AuthContext.googleSignIn). */
@@ -40,34 +38,11 @@ export default function LoginScreen({
   );
   const [pendingRole, setPendingRole] = useState<Exclude<UserRole, 'platform_admin'> | null>(null);
 
-  const discovery = AuthSession.useAutoDiscovery(GOOGLE_DISCOVERY_ISSUER);
-  const redirectUri = AuthSession.makeRedirectUri();
-  const [request, response, promptAsync] = AuthSession.useAuthRequest(
-    {
-      clientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID ?? '',
-      scopes: ['openid', 'email', 'profile'],
-      redirectUri,
-      responseType: AuthSession.ResponseType.Code,
-      usePKCE: true,
-    },
-    discovery,
-  );
-
-  useEffect(() => {
-    if (response?.type === 'success' && request?.codeVerifier) {
-      handleGoogleCode(response.params.code, request.codeVerifier);
-    } else if (response?.type === 'error') {
-      setError('No se pudo continuar con Google');
-    }
-    // response/request cambian juntos cuando promptAsync() resuelve — no hace falta más deps.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [response]);
-
-  async function handleGoogleCode(code: string, codeVerifier: string) {
+  async function handleGoogleCode(params: { code: string; redirectUri: string; codeVerifier: string }) {
     setSubmitting(true);
     setError(null);
     try {
-      const result = await googleSignIn({ code, redirectUri, codeVerifier });
+      const result = await googleSignIn(params);
       if (result.status === 'pendingRegistration') {
         setPendingGoogle(result);
         setStep('google-complete-profile');
@@ -80,6 +55,12 @@ export default function LoginScreen({
       setSubmitting(false);
     }
   }
+
+  const { request, promptAsync, isError: googleAuthError } = useGoogleAuthRequest(handleGoogleCode);
+
+  useEffect(() => {
+    if (googleAuthError) setError('No se pudo continuar con Google');
+  }, [googleAuthError]);
 
   async function handleCompleteGoogleRegistration() {
     if (!pendingGoogle || !pendingRole) return;

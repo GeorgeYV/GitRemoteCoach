@@ -6,6 +6,7 @@ import BrandLogo from '../../components/shared/BrandLogo';
 import IconTextInput from '../../components/shared/IconTextInput';
 import { useAuth } from '../../context/AuthContext';
 import { UserRole } from '../../lib/api';
+import { useGoogleAuthRequest } from '../../lib/googleAuthSession';
 import { colors, radius, withOpacity } from '../../lib/theme';
 
 const ROLE_OPTIONS: { value: Exclude<UserRole, 'platform_admin'>; label: string }[] = [
@@ -21,7 +22,7 @@ export default function RegisterScreen({
   onSuccess?: () => void;
   onNavigateToLogin?: () => void;
 }) {
-  const { user, register, logout } = useAuth();
+  const { user, register, logout, googleSignIn, completeGoogleRegistration } = useAuth();
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -45,6 +46,28 @@ export default function RegisterScreen({
       setSubmitting(false);
     }
   }
+
+  // A diferencia de LoginScreen, acá el rol ya se eligió antes de tocar el botón — si Google
+  // resulta ser una identidad nueva, se completa el registro directo con ese rol, sin un paso
+  // extra de "¿cuál es tu rol?" (eso solo hace falta cuando no había ningún rol de antemano).
+  async function handleGoogleCode(params: { code: string; redirectUri: string; codeVerifier: string }) {
+    if (!primaryRole) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      const result = await googleSignIn(params);
+      if (result.status === 'pendingRegistration') {
+        await completeGoogleRegistration({ pendingToken: result.pendingToken, primaryRole });
+      }
+      onSuccess?.();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo continuar con Google');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const { request, promptAsync, isError: googleAuthError } = useGoogleAuthRequest(handleGoogleCode);
 
   if (user) {
     return (
@@ -106,7 +129,9 @@ export default function RegisterScreen({
           secureTextEntry
         />
 
-        {error && <Text style={styles.errorText}>{error}</Text>}
+        {(error || googleAuthError) && (
+          <Text style={styles.errorText}>{error ?? 'No se pudo continuar con Google'}</Text>
+        )}
 
         <Pressable
           style={[styles.submitButton, !canSubmit && styles.submitButtonDisabled]}
@@ -122,6 +147,22 @@ export default function RegisterScreen({
             </View>
           )}
         </Pressable>
+
+        <View style={styles.dividerRow}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerLabel}>O</Text>
+          <View style={styles.dividerLine} />
+        </View>
+
+        <Pressable
+          style={[styles.googleButton, (!request || !primaryRole || submitting) && styles.googleButtonDisabled]}
+          disabled={!request || !primaryRole || submitting}
+          onPress={() => promptAsync()}
+        >
+          <Ionicons name="logo-google" size={18} color={colors.lineWhite} />
+          <Text style={styles.googleButtonLabel}>Continuar con Google</Text>
+        </Pressable>
+        {!primaryRole && <Text style={styles.googleHint}>Elige tu rol arriba para continuar con Google</Text>}
 
         {onNavigateToLogin && (
           <Pressable style={styles.linkButton} onPress={onNavigateToLogin}>
@@ -221,5 +262,47 @@ const styles = StyleSheet.create({
     color: colors.textSoft,
     fontSize: 13,
     fontWeight: '600',
+  },
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.borderSoft,
+  },
+  dividerLabel: {
+    color: colors.textDim,
+    fontSize: 11,
+    fontWeight: '700',
+    marginHorizontal: 10,
+  },
+  googleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderRadius: radius,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    backgroundColor: colors.panel,
+    paddingVertical: 14,
+    marginTop: 16,
+  },
+  googleButtonDisabled: {
+    opacity: 0.5,
+  },
+  googleButtonLabel: {
+    color: colors.lineWhite,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  googleHint: {
+    color: colors.textDim,
+    fontSize: 11,
+    textAlign: 'center',
+    marginTop: 8,
   },
 });
