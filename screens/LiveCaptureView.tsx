@@ -6,19 +6,25 @@ import PointFlow from '../components/PointFlow';
 import LiveStatsBar from '../components/LiveStatsBar';
 import ScoreHeader from '../components/ScoreHeader';
 import { useMatch } from '../context/MatchContext';
-import { colors, withOpacity } from '../lib/theme';
+import { colors, radius, withOpacity } from '../lib/theme';
 import { PlayerId } from '../lib/types';
 
 export default function LiveCaptureView({ roundLabel }: { roundLabel: string }) {
   const {
     config,
     matchState,
+    match,
     addPoint,
     addAdjustment,
     undoLast,
     closeMatch,
     canUndo,
     undoBudget,
+    pauseMatch,
+    resumeMatch,
+    suspendMatch,
+    resumeSuspendedMatch,
+    retireMatch,
     syncError,
     retrySync,
   } = useMatch();
@@ -37,6 +43,49 @@ export default function LiveCaptureView({ roundLabel }: { roundLabel: string }) 
       isReturnError: false,
     });
     setMenuOpen(false);
+  }
+
+  const contingencyMenu = (
+    <ContingencyMenu
+      visible={menuOpen}
+      onClose={() => setMenuOpen(false)}
+      player1Name={config.player1Name}
+      player2Name={config.player2Name}
+      matchState={matchState}
+      match={match}
+      onPointNotSeen={handlePointNotSeen}
+      onManualAdjustment={addAdjustment}
+      onPause={pauseMatch}
+      onResume={resumeMatch}
+      onSuspend={suspendMatch}
+      onRetire={retireMatch}
+    />
+  );
+
+  if (match.status === 'suspended') {
+    return (
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+        <ScoreHeader
+          roundLabel={roundLabel}
+          canUndo={canUndo}
+          undoBudget={undoBudget}
+          onUndo={undoLast}
+          onOpenMenu={() => setMenuOpen(true)}
+        />
+
+        <View style={styles.suspendedArea}>
+          <Text style={styles.suspendedTitle}>Partido suspendido</Text>
+          <Text style={styles.suspendedText}>
+            El marcador quedó guardado en el mismo set, juego y saque. Reanudá cuando estén listos para seguir.
+          </Text>
+          <Pressable style={styles.resumeButton} onPress={resumeSuspendedMatch}>
+            <Text style={styles.resumeLabel}>Reanudar partido</Text>
+          </Pressable>
+        </View>
+
+        {contingencyMenu}
+      </SafeAreaView>
+    );
   }
 
   return (
@@ -68,15 +117,7 @@ export default function LiveCaptureView({ roundLabel }: { roundLabel: string }) 
 
       <LiveStatsBar />
 
-      <ContingencyMenu
-        visible={menuOpen}
-        onClose={() => setMenuOpen(false)}
-        player1Name={config.player1Name}
-        player2Name={config.player2Name}
-        matchState={matchState}
-        onPointNotSeen={handlePointNotSeen}
-        onManualAdjustment={addAdjustment}
-      />
+      {contingencyMenu}
     </SafeAreaView>
   );
 }
@@ -121,5 +162,34 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '800',
     textDecorationLine: 'underline',
+  },
+  suspendedArea: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  suspendedTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: colors.lineWhite,
+    marginBottom: 10,
+  },
+  suspendedText: {
+    fontSize: 13,
+    color: colors.textDim,
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  resumeButton: {
+    backgroundColor: colors.ballLime,
+    borderRadius: radius,
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+  },
+  resumeLabel: {
+    color: colors.courtBlueDeep,
+    fontSize: 15,
+    fontWeight: '800',
   },
 });

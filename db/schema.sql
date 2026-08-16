@@ -59,7 +59,7 @@ CREATE TYPE match_best_of AS ENUM ('1', '3');
 
 CREATE TYPE match_player_slot AS ENUM ('player1', 'player2');
 
-CREATE TYPE match_status AS ENUM ('in_progress', 'completed');
+CREATE TYPE match_status AS ENUM ('in_progress', 'completed', 'suspended');
 
 CREATE TYPE capture_mode AS ENUM ('rapida', 'detallada');
 
@@ -1080,6 +1080,16 @@ CREATE TABLE matches (
   coach_observations TEXT,
   started_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
   completed_at       TIMESTAMPTZ,
+  -- Contingencia "Pausa temporal / tiempo médico": paused_at no nulo mientras está pausado;
+  -- al reanudar, la duración de esa pausa se suma a total_paused_seconds y paused_at vuelve a
+  -- NULL. El cronómetro del cliente resta total_paused_seconds (+ la pausa en curso) de
+  -- now() - started_at.
+  paused_at             TIMESTAMPTZ,
+  total_paused_seconds  INTEGER NOT NULL DEFAULT 0,
+  -- Contingencia "Terminar por retiro": quién abandonó — el partido igual queda 'completed'
+  -- (con sus métricas hasta ese punto), esto solo distingue el motivo para la insignia roja
+  -- "Partido Finalizado por Retiro" en el dashboard del entrenador.
+  retired_by            match_player_slot,
 
   CONSTRAINT chk_matches_completed_at
     CHECK ((status = 'completed') = (completed_at IS NOT NULL))

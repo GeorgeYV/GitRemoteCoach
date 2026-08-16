@@ -7,13 +7,18 @@ import { useMatch } from '../context/MatchContext';
 import { colors, radius } from '../lib/theme';
 
 export default function MatchSummaryView() {
-  const { config, matchState, stats, reducerState, setObservations, resetMatch, reopenMatch } = useMatch();
+  const { config, matchState, match, stats, reducerState, setObservations, resetMatch, reopenMatch } = useMatch();
   const p1 = stats.player1;
 
   const setScoresLine = matchState.completedSets.map((s) => `${s.gamesPlayer1}-${s.gamesPlayer2}`).join(', ');
 
   let subtitle: string;
-  if (matchState.matchEnded && matchState.winner) {
+  if (match.retiredBy) {
+    const retiredName = match.retiredBy === 'player1' ? config.player1Name : config.player2Name;
+    subtitle = setScoresLine
+      ? `Retiro de ${retiredName} · ${setScoresLine}`
+      : `Retiro de ${retiredName}`;
+  } else if (matchState.matchEnded && matchState.winner) {
     const winnerName = matchState.winner === 'player1' ? config.player1Name : config.player2Name;
     const loserName = matchState.winner === 'player1' ? config.player2Name : config.player1Name;
     subtitle = setScoresLine ? `${winnerName} venció a ${loserName} · ${setScoresLine}` : `${winnerName} venció a ${loserName}`;
@@ -27,6 +32,7 @@ export default function MatchSummaryView() {
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.title}>Partido finalizado</Text>
+        {match.retiredBy && <Text style={styles.retiredBadge}>PARTIDO FINALIZADO POR RETIRO</Text>}
         <Text style={styles.subtitle}>{subtitle}</Text>
 
         <View style={styles.summaryGrid}>
@@ -103,6 +109,19 @@ const styles = StyleSheet.create({
     color: colors.textDim,
     fontSize: 13,
     marginBottom: 20,
+  },
+  retiredBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: colors.errorCoral,
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    marginTop: 6,
+    marginBottom: 6,
   },
   summaryGrid: {
     flexDirection: 'row',

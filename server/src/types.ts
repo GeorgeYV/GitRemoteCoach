@@ -321,7 +321,7 @@ export interface ReviewWithParent extends Review {
 /** El enum de DB usa strings ('1'/'3'), no números — ver CREATE TYPE match_best_of en db/schema.sql. */
 export type MatchBestOf = '1' | '3';
 export type MatchPlayerSlot = 'player1' | 'player2';
-export type MatchStatus = 'in_progress' | 'completed';
+export type MatchStatus = 'in_progress' | 'completed' | 'suspended';
 export type CaptureMode = 'rapida' | 'detallada';
 export type PointDetail =
   | 'winner_derecha'
@@ -352,6 +352,9 @@ export interface Match {
   coachObservations: string | null;
   startedAt: string;
   completedAt: string | null;
+  pausedAt: string | null;
+  totalPausedSeconds: number;
+  retiredBy: MatchPlayerSlot | null;
 }
 
 export interface MatchPointEvent {

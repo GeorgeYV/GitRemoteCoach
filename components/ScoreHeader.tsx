@@ -1,9 +1,44 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Match } from '../lib/api';
 import { useMatch } from '../context/MatchContext';
 import { getCurrentServer, getGamePointLabels } from '../lib/scoringEngine';
 import { colors } from '../lib/theme';
 import { PlayerId } from '../lib/types';
+
+function elapsedSeconds(match: Match): number {
+  const startedMs = new Date(match.startedAt).getTime();
+  const nowMs = match.pausedAt ? new Date(match.pausedAt).getTime() : Date.now();
+  return Math.max(0, Math.floor((nowMs - startedMs) / 1000) - match.totalPausedSeconds);
+}
+
+function formatElapsed(totalSeconds: number): string {
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  const mm = String(m).padStart(2, '0');
+  const ss = String(s).padStart(2, '0');
+  return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
+}
+
+/** Ticks once a second while the match is running; frozen (no interval) while paused/suspended. */
+function MatchTimerLabel({ match }: { match: Match }) {
+  const [, setTick] = useState(0);
+
+  useEffect(() => {
+    if (match.pausedAt) return;
+    const interval = setInterval(() => setTick((n) => n + 1), 1000);
+    return () => clearInterval(interval);
+  }, [match.pausedAt]);
+
+  const statusLabel = match.status === 'suspended' ? 'Suspendido' : match.pausedAt ? 'Pausado' : 'Capturando';
+
+  return (
+    <Text style={styles.timerLabel} numberOfLines={1}>
+      {formatElapsed(elapsedSeconds(match))} · {statusLabel}
+    </Text>
+  );
+}
 
 function currentSetGames(games: { winner: PlayerId }[], player: PlayerId): number {
   return games.filter((g) => g.winner === player).length;
@@ -47,15 +82,18 @@ export default function ScoreHeader({
   onUndo: () => void;
   onOpenMenu: () => void;
 }) {
-  const { config, matchState } = useMatch();
+  const { config, matchState, match } = useMatch();
   const currentServer = matchState.matchEnded ? null : getCurrentServer(matchState);
 
   return (
     <View style={styles.header}>
       <View style={styles.headerTop}>
-        <Text style={styles.matchTag} numberOfLines={1}>
-          {matchState.matchEnded ? 'PARTIDO FINALIZADO' : roundLabel}
-        </Text>
+        <View style={styles.headerTitleColumn}>
+          <Text style={styles.matchTag} numberOfLines={1}>
+            {matchState.matchEnded ? 'PARTIDO FINALIZADO' : roundLabel}
+          </Text>
+          {!matchState.matchEnded && <MatchTimerLabel match={match} />}
+        </View>
         <View style={styles.headerActions}>
           <Pressable disabled={!canUndo} onPress={onUndo} style={[styles.undoBtn, !canUndo && styles.undoBtnDisabled]}>
             <Text style={styles.undoLabel}>↺ Deshacer {undoBudget}/3</Text>
@@ -109,14 +147,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 14,
   },
+  headerTitleColumn: {
+    flexShrink: 1,
+    marginRight: 10,
+  },
   matchTag: {
     fontSize: 11,
     letterSpacing: 1.4,
     textTransform: 'uppercase',
     color: colors.courtBlue,
     fontWeight: '700',
-    flexShrink: 1,
-    marginRight: 10,
+  },
+  timerLabel: {
+    fontSize: 11,
+    color: colors.textDim,
+    marginTop: 2,
+    fontVariant: ['tabular-nums'],
   },
   headerActions: {
     flexDirection: 'row',

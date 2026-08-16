@@ -62,6 +62,10 @@ const captureModeSchema = z.object({
   captureMode: z.enum(CAPTURE_MODE),
 });
 
+const retireSchema = z.object({
+  retiredBy: z.enum(PLAYER_SLOT),
+});
+
 const adjustmentSchema = z.object({
   sequenceNumber: z.number().int().positive(),
   gamesPlayer1: z.number().int().min(0),
@@ -143,6 +147,48 @@ export async function matchRoutes(app: FastifyInstance): Promise<void> {
     await assertOwnsMatch(id, sub);
     const adjustment = await matchService.addAdjustment(id, parsed.data);
     reply.code(201).send(adjustment);
+  });
+
+  // LiveCaptureView: Contingencias → Pausa temporal / tiempo médico.
+  app.post('/matches/:id/pause', { preHandler: app.authenticate }, async (req) => {
+    const { id } = req.params as { id: string };
+    const { sub } = req.user as { sub: string };
+    await assertOwnsMatch(id, sub);
+    return matchService.pauseMatch(id);
+  });
+
+  app.post('/matches/:id/resume', { preHandler: app.authenticate }, async (req) => {
+    const { id } = req.params as { id: string };
+    const { sub } = req.user as { sub: string };
+    await assertOwnsMatch(id, sub);
+    return matchService.resumeMatch(id);
+  });
+
+  // LiveCaptureView: Contingencias → Suspender partido.
+  app.post('/matches/:id/suspend', { preHandler: app.authenticate }, async (req) => {
+    const { id } = req.params as { id: string };
+    const { sub } = req.user as { sub: string };
+    await assertOwnsMatch(id, sub);
+    return matchService.suspendMatch(id);
+  });
+
+  // Banner del dashboard del coach: "Reanudar" un partido suspendido.
+  app.post('/matches/:id/resume-suspension', { preHandler: app.authenticate }, async (req) => {
+    const { id } = req.params as { id: string };
+    const { sub } = req.user as { sub: string };
+    await assertOwnsMatch(id, sub);
+    return matchService.resumeSuspendedMatch(id);
+  });
+
+  // LiveCaptureView: Contingencias → Terminar por retiro.
+  app.post('/matches/:id/retire', { preHandler: app.authenticate }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const parsed = retireSchema.safeParse(req.body);
+    if (!parsed.success) throw new ValidationError(parsed.error.message);
+    const { sub } = req.user as { sub: string };
+    await assertOwnsMatch(id, sub);
+    const match = await matchService.retireMatch(id, parsed.data.retiredBy);
+    reply.code(200).send(match);
   });
 
   // MatchSummaryView: "Nuevo partido" — reinicia el mismo partido (booking_id es UNIQUE, no crea uno nuevo).

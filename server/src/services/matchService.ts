@@ -71,12 +71,36 @@ export async function restartMatch(matchId: string): Promise<Match> {
   return withTransaction(async (client) => {
     await matchPointEventRepository.deleteAllForMatch(matchId, client);
     await matchScoreAdjustmentRepository.deleteAllForMatch(matchId, client);
-    return matchRepository.updateStatus(matchId, 'in_progress', client);
+    return matchRepository.resetForRestart(matchId, client);
   });
 }
 
 export async function setStatus(matchId: string, status: MatchStatus): Promise<Match> {
   return matchRepository.updateStatus(matchId, status);
+}
+
+export async function pauseMatch(matchId: string): Promise<Match> {
+  return matchRepository.pause(matchId);
+}
+
+export async function resumeMatch(matchId: string): Promise<Match> {
+  return matchRepository.resume(matchId);
+}
+
+export async function suspendMatch(matchId: string): Promise<Match> {
+  return matchRepository.suspend(matchId);
+}
+
+export async function resumeSuspendedMatch(matchId: string): Promise<Match> {
+  return matchRepository.resumeFromSuspension(matchId);
+}
+
+export async function retireMatch(matchId: string, retiredBy: MatchPlayerSlot): Promise<Match> {
+  return matchRepository.retire(matchId, retiredBy);
+}
+
+export async function getSuspendedMatchForCoach(coachId: string) {
+  return matchRepository.findSuspendedByCoach(coachId);
 }
 
 export async function setObservations(matchId: string, coachObservations: string): Promise<Match> {

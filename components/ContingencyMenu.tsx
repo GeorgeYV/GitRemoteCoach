@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Match } from '../lib/api';
 import { NewAdjustmentInput } from '../lib/matchReducer';
 import { getCurrentServer, MatchState } from '../lib/scoringEngine';
 import { colors, radius } from '../lib/theme';
 import { PlayerId } from '../lib/types';
 
-type SubView = 'menu' | 'pointNotSeen' | 'manualAdjustment';
+type SubView = 'menu' | 'pointNotSeen' | 'manualAdjustment' | 'suspendConfirm' | 'retire';
 
 const GAME_POINT_LABELS = ['0', '15', '30', '40'];
 
@@ -19,16 +20,26 @@ export default function ContingencyMenu({
   player1Name,
   player2Name,
   matchState,
+  match,
   onPointNotSeen,
   onManualAdjustment,
+  onPause,
+  onResume,
+  onSuspend,
+  onRetire,
 }: {
   visible: boolean;
   onClose: () => void;
   player1Name: string;
   player2Name: string;
   matchState: MatchState;
+  match: Match;
   onPointNotSeen: (winner: PlayerId) => void;
   onManualAdjustment: (input: NewAdjustmentInput) => void;
+  onPause: () => void;
+  onResume: () => void;
+  onSuspend: () => void;
+  onRetire: (retiredBy: PlayerId) => void;
 }) {
   const [subView, setSubView] = useState<SubView>('menu');
   const [gamesP1, setGamesP1] = useState(0);
@@ -47,10 +58,6 @@ export default function ContingencyMenu({
     setServer(getCurrentServer(matchState));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
-
-  function placeholder(label: string) {
-    Alert.alert(label, 'Próximamente.');
-  }
 
   function applyAdjustment() {
     onManualAdjustment({
@@ -80,14 +87,19 @@ export default function ContingencyMenu({
               <MenuRow label="Punto no visto" hint="SIN DATOS ANALÍT." onPress={() => setSubView('pointNotSeen')} />
               <MenuRow label="Ajuste manual del marcador" onPress={() => setSubView('manualAdjustment')} />
               <MenuRow
-                label="Pausar / suspender"
+                label={match.pausedAt ? 'Reanudar' : 'Pausa temporal'}
                 hint="LLUVIA · MÉDICO · LUZ"
-                onPress={() => placeholder('Pausar / suspender')}
+                onPress={() => {
+                  if (match.pausedAt) onResume();
+                  else onPause();
+                  onClose();
+                }}
               />
+              <MenuRow label="Suspender partido" onPress={() => setSubView('suspendConfirm')} />
               <MenuRow
                 label="Terminar por retiro"
                 hint="LESIÓN · DESCALIF."
-                onPress={() => placeholder('Terminar por retiro')}
+                onPress={() => setSubView('retire')}
               />
             </>
           )}
@@ -140,6 +152,59 @@ export default function ContingencyMenu({
                 <Text style={styles.applyLabel}>Aplicar ajuste</Text>
               </Pressable>
             </ScrollView>
+          )}
+
+          {subView === 'suspendConfirm' && (
+            <>
+              <View style={styles.titleRow}>
+                <Text style={styles.title}>Suspender partido</Text>
+                <Pressable onPress={() => setSubView('menu')} hitSlop={8}>
+                  <Text style={styles.closeLabel}>Atrás</Text>
+                </Pressable>
+              </View>
+              <Text style={styles.subtitle}>
+                El marcador queda guardado. Al reabrir la app vas a poder retomar en el mismo set, juego y saque.
+              </Text>
+
+              <Pressable
+                style={styles.applyButton}
+                onPress={() => {
+                  onSuspend();
+                  onClose();
+                }}
+              >
+                <Text style={styles.applyLabel}>Suspender ahora</Text>
+              </Pressable>
+            </>
+          )}
+
+          {subView === 'retire' && (
+            <>
+              <View style={styles.titleRow}>
+                <Text style={styles.title}>¿Quién abandona?</Text>
+                <Pressable onPress={() => setSubView('menu')} hitSlop={8}>
+                  <Text style={styles.closeLabel}>Atrás</Text>
+                </Pressable>
+              </View>
+              <Text style={styles.subtitle}>
+                El partido se cierra con las métricas hasta este punto y queda marcado como retiro.
+              </Text>
+
+              <MenuRow
+                label={player1Name}
+                onPress={() => {
+                  onRetire('player1');
+                  onClose();
+                }}
+              />
+              <MenuRow
+                label={player2Name}
+                onPress={() => {
+                  onRetire('player2');
+                  onClose();
+                }}
+              />
+            </>
           )}
         </Pressable>
       </Pressable>

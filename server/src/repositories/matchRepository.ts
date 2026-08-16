@@ -19,6 +19,9 @@ function mapRow(row: any): Match {
     coachObservations: row.coach_observations,
     startedAt: row.started_at,
     completedAt: row.completed_at,
+    pausedAt: row.paused_at,
+    totalPausedSeconds: row.total_paused_seconds,
+    retiredBy: row.retired_by,
   };
 }
 
@@ -86,6 +89,28 @@ export async function listCompletedByCoach(coachId: string, db: Queryable = pool
   return rows.map(mapRow);
 }
 
+export interface SuspendedMatchSummary {
+  matchId: string;
+  bookingId: string;
+  playerName: string;
+}
+
+/** CoachHomeScreen: banner prioritario "Partido suspendido" — a lo sumo uno por coach en la
+ * práctica (retomar antes de suspender otro), por eso LIMIT 1 sin ordenar por nada especial. */
+export async function findSuspendedByCoach(coachId: string, db: Queryable = pool): Promise<SuspendedMatchSummary | null> {
+  const { rows } = await db.query(
+    `SELECT m.id AS match_id, m.booking_id, p.full_name AS player_name
+       FROM matches m
+       JOIN bookings b ON b.id = m.booking_id
+       JOIN players p ON p.id = m.player1_id
+      WHERE b.coach_id = $1 AND m.status = 'suspended'
+      LIMIT 1`,
+    [coachId],
+  );
+  if (rows.length === 0) return null;
+  return { matchId: rows[0].match_id, bookingId: rows[0].booking_id, playerName: rows[0].player_name };
+}
+
 /** Fija completed_at explícitamente (no depende del trigger, que pg-mem no ejecuta) —
  * mismo patrón que paymentService.completeBooking con bookings.completed_at. */
 export async function updateStatus(id: string, status: MatchStatus, db: Queryable = pool): Promise<Match> {
@@ -93,6 +118,22 @@ export async function updateStatus(id: string, status: MatchStatus, db: Queryabl
   const { rows } = await db.query(
     `UPDATE matches SET status = $2, completed_at = $3 WHERE id = $1 RETURNING *`,
     [id, status, completedAt],
+  );
+  if (rows.length === 0) throw new NotFoundError('Match', id);
+  return mapRow(rows[0]);
+}
+
+/** "Nuevo partido" (matchService.restartMatch): a diferencia de updateStatus, también limpia
+ * paused_at/total_paused_seconds/retired_by — de lo contrario un retiro o una pausa viejos
+ * seguirían apareciendo en lo que el entrenador ve como un partido nuevo. */
+export async function resetForRestart(id: string, db: Queryable = pool): Promise<Match> {
+  const { rows } = await db.query(
+    `UPDATE matches
+       SET status = 'in_progress', completed_at = NULL,
+           paused_at = NULL, total_paused_seconds = 0, retired_by = NULL
+     WHERE id = $1
+     RETURNING *`,
+    [id],
   );
   if (rows.length === 0) throw new NotFoundError('Match', id);
   return mapRow(rows[0]);
@@ -111,6 +152,73 @@ export async function updateCaptureMode(id: string, captureMode: CaptureMode, db
   const { rows } = await db.query(
     `UPDATE matches SET capture_mode = $2 WHERE id = $1 RETURNING *`,
     [id, captureMode],
+  );
+  if (rows.length === 0) throw new NotFoundError('Match', id);
+  return mapRow(rows[0]);
+}
+
+/** Contingencia "Pausa temporal / tiempo médico" — no-op si ya estaba pausado (WHERE paused_at
+ * IS NULL), así que reintentar la llamada de red no pisa un paused_at más viejo. */
+export async function pause(id: string, db: Queryable = pool): Promise<Match> {
+  const { rows } = await db.query(
+    `UPDATE matches SET paused_at = now() WHERE id = $1 AND paused_at IS NULL RETURNING *`,
+    [id],
+  );
+  if (rows.length > 0) return mapRow(rows[0]);
+  return getById(id, db);
+}
+
+/** Suma la duración de la pausa en curso a total_paused_seconds y limpia paused_at — todo en la
+ * misma expresión SQL para que sea atómico. No-op si no estaba pausado. */
+export async function resume(id: string, db: Queryable = pool): Promise<Match> {
+  const { rows } = await db.query(
+    `UPDATE matches
+       SET total_paused_seconds = total_paused_seconds + GREATEST(0, EXTRACT(EPOCH FROM (now() - paused_at))::int),
+           paused_at = NULL
+     WHERE id = $1 AND paused_at IS NOT NULL
+     RETURNING *`,
+    [id],
+  );
+  if (rows.length > 0) return mapRow(rows[0]);
+  return getById(id, db);
+}
+
+/** Contingencia "Suspender partido" — también pausa el cronómetro si no lo estaba ya (suspender
+ * implica que el partido dejó de correr). */
+export async function suspend(id: string, db: Queryable = pool): Promise<Match> {
+  const { rows } = await db.query(
+    `UPDATE matches
+       SET status = 'suspended', completed_at = NULL, paused_at = COALESCE(paused_at, now())
+     WHERE id = $1
+     RETURNING *`,
+    [id],
+  );
+  if (rows.length === 0) throw new NotFoundError('Match', id);
+  return mapRow(rows[0]);
+}
+
+/** Reabrir desde 'suspended' — vuelve a 'in_progress' y reanuda el cronómetro (misma cuenta que
+ * `resume`), ya que suspender lo había pausado. */
+export async function resumeFromSuspension(id: string, db: Queryable = pool): Promise<Match> {
+  const { rows } = await db.query(
+    `UPDATE matches
+       SET status = 'in_progress',
+           total_paused_seconds = total_paused_seconds + GREATEST(0, EXTRACT(EPOCH FROM (now() - paused_at))::int),
+           paused_at = NULL
+     WHERE id = $1
+     RETURNING *`,
+    [id],
+  );
+  if (rows.length === 0) throw new NotFoundError('Match', id);
+  return mapRow(rows[0]);
+}
+
+/** Contingencia "Terminar por retiro" — el partido queda 'completed' igual (con sus métricas
+ * hasta ese punto), retired_by solo marca el motivo para la insignia del dashboard. */
+export async function retire(id: string, retiredBy: MatchPlayerSlot, db: Queryable = pool): Promise<Match> {
+  const { rows } = await db.query(
+    `UPDATE matches SET status = 'completed', completed_at = now(), retired_by = $2 WHERE id = $1 RETURNING *`,
+    [id, retiredBy],
   );
   if (rows.length === 0) throw new NotFoundError('Match', id);
   return mapRow(rows[0]);

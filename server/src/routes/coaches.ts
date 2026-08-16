@@ -68,6 +68,15 @@ export async function coachRoutes(app: FastifyInstance): Promise<void> {
     return matchService.getCoachReportSummary(id);
   });
 
+  // CoachHomeScreen: banner prioritario de un partido suspendido pendiente de retomar —
+  // privado, a diferencia de report-summary (revela con qué jugador quedó a mitad de captura).
+  app.get('/coaches/:id/suspended-match', { preHandler: app.authenticate }, async (req) => {
+    const { id } = req.params as { id: string };
+    const { sub } = req.user as { sub: string };
+    if (sub !== id) throw new ForbiddenError('Solo el propio entrenador puede ver esto');
+    return matchService.getSuspendedMatchForCoach(id);
+  });
+
   // CoachAvailabilityScreen, CoachTournamentSearchScreen, CoachReputationScreen: insignias de
   // "entrenador oficial" — público, igual que /coaches/:id/reviews.
   app.get('/coaches/:id/club-tags', async (req) => {

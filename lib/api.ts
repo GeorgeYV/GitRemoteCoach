@@ -461,6 +461,21 @@ export function getCoachReportSummary(coachId: string): Promise<CoachReportSumma
   return request(`/coaches/${coachId}/report-summary`);
 }
 
+export interface SuspendedMatchSummary {
+  matchId: string;
+  bookingId: string;
+  playerName: string;
+}
+
+/** GET /coaches/:id/suspended-match — CoachHomeScreen: banner prioritario de un partido
+ * suspendido pendiente de retomar. Privado (solo el propio entrenador), a diferencia de
+ * report-summary. null si no hay ninguno suspendido. */
+export function getSuspendedMatch(authToken: string, coachId: string): Promise<SuspendedMatchSummary | null> {
+  return request(`/coaches/${coachId}/suspended-match`, {
+    headers: { Authorization: `Bearer ${authToken}` },
+  });
+}
+
 /** Espeja server/src/types.ts#CoachSearchResult. */
 export interface CoachSearchResult {
   id: string;
@@ -875,7 +890,7 @@ export function settleTournament(
 
 export type MatchBestOf = '1' | '3';
 export type MatchPlayerSlot = 'player1' | 'player2';
-export type MatchStatus = 'in_progress' | 'completed';
+export type MatchStatus = 'in_progress' | 'completed' | 'suspended';
 export type CaptureMode = 'rapida' | 'detallada';
 export type PointDetail =
   | 'winner_derecha'
@@ -907,6 +922,9 @@ export interface Match {
   coachObservations: string | null;
   startedAt: string;
   completedAt: string | null;
+  pausedAt: string | null;
+  totalPausedSeconds: number;
+  retiredBy: MatchPlayerSlot | null;
 }
 
 /** Espeja server/src/types.ts#MatchPointEvent. */
@@ -1027,6 +1045,47 @@ export function createMatchScoreAdjustment(
     method: 'POST',
     headers: { Authorization: `Bearer ${authToken}` },
     body: JSON.stringify(adjustment),
+  });
+}
+
+/** POST /matches/:id/pause — LiveCaptureView, Contingencias → Pausa temporal / tiempo médico. */
+export function pauseMatch(authToken: string, matchId: string): Promise<Match> {
+  return request(`/matches/${matchId}/pause`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${authToken}` },
+  });
+}
+
+/** POST /matches/:id/resume — reanuda una pausa temporal (misma fila que pauseMatch). */
+export function resumeMatch(authToken: string, matchId: string): Promise<Match> {
+  return request(`/matches/${matchId}/resume`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${authToken}` },
+  });
+}
+
+/** POST /matches/:id/suspend — LiveCaptureView, Contingencias → Suspender partido. */
+export function suspendMatch(authToken: string, matchId: string): Promise<Match> {
+  return request(`/matches/${matchId}/suspend`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${authToken}` },
+  });
+}
+
+/** POST /matches/:id/resume-suspension — banner del dashboard del coach: reanudar un partido suspendido. */
+export function resumeSuspendedMatch(authToken: string, matchId: string): Promise<Match> {
+  return request(`/matches/${matchId}/resume-suspension`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${authToken}` },
+  });
+}
+
+/** POST /matches/:id/retire — LiveCaptureView, Contingencias → Terminar por retiro. */
+export function retireMatch(authToken: string, matchId: string, retiredBy: MatchPlayerSlot): Promise<Match> {
+  return request(`/matches/${matchId}/retire`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${authToken}` },
+    body: JSON.stringify({ retiredBy }),
   });
 }
 

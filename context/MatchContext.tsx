@@ -12,16 +12,22 @@ import {
   NewAdjustmentInput,
   NewPointInput,
 } from '../lib/matchReducer';
-import { MatchConfig, PointEvent, ScoreAdjustment } from '../lib/types';
+import { MatchConfig, PlayerId, PointEvent, ScoreAdjustment } from '../lib/types';
 import {
   ApiError,
   createMatchPoint,
   createMatchPointsBulk,
   createMatchScoreAdjustment,
   deleteMatchPoint,
+  Match,
   MatchPointInput,
   MatchScoreAdjustmentInput,
+  pauseMatch as apiPauseMatch,
+  resumeMatch as apiResumeMatch,
+  resumeSuspendedMatch as apiResumeSuspendedMatch,
   restartMatch,
+  retireMatch as apiRetireMatch,
+  suspendMatch as apiSuspendMatch,
   updateMatchObservations,
   updateMatchStatus,
 } from '../lib/api';
@@ -34,11 +40,19 @@ interface MatchContextValue {
   reducerState: MatchReducerState;
   matchState: MatchState;
   stats: MatchStats;
+  /** Fila `matches` en vivo — status/pausedAt/totalPausedSeconds/retiredBy, para el cronómetro
+   * del header y las pantallas de pausado/suspendido/retiro. */
+  match: Match;
   addPoint: (input: NewPointInput) => void;
   addAdjustment: (input: NewAdjustmentInput) => void;
   undoLast: () => void;
   closeMatch: () => void;
   reopenMatch: () => void;
+  pauseMatch: () => void;
+  resumeMatch: () => void;
+  suspendMatch: () => void;
+  resumeSuspendedMatch: () => void;
+  retireMatch: (retiredBy: PlayerId) => void;
   setObservations: (text: string) => void;
   resetMatch: () => void;
   canUndo: boolean;
@@ -77,17 +91,25 @@ function toAdjustmentInput(adjustment: ScoreAdjustment, sequenceNumber: number):
   };
 }
 
+/** Segundos transcurridos de una pausa que empezó en `pausedAtIso`, nunca negativo (protege
+ * contra reloj del cliente desincronizado). */
+function elapsedPauseSeconds(pausedAtIso: string): number {
+  return Math.max(0, Math.round((Date.now() - new Date(pausedAtIso).getTime()) / 1000));
+}
+
 export function MatchProvider({
   config,
-  matchId,
+  initialMatch,
   children,
 }: {
   config: MatchConfig;
   /** Fila matches ya creada/resuelta (server) antes de montar este provider — ver App.tsx CoachMatchDayFlow. */
-  matchId: string;
+  initialMatch: Match;
   children: React.ReactNode;
 }) {
   const { token } = useAuth();
+  const matchId = initialMatch.id;
+  const [match, setMatch] = useState<Match>(initialMatch);
   const [reducerState, dispatch] = useReducer(matchReducer, initialReducerState);
   const hydrated = useRef(false);
   const [syncError, setSyncError] = useState<string | null>(null);
@@ -188,6 +210,7 @@ export function MatchProvider({
     reducerState,
     matchState,
     stats,
+    match,
     addPoint: (input) => {
       const sequenceNumber = reducerState.events.length + 1;
       const event = createPointEvent(input);
@@ -213,9 +236,38 @@ export function MatchProvider({
       dispatch({ type: 'REOPEN_MATCH' });
       enqueue((authToken) => updateMatchStatus(authToken, matchId, 'in_progress'));
     },
+    pauseMatch: () => {
+      if (match.pausedAt) return;
+      setMatch((m) => ({ ...m, pausedAt: new Date().toISOString() }));
+      enqueue((authToken) => apiPauseMatch(authToken, matchId));
+    },
+    resumeMatch: () => {
+      if (!match.pausedAt) return;
+      const paused = elapsedPauseSeconds(match.pausedAt);
+      setMatch((m) => ({ ...m, pausedAt: null, totalPausedSeconds: m.totalPausedSeconds + paused }));
+      enqueue((authToken) => apiResumeMatch(authToken, matchId));
+    },
+    suspendMatch: () => {
+      setMatch((m) => ({ ...m, status: 'suspended', pausedAt: m.pausedAt ?? new Date().toISOString() }));
+      enqueue((authToken) => apiSuspendMatch(authToken, matchId));
+    },
+    resumeSuspendedMatch: () => {
+      const paused = match.pausedAt ? elapsedPauseSeconds(match.pausedAt) : 0;
+      setMatch((m) => ({ ...m, status: 'in_progress', pausedAt: null, totalPausedSeconds: m.totalPausedSeconds + paused }));
+      enqueue((authToken) => apiResumeSuspendedMatch(authToken, matchId));
+    },
+    retireMatch: (retiredBy) => {
+      setMatch((m) => ({ ...m, status: 'completed', retiredBy }));
+      dispatch({ type: 'CLOSE_MATCH' });
+      enqueue((authToken) => apiRetireMatch(authToken, matchId, retiredBy));
+    },
     setObservations: (text) => dispatch({ type: 'SET_OBSERVATIONS', payload: text }),
     resetMatch: () => {
       dispatch({ type: 'RESET' });
+      // clears status/pausedAt/totalPausedSeconds/retiredBy too — matchRepository.resetForRestart
+      // does the same server-side, so stale retiro/pausa data from the previous match doesn't
+      // leak into what the coach sees as a brand new one.
+      setMatch((m) => ({ ...m, status: 'in_progress', completedAt: null, pausedAt: null, totalPausedSeconds: 0, retiredBy: null }));
       AsyncStorage.removeItem(STORAGE_KEY).catch(() => {});
       enqueue((authToken) => restartMatch(authToken, matchId));
     },

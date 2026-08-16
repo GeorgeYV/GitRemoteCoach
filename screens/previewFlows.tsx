@@ -14,11 +14,14 @@ import {
   createOrGetMatch,
   getClubForAdmin,
   getCoachProfile,
+  getSuspendedMatch,
   listClubInvitations,
   listCoachBookings,
   listPlayers,
+  Match,
   Player,
   searchTournaments,
+  SuspendedMatchSummary,
   TournamentSearchResult,
   TournamentSummary,
 } from '../lib/api';
@@ -298,6 +301,7 @@ export function CoachHomeFlow({ coachId, coachName }: { coachId: string; coachNa
   const [rating, setRating] = useState('—');
   const [pendingInvitation, setPendingInvitation] = useState<ClubCoachInvitationWithNames | null>(null);
   const [invitationRefreshKey, setInvitationRefreshKey] = useState(0);
+  const [suspendedMatch, setSuspendedMatch] = useState<SuspendedMatchSummary | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [step, setStep] = useState<
     | 'home'
@@ -311,6 +315,7 @@ export function CoachHomeFlow({ coachId, coachName }: { coachId: string; coachNa
     | 'reputation'
     | 'invitation'
     | 'match'
+    | 'resumeSuspended'
   >('home');
 
   useEffect(() => {
@@ -348,11 +353,25 @@ export function CoachHomeFlow({ coachId, coachName }: { coachId: string; coachNa
     };
   }, [coachId, token, invitationRefreshKey]);
 
+  // Banner prioritario de "Ajuste manual"/pausa: a lo sumo un partido suspendido a la vez en la
+  // práctica, ya que hay que retomarlo antes de poder suspender otro.
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+    getSuspendedMatch(token, coachId).then((result) => {
+      if (!cancelled) setSuspendedMatch(result);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [coachId, token]);
+
   const nextBookingRaw =
     bookings
       ?.filter(isUpcoming)
       .sort((a, b) => new Date(a.matchDatetime).getTime() - new Date(b.matchDatetime).getTime())[0] ?? null;
   const nextBooking = nextBookingRaw ? toCoachBooking(nextBookingRaw) : undefined;
+  const suspendedBookingRaw = suspendedMatch ? bookings?.find((b) => b.id === suspendedMatch.bookingId) ?? null : null;
   const pendingRequests = bookings?.filter((b) => b.status === 'requested').length ?? 0;
   const pendingEarnings =
     bookings?.filter((b) => b.status === 'paid').reduce((sum, b) => sum + Number(b.coachNetAmount ?? 0), 0) ?? 0;
@@ -392,6 +411,12 @@ export function CoachHomeFlow({ coachId, coachName }: { coachId: string; coachNa
 
   if (step === 'chat' && nextBooking) {
     return <CoachChatScreen booking={nextBooking} onBack={() => setStep('detail')} />;
+  }
+
+  if (step === 'resumeSuspended' && suspendedBookingRaw) {
+    // Mismo flujo que "Iniciar partido" — createOrGetMatch es idempotente por booking_id, así
+    // que devuelve la misma fila 'suspended' y LiveCaptureView muestra la pantalla de reanudar.
+    return <CoachMatchDayFlow booking={suspendedBookingRaw} />;
   }
 
   if (step === 'match' && nextBookingRaw) {
@@ -455,6 +480,8 @@ export function CoachHomeFlow({ coachId, coachName }: { coachId: string; coachNa
       pendingEarnings={pendingEarnings}
       nextBooking={nextBooking}
       pendingInvitation={pendingInvitation}
+      suspendedMatchPlayerName={suspendedBookingRaw ? suspendedMatch?.playerName : undefined}
+      onOpenSuspendedMatch={suspendedBookingRaw ? () => setStep('resumeSuspended') : undefined}
       onOpenBooking={() => setStep('detail')}
       onOpenRequests={() => setStep('requests')}
       onOpenAvailability={() => setStep('availability')}
@@ -479,7 +506,7 @@ export function CoachMatchDayFlow({ booking: initialBooking }: { booking: Bookin
   const bookingId = booking.id;
   const [step, setStep] = useState<'reminder' | 'setup' | 'loadingMatch' | 'live' | 'chat'>('reminder');
   const [session, setSession] = useState<{ config: MatchConfig; roundLabel: string } | null>(null);
-  const [matchId, setMatchId] = useState<string | null>(null);
+  const [match, setMatch] = useState<Match | null>(null);
   const [matchError, setMatchError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -498,9 +525,9 @@ export function CoachMatchDayFlow({ booking: initialBooking }: { booking: Bookin
       initialServer: session.config.initialServer,
       captureMode: 'rapida',
     })
-      .then((match) => {
+      .then((createdMatch) => {
         if (cancelled) return;
-        setMatchId(match.id);
+        setMatch(createdMatch);
         setStep('live');
       })
       .catch((err) => {
@@ -552,10 +579,10 @@ export function CoachMatchDayFlow({ booking: initialBooking }: { booking: Bookin
     );
   }
 
-  if (!session || !matchId) return null;
+  if (!session || !match) return null;
 
   return (
-    <MatchProvider config={session.config} matchId={matchId}>
+    <MatchProvider config={session.config} initialMatch={match}>
       <CoachFlow roundLabel={session.roundLabel} />
     </MatchProvider>
   );
@@ -565,7 +592,7 @@ export function CoachMatchDayFlow({ booking: initialBooking }: { booking: Bookin
  * persistencia real que CoachMatchDayFlow, contra el mismo booking fixture. */
 export function CoachCapturePreview() {
   const { token } = useAuth();
-  const [matchId, setMatchId] = useState<string | null>(null);
+  const [match, setMatch] = useState<Match | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -582,8 +609,8 @@ export function CoachCapturePreview() {
       initialServer: mockMatchConfig.initialServer,
       captureMode: 'rapida',
     })
-      .then((match) => {
-        if (!cancelled) setMatchId(match.id);
+      .then((createdMatch) => {
+        if (!cancelled) setMatch(createdMatch);
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof ApiError ? err.message : 'No se pudo iniciar el partido.');
@@ -601,7 +628,7 @@ export function CoachCapturePreview() {
     );
   }
 
-  if (!matchId) {
+  if (!match) {
     return (
       <View style={[styles.root, styles.centerState]}>
         <ActivityIndicator color={colors.courtBlue} />
@@ -610,7 +637,7 @@ export function CoachCapturePreview() {
   }
 
   return (
-    <MatchProvider config={mockMatchConfig} matchId={matchId}>
+    <MatchProvider config={mockMatchConfig} initialMatch={match}>
       <CoachFlow />
     </MatchProvider>
   );

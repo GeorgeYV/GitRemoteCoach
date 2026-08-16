@@ -25,6 +25,8 @@ export default function CoachHomeScreen({
   pendingEarnings,
   nextBooking,
   pendingInvitation,
+  suspendedMatchPlayerName,
+  onOpenSuspendedMatch,
   onOpenBooking,
   onOpenRequests,
   onOpenAvailability,
@@ -40,6 +42,8 @@ export default function CoachHomeScreen({
   pendingEarnings: number;
   nextBooking?: CoachBooking;
   pendingInvitation?: ClubCoachInvitationWithNames | null;
+  suspendedMatchPlayerName?: string;
+  onOpenSuspendedMatch?: () => void;
   onOpenBooking?: () => void;
   onOpenRequests?: () => void;
   onOpenAvailability?: () => void;
@@ -67,6 +71,16 @@ export default function CoachHomeScreen({
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.greeting}>Hola, {firstName}</Text>
         <Text style={styles.headline}>Este es el resumen de tu actividad como entrenador</Text>
+
+        {suspendedMatchPlayerName && (
+          <Pressable style={styles.suspendedBanner} onPress={onOpenSuspendedMatch}>
+            <View style={styles.suspendedTextWrap}>
+              <Text style={styles.suspendedTitle}>Partido suspendido</Text>
+              <Text style={styles.suspendedMeta}>Con {suspendedMatchPlayerName} · toca para reanudar</Text>
+            </View>
+            <Text style={styles.chevron}>›</Text>
+          </Pressable>
+        )}
 
         <View style={styles.statsRow}>
           <StatChip
@@ -193,6 +207,30 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     lineHeight: 28,
     marginBottom: 20,
+  },
+  suspendedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: withOpacity(colors.errorCoral, 0.12),
+    borderRadius: radius,
+    borderWidth: 1,
+    borderColor: withOpacity(colors.errorCoral, 0.4),
+    padding: 16,
+    marginBottom: 20,
+  },
+  suspendedTextWrap: {
+    flex: 1,
+    marginRight: 8,
+  },
+  suspendedTitle: {
+    color: colors.errorCoral,
+    fontSize: 14,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
+  suspendedMeta: {
+    color: colors.textSoft,
+    fontSize: 12,
   },
   statsRow: {
     flexDirection: 'row',
