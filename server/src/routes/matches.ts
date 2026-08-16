@@ -62,6 +62,15 @@ const captureModeSchema = z.object({
   captureMode: z.enum(CAPTURE_MODE),
 });
 
+const adjustmentSchema = z.object({
+  sequenceNumber: z.number().int().positive(),
+  gamesPlayer1: z.number().int().min(0),
+  gamesPlayer2: z.number().int().min(0),
+  pointsPlayer1: z.number().int().min(0).max(3),
+  pointsPlayer2: z.number().int().min(0).max(3),
+  server: z.enum(PLAYER_SLOT),
+});
+
 /** Autorización compartida por todas las rutas de :id — solo el entrenador dueño de la
  * reserva del partido puede leer/modificarlo. */
 async function assertOwnsMatch(matchId: string, sub: string): Promise<void> {
@@ -123,6 +132,17 @@ export async function matchRoutes(app: FastifyInstance): Promise<void> {
     await assertOwnsMatch(id, sub);
     await matchService.removePoint(id, Number(sequenceNumber));
     reply.code(204).send();
+  });
+
+  // LiveCaptureView: Contingencias → Ajuste manual del marcador.
+  app.post('/matches/:id/adjustments', { preHandler: app.authenticate }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const parsed = adjustmentSchema.safeParse(req.body);
+    if (!parsed.success) throw new ValidationError(parsed.error.message);
+    const { sub } = req.user as { sub: string };
+    await assertOwnsMatch(id, sub);
+    const adjustment = await matchService.addAdjustment(id, parsed.data);
+    reply.code(201).send(adjustment);
   });
 
   // MatchSummaryView: "Nuevo partido" — reinicia el mismo partido (booking_id es UNIQUE, no crea uno nuevo).

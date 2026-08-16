@@ -1,4 +1,4 @@
-import { MatchConfig, PlayerId, PointEvent, otherPlayer } from './types';
+import { MatchConfig, PlayerId, PointEvent, ScoreAdjustment, otherPlayer } from './types';
 
 export interface GameRecord {
   server: PlayerId;
@@ -219,10 +219,112 @@ function processPoint(state: MatchState, event: PointEvent, config: MatchConfig)
   };
 }
 
-export function computeMatchState(events: PointEvent[], config: MatchConfig): MatchState {
+/** Rebuilds `currentSetGames` to hold exactly `target` games won by `player`, padding with
+ * synthetic manually-adjusted records (server unknown → the adjustment's server) or trimming
+ * the most recent ones. Never touches completed sets — "Ajuste manual" only edits the set in
+ * progress, same as the steppers in its UI only show the current set's games. */
+function resizeGamesFor(games: GameRecord[], player: PlayerId, target: number, fallbackServer: PlayerId): GameRecord[] {
+  const current = games.filter((g) => g.winner === player).length;
+  if (target === current) return games;
+
+  if (target > current) {
+    const additions: GameRecord[] = Array.from({ length: target - current }, () => ({
+      server: fallbackServer,
+      winner: player,
+      isTiebreak: false,
+    }));
+    return [...games, ...additions];
+  }
+
+  let toRemove = current - target;
+  const kept: GameRecord[] = [];
+  for (let i = games.length - 1; i >= 0; i--) {
+    const g = games[i];
+    if (g.winner === player && toRemove > 0) {
+      toRemove -= 1;
+      continue;
+    }
+    kept.unshift(g);
+  }
+  return kept;
+}
+
+/**
+ * Contingencia "Ajuste manual del marcador" — a distinct event from PointEvent, not a sequence
+ * of synthetic points. Sets the current set's games/points/server to absolute values the coach
+ * chose, then re-runs the same set/tie-break/match completion checks a normal point triggers so
+ * the adjustment can't leave the match in an impossible state (e.g. 7-2 games sitting uncounted
+ * as "current set"). Doesn't touch pointHistory — statsEngine has no shot data for these games.
+ */
+function processAdjustment(state: MatchState, adj: ScoreAdjustment, config: MatchConfig): MatchState {
+  if (state.matchEnded) return state;
+
+  let currentSetGames = resizeGamesFor(state.currentSetGames, 'player1', adj.gamesPlayer1, adj.server);
+  currentSetGames = resizeGamesFor(currentSetGames, 'player2', adj.gamesPlayer2, adj.server);
+  const gamesCount = countGames(currentSetGames);
+
+  if (gamesCount.player1 === 6 && gamesCount.player2 === 6) {
+    return {
+      ...state,
+      currentSetGames,
+      currentGamePoints: { player1: 0, player2: 0 },
+      inTiebreak: true,
+      tiebreakPoints: { player1: 0, player2: 0 },
+      tiebreakInitialServer: adj.server,
+    };
+  }
+
+  const stWinner = setWinner(gamesCount);
+  if (stWinner) {
+    const setRecord: SetRecord = {
+      games: currentSetGames,
+      winner: stWinner,
+      gamesPlayer1: gamesCount.player1,
+      gamesPlayer2: gamesCount.player2,
+    };
+    const completedSets = [...state.completedSets, setRecord];
+    const setsWon = { ...state.setsWon, [stWinner]: state.setsWon[stWinner] + 1 };
+    const matchEnded = setsWon[stWinner] >= setsToWin(config.bestOf);
+    return {
+      ...state,
+      completedSets,
+      currentSetGames: [],
+      currentGamePoints: { player1: 0, player2: 0 },
+      inTiebreak: false,
+      server: adj.server,
+      setsWon,
+      matchEnded,
+      winner: matchEnded ? stWinner : null,
+    };
+  }
+
+  return {
+    ...state,
+    currentSetGames,
+    currentGamePoints: { player1: adj.pointsPlayer1, player2: adj.pointsPlayer2 },
+    inTiebreak: false,
+    server: adj.server,
+  };
+}
+
+export function computeMatchState(
+  events: PointEvent[],
+  config: MatchConfig,
+  adjustments: ScoreAdjustment[] = []
+): MatchState {
+  type LogItem =
+    | { kind: 'point'; ts: number; event: PointEvent }
+    | { kind: 'adjustment'; ts: number; adjustment: ScoreAdjustment };
+
+  const log: LogItem[] = [
+    ...events.map((event) => ({ kind: 'point' as const, ts: event.timestamp, event })),
+    ...adjustments.map((adjustment) => ({ kind: 'adjustment' as const, ts: adjustment.timestamp, adjustment })),
+  ];
+  log.sort((a, b) => a.ts - b.ts);
+
   let state = createInitialMatchState(config);
-  for (const event of events) {
-    state = processPoint(state, event, config);
+  for (const item of log) {
+    state = item.kind === 'point' ? processPoint(state, item.event, config) : processAdjustment(state, item.adjustment, config);
   }
   return state;
 }

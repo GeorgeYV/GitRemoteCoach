@@ -1150,6 +1150,27 @@ CREATE INDEX idx_match_point_events_match_id ON match_point_events (match_id, se
 -- Soporta agregaciones tipo "aces por entrenador" o "winners de revés".
 CREATE INDEX idx_match_point_events_detail ON match_point_events (detail) WHERE detail IS NOT NULL;
 
+-- Contingencia "Ajuste manual del marcador" — evento distinto de match_point_events (no una
+-- secuencia de puntos sintéticos): fija valores absolutos del set en curso. lib/scoringEngine.ts
+-- intercala esta tabla con match_point_events por occurred_at para reconstruir el estado.
+CREATE TABLE match_score_adjustments (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  match_id         UUID NOT NULL REFERENCES matches (id) ON DELETE CASCADE,
+  -- Mismo patrón de idempotencia que match_point_events.sequence_number: reintentar un ajuste
+  -- que ya llegó (ej. tras un timeout de red) no debe duplicarlo.
+  sequence_number  INTEGER NOT NULL,
+  occurred_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  games_player1    SMALLINT NOT NULL CHECK (games_player1 >= 0),
+  games_player2    SMALLINT NOT NULL CHECK (games_player2 >= 0),
+  points_player1   SMALLINT NOT NULL CHECK (points_player1 BETWEEN 0 AND 3),
+  points_player2   SMALLINT NOT NULL CHECK (points_player2 BETWEEN 0 AND 3),
+  server           match_player_slot NOT NULL,
+
+  UNIQUE (match_id, sequence_number)
+);
+
+CREATE INDEX idx_match_score_adjustments_match_id ON match_score_adjustments (match_id, occurred_at);
+
 -- ---------------------------------------------------------------------
 -- Calificaciones / reseñas
 -- ---------------------------------------------------------------------

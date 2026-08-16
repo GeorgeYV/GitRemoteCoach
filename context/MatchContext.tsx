@@ -5,18 +5,22 @@ import { computeMatchState, MatchState } from '../lib/scoringEngine';
 import { computeMatchStats, MatchStats } from '../lib/statsEngine';
 import {
   createPointEvent,
+  createScoreAdjustment,
   initialReducerState,
   matchReducer,
   MatchReducerState,
+  NewAdjustmentInput,
   NewPointInput,
 } from '../lib/matchReducer';
-import { MatchConfig, PointEvent } from '../lib/types';
+import { MatchConfig, PointEvent, ScoreAdjustment } from '../lib/types';
 import {
   ApiError,
   createMatchPoint,
   createMatchPointsBulk,
+  createMatchScoreAdjustment,
   deleteMatchPoint,
   MatchPointInput,
+  MatchScoreAdjustmentInput,
   restartMatch,
   updateMatchObservations,
   updateMatchStatus,
@@ -31,6 +35,7 @@ interface MatchContextValue {
   matchState: MatchState;
   stats: MatchStats;
   addPoint: (input: NewPointInput) => void;
+  addAdjustment: (input: NewAdjustmentInput) => void;
   undoLast: () => void;
   closeMatch: () => void;
   reopenMatch: () => void;
@@ -41,7 +46,7 @@ interface MatchContextValue {
   undoBudget: number;
   /** Error de la última sincronización con el servidor fallida (nunca bloquea la captura local). */
   syncError: string | null;
-  /** Reenvía todos los puntos locales actuales — botón "Reintentar sincronización". */
+  /** Reenvía todos los puntos y ajustes locales actuales — botón "Reintentar sincronización". */
   retrySync: () => void;
 }
 
@@ -58,6 +63,17 @@ function toPointInput(event: PointEvent, sequenceNumber: number): MatchPointInpu
     rallyLength: event.rallyLength,
     netApproach: event.netApproach,
     isReturnError: event.isReturnError,
+  };
+}
+
+function toAdjustmentInput(adjustment: ScoreAdjustment, sequenceNumber: number): MatchScoreAdjustmentInput {
+  return {
+    sequenceNumber,
+    gamesPlayer1: adjustment.gamesPlayer1,
+    gamesPlayer2: adjustment.gamesPlayer2,
+    pointsPlayer1: adjustment.pointsPlayer1,
+    pointsPlayer2: adjustment.pointsPlayer2,
+    server: adjustment.server,
   };
 }
 
@@ -96,11 +112,17 @@ export function MatchProvider({
     });
   }
 
-  function bulkSync(events: PointEvent[]) {
-    if (events.length === 0) return;
-    // events.map(toPointInput) would pass Array.map's 0-based index straight through as
-    // sequenceNumber — off by one against the server's 1-based, positive-only sequence.
-    enqueue((authToken) => createMatchPointsBulk(authToken, matchId, events.map((event, i) => toPointInput(event, i + 1))));
+  function bulkSync(events: PointEvent[], adjustments: ScoreAdjustment[]) {
+    if (events.length > 0) {
+      // events.map(toPointInput) would pass Array.map's 0-based index straight through as
+      // sequenceNumber — off by one against the server's 1-based, positive-only sequence.
+      enqueue((authToken) => createMatchPointsBulk(authToken, matchId, events.map((event, i) => toPointInput(event, i + 1))));
+    }
+    // No bulk endpoint for adjustments (rare enough not to need one) — each call is idempotent
+    // by (match_id, sequence_number), same as points, so resending already-synced ones is safe.
+    adjustments.forEach((adjustment, i) => {
+      enqueue((authToken) => createMatchScoreAdjustment(authToken, matchId, toAdjustmentInput(adjustment, i + 1)));
+    });
   }
 
   /** Undo del botón "Deshacer" del header — respeta la pila de 3 niveles. */
@@ -127,9 +149,9 @@ export function MatchProvider({
           const parsed: MatchReducerState = JSON.parse(raw);
           dispatch({ type: 'LOAD_STATE', payload: parsed });
           // Recuperación tras cierre/crash: reenvía todo lo que ya estaba capturado localmente —
-          // idempotente en el servidor (ON CONFLICT DO NOTHING por sequence_number), así que los
-          // puntos que sí llegaron a sincronizarse antes no se duplican.
-          bulkSync(parsed.events);
+          // idempotente en el servidor (ON CONFLICT DO NOTHING por sequence_number), así que lo
+          // que sí llegó a sincronizarse antes no se duplica.
+          bulkSync(parsed.events, parsed.adjustments);
         } catch {
           // ignore corrupt persisted state, start fresh
         }
@@ -156,8 +178,8 @@ export function MatchProvider({
   }, [reducerState.observations]);
 
   const matchState = useMemo(
-    () => computeMatchState(reducerState.events, config),
-    [reducerState.events, config]
+    () => computeMatchState(reducerState.events, config, reducerState.adjustments),
+    [reducerState.events, reducerState.adjustments, config]
   );
   const stats = useMemo(() => computeMatchStats(matchState), [matchState]);
 
@@ -171,6 +193,12 @@ export function MatchProvider({
       const event = createPointEvent(input);
       dispatch({ type: 'ADD_POINT', payload: event });
       enqueue((authToken) => createMatchPoint(authToken, matchId, toPointInput(event, sequenceNumber)));
+    },
+    addAdjustment: (input) => {
+      const sequenceNumber = reducerState.adjustments.length + 1;
+      const adjustment = createScoreAdjustment(input);
+      dispatch({ type: 'ADD_ADJUSTMENT', payload: adjustment });
+      enqueue((authToken) => createMatchScoreAdjustment(authToken, matchId, toAdjustmentInput(adjustment, sequenceNumber)));
     },
     undoLast: performUndo,
     closeMatch: () => {
@@ -194,7 +222,7 @@ export function MatchProvider({
     canUndo: reducerState.undoBudget > 0,
     undoBudget: reducerState.undoBudget,
     syncError,
-    retrySync: () => bulkSync(reducerState.events),
+    retrySync: () => bulkSync(reducerState.events, reducerState.adjustments),
   };
 
   return <MatchContext.Provider value={value}>{children}</MatchContext.Provider>;

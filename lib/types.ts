@@ -35,6 +35,21 @@ export interface PointEvent {
   isReturnError: boolean;
 }
 
+/**
+ * Ajuste manual del marcador — un evento distinto de PointEvent, no una secuencia de puntos
+ * sintéticos. Fija valores absolutos del SET EN CURSO (nunca toca sets ya completados):
+ * `points*` usa el mismo índice interno que el motor de puntaje (0/15/30/40 → 0-3).
+ */
+export interface ScoreAdjustment {
+  id: string;
+  timestamp: number;
+  gamesPlayer1: number;
+  gamesPlayer2: number;
+  pointsPlayer1: number;
+  pointsPlayer2: number;
+  server: PlayerId;
+}
+
 export interface MatchConfig {
   bestOf: 1 | 3;
   noAd: boolean;

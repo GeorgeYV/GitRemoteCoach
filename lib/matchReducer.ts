@@ -1,9 +1,10 @@
-import { PointEvent } from './types';
+import { PointEvent, ScoreAdjustment } from './types';
 
 export const UNDO_STACK_DEPTH = 3;
 
 export interface MatchReducerState {
   events: PointEvent[];
+  adjustments: ScoreAdjustment[];
   matchClosed: boolean;
   observations: string;
   /** Bounded undo stack (0-UNDO_STACK_DEPTH): grows by 1 on each new point (capped), shrinks by
@@ -14,6 +15,7 @@ export interface MatchReducerState {
 
 export type MatchAction =
   | { type: 'ADD_POINT'; payload: PointEvent }
+  | { type: 'ADD_ADJUSTMENT'; payload: ScoreAdjustment }
   | { type: 'UNDO_LAST' }
   /** Bypasses the 3-level cap — reopenMatch uses this to undo the point that just ended the
    * match, which isn't the "coach fixing a recent capture mistake" case the cap guards against. */
@@ -26,6 +28,7 @@ export type MatchAction =
 
 export const initialReducerState: MatchReducerState = {
   events: [],
+  adjustments: [],
   matchClosed: false,
   observations: '',
   undoBudget: 0,
@@ -39,6 +42,8 @@ export function matchReducer(state: MatchReducerState, action: MatchAction): Mat
         events: [...state.events, action.payload],
         undoBudget: Math.min(UNDO_STACK_DEPTH, state.undoBudget + 1),
       };
+    case 'ADD_ADJUSTMENT':
+      return { ...state, adjustments: [...state.adjustments, action.payload] };
     case 'UNDO_LAST':
       if (state.undoBudget <= 0) return state;
       return { ...state, events: state.events.slice(0, -1), undoBudget: state.undoBudget - 1 };
@@ -52,7 +57,7 @@ export function matchReducer(state: MatchReducerState, action: MatchAction): Mat
       return { ...state, observations: action.payload };
     case 'LOAD_STATE':
       // merge over defaults, not a raw replace — a persisted state from before a reducer-state
-      // field existed (e.g. undoBudget) would otherwise come back `undefined`.
+      // field existed (e.g. undoBudget, adjustments) would otherwise come back `undefined`.
       return { ...initialReducerState, ...action.payload };
     case 'RESET':
       return initialReducerState;
@@ -64,6 +69,16 @@ export function matchReducer(state: MatchReducerState, action: MatchAction): Mat
 export type NewPointInput = Omit<PointEvent, 'id' | 'timestamp'>;
 
 export function createPointEvent(input: NewPointInput): PointEvent {
+  return {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    timestamp: Date.now(),
+    ...input,
+  };
+}
+
+export type NewAdjustmentInput = Omit<ScoreAdjustment, 'id' | 'timestamp'>;
+
+export function createScoreAdjustment(input: NewAdjustmentInput): ScoreAdjustment {
   return {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     timestamp: Date.now(),

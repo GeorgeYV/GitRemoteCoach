@@ -9,7 +9,7 @@ import { toBookingHistoryEntry } from '../../lib/parentBookingDisplay';
 import { computeMatchState } from '../../lib/scoringEngine';
 import { computeMatchStats, MatchStats } from '../../lib/statsEngine';
 import { colors, radius, withOpacity } from '../../lib/theme';
-import { MatchConfig, PointEvent } from '../../lib/types';
+import { MatchConfig, PointEvent, ScoreAdjustment } from '../../lib/types';
 import { BookingHistoryEntry } from '../../mock/parentFlow';
 
 function toReportConfig(report: MatchReport, playerName: string): MatchConfig {
@@ -34,6 +34,18 @@ function toReportEvents(report: MatchReport): PointEvent[] {
     rallyLength: p.rallyLength,
     netApproach: p.netApproach,
     isReturnError: p.isReturnError,
+  }));
+}
+
+function toReportAdjustments(report: MatchReport): ScoreAdjustment[] {
+  return report.adjustments.map((a) => ({
+    id: a.id,
+    timestamp: new Date(a.occurredAt).getTime(),
+    gamesPlayer1: a.gamesPlayer1,
+    gamesPlayer2: a.gamesPlayer2,
+    pointsPlayer1: a.pointsPlayer1,
+    pointsPlayer2: a.pointsPlayer2,
+    server: a.server,
   }));
 }
 
@@ -139,7 +151,7 @@ function ReportDetail({ booking, onBack }: { booking: BookingHistoryEntry; onBac
   let scoreLine = '';
   if (report && report.match.status === 'completed') {
     const config = toReportConfig(report, booking.playerName);
-    const matchState = computeMatchState(toReportEvents(report), config);
+    const matchState = computeMatchState(toReportEvents(report), config, toReportAdjustments(report));
     stats = computeMatchStats(matchState);
     scoreLine = matchState.completedSets.map((s) => `${s.gamesPlayer1}-${s.gamesPlayer2}`).join(', ');
   }

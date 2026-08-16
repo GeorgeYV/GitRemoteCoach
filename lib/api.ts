@@ -937,9 +937,32 @@ export interface MatchPointInput {
   isReturnError: boolean;
 }
 
+/** Espeja server/src/types.ts#MatchScoreAdjustment. */
+export interface MatchScoreAdjustment {
+  id: string;
+  matchId: string;
+  sequenceNumber: number;
+  occurredAt: string;
+  gamesPlayer1: number;
+  gamesPlayer2: number;
+  pointsPlayer1: number;
+  pointsPlayer2: number;
+  server: MatchPlayerSlot;
+}
+
+export interface MatchScoreAdjustmentInput {
+  sequenceNumber: number;
+  gamesPlayer1: number;
+  gamesPlayer2: number;
+  pointsPlayer1: number;
+  pointsPlayer2: number;
+  server: MatchPlayerSlot;
+}
+
 export interface MatchReport {
   match: Match;
   points: MatchPointEvent[];
+  adjustments: MatchScoreAdjustment[];
 }
 
 /** GET /bookings/:id/match — ParentReportsScreen. El padre o el entrenador de la reserva pueden
@@ -991,6 +1014,19 @@ export function createMatchPointsBulk(
     method: 'POST',
     headers: { Authorization: `Bearer ${authToken}` },
     body: JSON.stringify({ points }),
+  });
+}
+
+/** POST /matches/:id/adjustments — LiveCaptureView, Contingencias → Ajuste manual del marcador. */
+export function createMatchScoreAdjustment(
+  authToken: string,
+  matchId: string,
+  adjustment: MatchScoreAdjustmentInput,
+): Promise<MatchScoreAdjustment> {
+  return request(`/matches/${matchId}/adjustments`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${authToken}` },
+    body: JSON.stringify(adjustment),
   });
 }
 

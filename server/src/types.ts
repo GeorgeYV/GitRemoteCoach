@@ -369,6 +369,18 @@ export interface MatchPointEvent {
   isReturnError: boolean;
 }
 
+export interface MatchScoreAdjustment {
+  id: string;
+  matchId: string;
+  sequenceNumber: number;
+  occurredAt: string;
+  gamesPlayer1: number;
+  gamesPlayer2: number;
+  pointsPlayer1: number;
+  pointsPlayer2: number;
+  server: MatchPlayerSlot;
+}
+
 /** TrainerProfileScreen: stats agregadas de todos los partidos completados de un coach —
  * nunca datos de un partido individual, solo sumas/promedios (ver matchService.getCoachReportSummary). */
 export interface CoachReportSummary {

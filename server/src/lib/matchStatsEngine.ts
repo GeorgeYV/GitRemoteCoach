@@ -13,9 +13,19 @@ export function otherPlayer(p: MatchPlayerSlot): MatchPlayerSlot {
 }
 
 export interface StatsPointEvent {
+  timestamp: number;
   wonBy: MatchPlayerSlot;
   detail: PointDetail | null;
   firstServeIn: boolean;
+}
+
+export interface StatsScoreAdjustment {
+  timestamp: number;
+  gamesPlayer1: number;
+  gamesPlayer2: number;
+  pointsPlayer1: number;
+  pointsPlayer2: number;
+  server: MatchPlayerSlot;
 }
 
 export interface StatsMatchConfig {
@@ -221,10 +231,108 @@ function processPoint(state: MatchState, event: StatsPointEvent, config: StatsMa
   };
 }
 
-function computeMatchState(events: StatsPointEvent[], config: StatsMatchConfig): MatchState {
+/** Contingencia "Ajuste manual del marcador" — ver lib/scoringEngine.ts#processAdjustment (misma
+ * lógica: fija el set en curso, nunca toca sets ya completados, no deja pointHistory). */
+function resizeGamesFor(
+  games: GameRecord[],
+  player: MatchPlayerSlot,
+  target: number,
+  fallbackServer: MatchPlayerSlot,
+): GameRecord[] {
+  const current = games.filter((g) => g.winner === player).length;
+  if (target === current) return games;
+
+  if (target > current) {
+    const additions: GameRecord[] = Array.from({ length: target - current }, () => ({
+      server: fallbackServer,
+      winner: player,
+      isTiebreak: false,
+    }));
+    return [...games, ...additions];
+  }
+
+  let toRemove = current - target;
+  const kept: GameRecord[] = [];
+  for (let i = games.length - 1; i >= 0; i--) {
+    const g = games[i];
+    if (g.winner === player && toRemove > 0) {
+      toRemove -= 1;
+      continue;
+    }
+    kept.unshift(g);
+  }
+  return kept;
+}
+
+function processAdjustment(state: MatchState, adj: StatsScoreAdjustment, config: StatsMatchConfig): MatchState {
+  if (state.matchEnded) return state;
+
+  let currentSetGames = resizeGamesFor(state.currentSetGames, 'player1', adj.gamesPlayer1, adj.server);
+  currentSetGames = resizeGamesFor(currentSetGames, 'player2', adj.gamesPlayer2, adj.server);
+  const gamesCount = countGames(currentSetGames);
+
+  if (gamesCount.player1 === 6 && gamesCount.player2 === 6) {
+    return {
+      ...state,
+      currentSetGames,
+      currentGamePoints: { player1: 0, player2: 0 },
+      inTiebreak: true,
+      tiebreakPoints: { player1: 0, player2: 0 },
+      tiebreakInitialServer: adj.server,
+    };
+  }
+
+  const stWinner = setWinner(gamesCount);
+  if (stWinner) {
+    const setRecord: SetRecord = {
+      games: currentSetGames,
+      winner: stWinner,
+      gamesPlayer1: gamesCount.player1,
+      gamesPlayer2: gamesCount.player2,
+    };
+    const completedSets = [...state.completedSets, setRecord];
+    const setsWon = { ...state.setsWon, [stWinner]: state.setsWon[stWinner] + 1 };
+    const matchEnded = setsWon[stWinner] >= setsToWin(config.bestOf);
+    return {
+      ...state,
+      completedSets,
+      currentSetGames: [],
+      currentGamePoints: { player1: 0, player2: 0 },
+      inTiebreak: false,
+      server: adj.server,
+      setsWon,
+      matchEnded,
+      winner: matchEnded ? stWinner : null,
+    };
+  }
+
+  return {
+    ...state,
+    currentSetGames,
+    currentGamePoints: { player1: adj.pointsPlayer1, player2: adj.pointsPlayer2 },
+    inTiebreak: false,
+    server: adj.server,
+  };
+}
+
+function computeMatchState(
+  events: StatsPointEvent[],
+  config: StatsMatchConfig,
+  adjustments: StatsScoreAdjustment[],
+): MatchState {
+  type LogItem =
+    | { kind: 'point'; ts: number; event: StatsPointEvent }
+    | { kind: 'adjustment'; ts: number; adjustment: StatsScoreAdjustment };
+
+  const log: LogItem[] = [
+    ...events.map((event) => ({ kind: 'point' as const, ts: event.timestamp, event })),
+    ...adjustments.map((adjustment) => ({ kind: 'adjustment' as const, ts: adjustment.timestamp, adjustment })),
+  ];
+  log.sort((a, b) => a.ts - b.ts);
+
   let state = createInitialMatchState(config);
-  for (const event of events) {
-    state = processPoint(state, event, config);
+  for (const item of log) {
+    state = item.kind === 'point' ? processPoint(state, item.event, config) : processAdjustment(state, item.adjustment, config);
   }
   return state;
 }
@@ -245,10 +353,14 @@ function emptyStats(): PlayerMatchStats {
   return { winners: 0, unforcedErrors: 0, firstServePct: null, breaksConverted: 0, returnGamesPlayed: 0 };
 }
 
-/** Reconstruye el partido a partir de sus puntos crudos y devuelve las stats del jugador
- * seguido por el coach (player1 — player2 es el rival, un texto libre sin cuenta propia). */
-export function computePlayer1MatchStats(events: StatsPointEvent[], config: StatsMatchConfig): PlayerMatchStats {
-  const state = computeMatchState(events, config);
+/** Reconstruye el partido a partir de sus puntos crudos + ajustes manuales y devuelve las stats
+ * del jugador seguido por el coach (player1 — player2 es el rival, un texto libre sin cuenta propia). */
+export function computePlayer1MatchStats(
+  events: StatsPointEvent[],
+  config: StatsMatchConfig,
+  adjustments: StatsScoreAdjustment[] = [],
+): PlayerMatchStats {
+  const state = computeMatchState(events, config, adjustments);
   const stats: Record<MatchPlayerSlot, PlayerMatchStats> = { player1: emptyStats(), player2: emptyStats() };
   const firstServeAttempts: Record<MatchPlayerSlot, number> = { player1: 0, player2: 0 };
   const firstServesIn: Record<MatchPlayerSlot, number> = { player1: 0, player2: 0 };
@@ -258,15 +370,22 @@ export function computePlayer1MatchStats(events: StatsPointEvent[], config: Stat
       case 'winner_derecha':
       case 'winner_reves':
       case 'winner_volea':
+      case 'winner':
       case 'ace':
         stats[event.wonBy].winners += 1;
         break;
       case 'error_no_forzado':
+      case 'error_no_forzado_derecha':
+      case 'error_no_forzado_reves':
         stats[otherPlayer(event.wonBy)].unforcedErrors += 1;
         break;
       default:
         break;
     }
+
+    // "Punto no visto": el marcador ya avanzó, pero no hay dato real de saque que promediar.
+    if (event.detail === 'dato_no_capturado') continue;
+
     firstServeAttempts[server] += 1;
     if (event.firstServeIn) firstServesIn[server] += 1;
   }

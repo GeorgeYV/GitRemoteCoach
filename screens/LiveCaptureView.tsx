@@ -10,8 +10,18 @@ import { colors, withOpacity } from '../lib/theme';
 import { PlayerId } from '../lib/types';
 
 export default function LiveCaptureView({ roundLabel }: { roundLabel: string }) {
-  const { config, matchState, addPoint, undoLast, closeMatch, canUndo, undoBudget, syncError, retrySync } =
-    useMatch();
+  const {
+    config,
+    matchState,
+    addPoint,
+    addAdjustment,
+    undoLast,
+    closeMatch,
+    canUndo,
+    undoBudget,
+    syncError,
+    retrySync,
+  } = useMatch();
   const [menuOpen, setMenuOpen] = useState(false);
   const matchEnded = matchState.matchEnded;
 
@@ -63,7 +73,9 @@ export default function LiveCaptureView({ roundLabel }: { roundLabel: string }) 
         onClose={() => setMenuOpen(false)}
         player1Name={config.player1Name}
         player2Name={config.player2Name}
+        matchState={matchState}
         onPointNotSeen={handlePointNotSeen}
+        onManualAdjustment={addAdjustment}
       />
     </SafeAreaView>
   );

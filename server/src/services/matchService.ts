@@ -3,6 +3,8 @@ import { computePlayer1MatchStats } from '../lib/matchStatsEngine.js';
 import * as bookingRepository from '../repositories/bookingRepository.js';
 import * as matchPointEventRepository from '../repositories/matchPointEventRepository.js';
 import type { PointInput } from '../repositories/matchPointEventRepository.js';
+import * as matchScoreAdjustmentRepository from '../repositories/matchScoreAdjustmentRepository.js';
+import type { AdjustmentInput } from '../repositories/matchScoreAdjustmentRepository.js';
 import * as matchRepository from '../repositories/matchRepository.js';
 import type {
   CaptureMode,
@@ -11,6 +13,7 @@ import type {
   MatchBestOf,
   MatchPlayerSlot,
   MatchPointEvent,
+  MatchScoreAdjustment,
   MatchStatus,
 } from '../types.js';
 
@@ -57,13 +60,17 @@ export async function removePoint(matchId: string, sequenceNumber: number): Prom
   return matchPointEventRepository.deleteBySequence(matchId, sequenceNumber);
 }
 
-/** "Nuevo partido": borra todos los puntos y vuelve el partido a in_progress, en vez de
- * crear una segunda fila matches (booking_id es UNIQUE). Ambos pasos van en una sola
- * transacción — un crash a mitad de camino no debe dejar los puntos borrados con el
- * partido todavía marcado 'completed'. */
+export async function addAdjustment(matchId: string, adjustment: AdjustmentInput): Promise<MatchScoreAdjustment> {
+  return matchScoreAdjustmentRepository.create(matchId, adjustment);
+}
+
+/** "Nuevo partido": borra todos los puntos y ajustes, y vuelve el partido a in_progress, en vez
+ * de crear una segunda fila matches (booking_id es UNIQUE). Todo en una sola transacción — un
+ * crash a mitad de camino no debe dejar el partido a medio borrar pero todavía 'completed'. */
 export async function restartMatch(matchId: string): Promise<Match> {
   return withTransaction(async (client) => {
     await matchPointEventRepository.deleteAllForMatch(matchId, client);
+    await matchScoreAdjustmentRepository.deleteAllForMatch(matchId, client);
     return matchRepository.updateStatus(matchId, 'in_progress', client);
   });
 }
@@ -83,6 +90,7 @@ export async function setCaptureMode(matchId: string, captureMode: CaptureMode):
 export interface MatchReport {
   match: Match;
   points: MatchPointEvent[];
+  adjustments: MatchScoreAdjustment[];
 }
 
 /** ParentReportsScreen: null cuando la reserva nunca tuvo una captura en vivo (no es un error —
@@ -91,7 +99,8 @@ export async function getMatchReport(bookingId: string): Promise<MatchReport | n
   const match = await matchRepository.findByBookingId(bookingId);
   if (!match) return null;
   const points = await matchPointEventRepository.listByMatch(match.id);
-  return { match, points };
+  const adjustments = await matchScoreAdjustmentRepository.listByMatch(match.id);
+  return { match, points, adjustments };
 }
 
 /**
@@ -112,9 +121,23 @@ export async function getCoachReportSummary(coachId: string): Promise<CoachRepor
 
   for (const match of matches) {
     const points = await matchPointEventRepository.listByMatch(match.id);
+    const adjustments = await matchScoreAdjustmentRepository.listByMatch(match.id);
     const stats = computePlayer1MatchStats(
-      points.map((p) => ({ wonBy: p.wonBy, detail: p.detail, firstServeIn: p.firstServeIn })),
+      points.map((p) => ({
+        timestamp: new Date(p.occurredAt).getTime(),
+        wonBy: p.wonBy,
+        detail: p.detail,
+        firstServeIn: p.firstServeIn,
+      })),
       { bestOf: Number(match.bestOf) as 1 | 3, noAd: match.noAd, initialServer: match.initialServer },
+      adjustments.map((a) => ({
+        timestamp: new Date(a.occurredAt).getTime(),
+        gamesPlayer1: a.gamesPlayer1,
+        gamesPlayer2: a.gamesPlayer2,
+        pointsPlayer1: a.pointsPlayer1,
+        pointsPlayer2: a.pointsPlayer2,
+        server: a.server,
+      })),
     );
     winners += stats.winners;
     unforcedErrors += stats.unforcedErrors;
