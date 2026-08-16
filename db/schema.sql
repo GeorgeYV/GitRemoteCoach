@@ -68,11 +68,20 @@ CREATE TYPE point_detail AS ENUM (
   'winner_derecha',
   'winner_reves',
   'winner_volea',
+  -- side unspecified — usado para los winners de la rival, que esta app no desglosa por lado.
+  'winner',
   'ace',
   'doble_falta',
+  'error_forzado',
   'error_no_forzado',
-  'error_forzado'
+  'error_no_forzado_derecha',
+  'error_no_forzado_reves'
 );
+
+-- Metadatos opcionales del flujo de captura (Paso 1/3 de lib/types.ts) — ver match_point_events.
+CREATE TYPE serve_direction AS ENUM ('T', 'cuerpo', 'abierto');
+CREATE TYPE error_direction AS ENUM ('red', 'larga', 'ancha');
+CREATE TYPE rally_length AS ENUM ('corto', 'medio', 'largo');
 
 -- ---------------------------------------------------------------------
 -- Usuarios
@@ -1118,6 +1127,15 @@ CREATE TABLE match_point_events (
   won_by           match_player_slot NOT NULL,
   detail           point_detail,
   first_serve_in   BOOLEAN NOT NULL DEFAULT TRUE,
+  -- Paso 1/3 del flujo de captura (lib/types.ts::PointEvent) — todos opcionales, no se piden
+  -- para los cierres rápidos (ace/doble falta/error de devolución).
+  serve_direction  serve_direction,
+  error_direction  error_direction,
+  rally_length     rally_length,
+  net_approach     BOOLEAN NOT NULL DEFAULT FALSE,
+  -- Atajo de 3 toques del Paso 2 (error de devolución) — separado de `detail` porque el mismo
+  -- tipo_finalizacion (error_no_forzado_derecha/reves) puede ocurrir también en un rally largo.
+  is_return_error  BOOLEAN NOT NULL DEFAULT FALSE,
   -- Snapshot denormalizado del marcador tras este punto, solo para
   -- lectura rápida (evita recalcular replayeando todos los eventos).
   -- La fuente de verdad sigue siendo la secuencia de eventos.

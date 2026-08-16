@@ -12,11 +12,17 @@ const POINT_DETAIL = [
   'winner_derecha',
   'winner_reves',
   'winner_volea',
+  'winner',
   'ace',
   'doble_falta',
-  'error_no_forzado',
   'error_forzado',
+  'error_no_forzado',
+  'error_no_forzado_derecha',
+  'error_no_forzado_reves',
 ] as const;
+const SERVE_DIRECTION = ['T', 'cuerpo', 'abierto'] as const;
+const ERROR_DIRECTION = ['red', 'larga', 'ancha'] as const;
+const RALLY_LENGTH = ['corto', 'medio', 'largo'] as const;
 
 const getOrCreateMatchSchema = z.object({
   bookingId: z.string().uuid(),
@@ -32,6 +38,11 @@ const pointSchema = z.object({
   wonBy: z.enum(PLAYER_SLOT),
   detail: z.enum(POINT_DETAIL).nullable(),
   firstServeIn: z.boolean(),
+  serveDirection: z.enum(SERVE_DIRECTION).nullable(),
+  errorDirection: z.enum(ERROR_DIRECTION).nullable(),
+  rallyLength: z.enum(RALLY_LENGTH).nullable(),
+  netApproach: z.boolean(),
+  isReturnError: z.boolean(),
 });
 
 const pointsBulkSchema = z.object({

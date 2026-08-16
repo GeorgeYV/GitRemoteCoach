@@ -1,7 +1,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useMatch } from '../context/MatchContext';
-import { getGamePointLabels } from '../lib/scoringEngine';
+import { getCurrentServer, getGamePointLabels } from '../lib/scoringEngine';
 import { colors } from '../lib/theme';
 import { PlayerId } from '../lib/types';
 
@@ -44,6 +44,7 @@ export default function ScoreHeader({
   onUndo: () => void;
 }) {
   const { config, matchState } = useMatch();
+  const currentServer = matchState.matchEnded ? null : getCurrentServer(matchState);
 
   return (
     <View style={styles.header}>
@@ -59,7 +60,7 @@ export default function ScoreHeader({
       <View style={styles.playersRow}>
         <View style={styles.playerYou}>
           <Text style={[styles.playerName, styles.playerNameYou]} numberOfLines={1}>
-            {config.player1Name} {matchState.server === 'player1' && !matchState.matchEnded ? '●' : ''}
+            {config.player1Name} {currentServer === 'player1' ? '●' : ''}
           </Text>
           <View style={styles.scoreBlockYou}>
             <SetScoresLine player="player1" />
@@ -69,7 +70,7 @@ export default function ScoreHeader({
 
         <View style={styles.playerRival}>
           <Text style={styles.playerName} numberOfLines={1}>
-            {matchState.server === 'player2' && !matchState.matchEnded ? '● ' : ''}
+            {currentServer === 'player2' ? '● ' : ''}
             {config.player2Name}
           </Text>
           <View style={styles.scoreBlockRival}>

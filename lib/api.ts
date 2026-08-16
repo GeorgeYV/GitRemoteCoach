@@ -881,10 +881,16 @@ export type PointDetail =
   | 'winner_derecha'
   | 'winner_reves'
   | 'winner_volea'
+  | 'winner'
   | 'ace'
   | 'doble_falta'
+  | 'error_forzado'
   | 'error_no_forzado'
-  | 'error_forzado';
+  | 'error_no_forzado_derecha'
+  | 'error_no_forzado_reves';
+export type ServeDirection = 'T' | 'cuerpo' | 'abierto';
+export type ErrorDirection = 'red' | 'larga' | 'ancha';
+export type RallyLength = 'corto' | 'medio' | 'largo';
 
 /** Espeja server/src/types.ts#Match. */
 export interface Match {
@@ -911,6 +917,11 @@ export interface MatchPointEvent {
   wonBy: MatchPlayerSlot;
   detail: PointDetail | null;
   firstServeIn: boolean;
+  serveDirection: ServeDirection | null;
+  errorDirection: ErrorDirection | null;
+  rallyLength: RallyLength | null;
+  netApproach: boolean;
+  isReturnError: boolean;
 }
 
 export interface MatchPointInput {
@@ -918,6 +929,11 @@ export interface MatchPointInput {
   wonBy: MatchPlayerSlot;
   detail: PointDetail | null;
   firstServeIn: boolean;
+  serveDirection: ServeDirection | null;
+  errorDirection: ErrorDirection | null;
+  rallyLength: RallyLength | null;
+  netApproach: boolean;
+  isReturnError: boolean;
 }
 
 export interface MatchReport {

@@ -8,23 +8,25 @@ import { PlayerId } from '../lib/types';
 export default function PointButtons({
   disabled,
   onPoint,
+  player1Name,
+  player2Name,
 }: {
   disabled: boolean;
   onPoint: (wonBy: PlayerId) => void;
+  player1Name: string;
+  player2Name: string;
 }) {
   return (
     <View style={styles.container}>
       <PointButton
-        label="Punto ganado"
-        icon="●"
+        name={player1Name}
         colorsRange={[colors.ballLime, colors.ballLimeDim]}
         textColor={colors.courtBlueDeep}
         disabled={disabled}
         onPress={() => onPoint('player1')}
       />
       <PointButton
-        label="Punto perdido"
-        icon="○"
+        name={player2Name}
         colorsRange={[colors.errorCoral, colors.errorCoralDeep]}
         // lineWhite es ahora tinta oscura (tema claro) — este botón sigue con gradiente rojo
         // oscuro de fondo, así que su texto necesita quedarse claro, no lineWhite.
@@ -37,15 +39,13 @@ export default function PointButtons({
 }
 
 function PointButton({
-  label,
-  icon,
+  name,
   colorsRange,
   textColor,
   disabled,
   onPress,
 }: {
-  label: string;
-  icon: string;
+  name: string;
   colorsRange: [string, string];
   textColor: string;
   disabled: boolean;
@@ -70,9 +70,11 @@ function PointButton({
       style={[styles.buttonWrap, pressed && styles.buttonPressed, disabled && styles.buttonDisabled]}
     >
       <LinearGradient colors={colorsRange} start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }} style={styles.gradient}>
-        <Text style={[styles.icon, { color: textColor }]}>{icon}</Text>
-        <Text style={[styles.label, { color: textColor }]}>{label}</Text>
-        <Text style={[styles.sub, { color: textColor }]}>Toca para registrar</Text>
+        <Text style={[styles.caption, { color: textColor }]}>PUNTO PARA</Text>
+        <Text style={[styles.label, { color: textColor }]}>GANÓ</Text>
+        <Text style={[styles.name, { color: textColor }]} numberOfLines={2}>
+          {name}
+        </Text>
       </LinearGradient>
     </Pressable>
   );
@@ -99,19 +101,23 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    paddingHorizontal: 8,
   },
-  icon: {
-    fontSize: 30,
+  caption: {
+    fontSize: 11,
+    fontWeight: '600',
+    opacity: 0.75,
+    letterSpacing: 0.8,
+    marginBottom: 4,
   },
   label: {
-    fontSize: 19,
+    fontSize: 22,
     fontWeight: '800',
   },
-  sub: {
-    fontSize: 11,
-    fontWeight: '500',
-    opacity: 0.75,
-    letterSpacing: 0.5,
+  name: {
+    fontSize: 19,
+    fontWeight: '800',
+    textAlign: 'center',
+    marginTop: 2,
   },
 });

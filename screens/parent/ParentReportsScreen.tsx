@@ -29,6 +29,11 @@ function toReportEvents(report: MatchReport): PointEvent[] {
     wonBy: p.wonBy,
     detail: p.detail,
     firstServeIn: p.firstServeIn,
+    serveDirection: p.serveDirection,
+    errorDirection: p.errorDirection,
+    rallyLength: p.rallyLength,
+    netApproach: p.netApproach,
+    isReturnError: p.isReturnError,
   }));
 }
 

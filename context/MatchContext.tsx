@@ -4,13 +4,13 @@ import { useAuth } from './AuthContext';
 import { computeMatchState, MatchState } from '../lib/scoringEngine';
 import { computeMatchStats, MatchStats } from '../lib/statsEngine';
 import {
-  CaptureMode,
   createPointEvent,
   initialReducerState,
   matchReducer,
   MatchReducerState,
+  NewPointInput,
 } from '../lib/matchReducer';
-import { MatchConfig, PlayerId, PointEvent, PointDetail } from '../lib/types';
+import { MatchConfig, PointEvent } from '../lib/types';
 import {
   ApiError,
   createMatchPoint,
@@ -18,7 +18,6 @@ import {
   deleteMatchPoint,
   MatchPointInput,
   restartMatch,
-  updateMatchCaptureMode,
   updateMatchObservations,
   updateMatchStatus,
 } from '../lib/api';
@@ -31,9 +30,8 @@ interface MatchContextValue {
   reducerState: MatchReducerState;
   matchState: MatchState;
   stats: MatchStats;
-  addPoint: (wonBy: PlayerId, detail: PointDetail | null, firstServeIn?: boolean) => void;
+  addPoint: (input: NewPointInput) => void;
   undoLast: () => void;
-  setMode: (mode: CaptureMode) => void;
   closeMatch: () => void;
   reopenMatch: () => void;
   setObservations: (text: string) => void;
@@ -48,7 +46,17 @@ interface MatchContextValue {
 const MatchContext = createContext<MatchContextValue | null>(null);
 
 function toPointInput(event: PointEvent, sequenceNumber: number): MatchPointInput {
-  return { sequenceNumber, wonBy: event.wonBy, detail: event.detail, firstServeIn: event.firstServeIn };
+  return {
+    sequenceNumber,
+    wonBy: event.wonBy,
+    detail: event.detail,
+    firstServeIn: event.firstServeIn,
+    serveDirection: event.serveDirection,
+    errorDirection: event.errorDirection,
+    rallyLength: event.rallyLength,
+    netApproach: event.netApproach,
+    isReturnError: event.isReturnError,
+  };
 }
 
 export function MatchProvider({
@@ -88,7 +96,9 @@ export function MatchProvider({
 
   function bulkSync(events: PointEvent[]) {
     if (events.length === 0) return;
-    enqueue((authToken) => createMatchPointsBulk(authToken, matchId, events.map(toPointInput)));
+    // events.map(toPointInput) would pass Array.map's 0-based index straight through as
+    // sequenceNumber — off by one against the server's 1-based, positive-only sequence.
+    enqueue((authToken) => createMatchPointsBulk(authToken, matchId, events.map((event, i) => toPointInput(event, i + 1))));
   }
 
   /** Compartido por undoLast y reopenMatch (que también deshace el punto final del partido). */
@@ -146,17 +156,13 @@ export function MatchProvider({
     reducerState,
     matchState,
     stats,
-    addPoint: (wonBy, detail, firstServeIn = detail !== 'doble_falta') => {
+    addPoint: (input) => {
       const sequenceNumber = reducerState.events.length + 1;
-      const event = createPointEvent(wonBy, detail, firstServeIn);
+      const event = createPointEvent(input);
       dispatch({ type: 'ADD_POINT', payload: event });
       enqueue((authToken) => createMatchPoint(authToken, matchId, toPointInput(event, sequenceNumber)));
     },
     undoLast: performUndo,
-    setMode: (mode) => {
-      dispatch({ type: 'SET_MODE', payload: mode });
-      enqueue((authToken) => updateMatchCaptureMode(authToken, matchId, mode));
-    },
     closeMatch: () => {
       dispatch({ type: 'CLOSE_MATCH' });
       enqueue((authToken) => updateMatchStatus(authToken, matchId, 'completed'));

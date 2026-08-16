@@ -1,6 +1,6 @@
 import type { Pool, PoolClient } from 'pg';
 import { pool } from '../lib/db.js';
-import type { MatchPlayerSlot, MatchPointEvent, PointDetail } from '../types.js';
+import type { MatchPlayerSlot, MatchPointEvent, PointDetail, ServeDirection, ErrorDirection, RallyLength } from '../types.js';
 
 type Queryable = Pool | PoolClient;
 
@@ -13,6 +13,11 @@ function mapRow(row: any): MatchPointEvent {
     wonBy: row.won_by,
     detail: row.detail,
     firstServeIn: row.first_serve_in,
+    serveDirection: row.serve_direction,
+    errorDirection: row.error_direction,
+    rallyLength: row.rally_length,
+    netApproach: row.net_approach,
+    isReturnError: row.is_return_error,
   };
 }
 
@@ -21,6 +26,11 @@ export interface PointInput {
   wonBy: MatchPlayerSlot;
   detail: PointDetail | null;
   firstServeIn: boolean;
+  serveDirection: ServeDirection | null;
+  errorDirection: ErrorDirection | null;
+  rallyLength: RallyLength | null;
+  netApproach: boolean;
+  isReturnError: boolean;
 }
 
 /**
@@ -30,11 +40,24 @@ export interface PointInput {
  */
 export async function create(matchId: string, point: PointInput, db: Queryable = pool): Promise<MatchPointEvent> {
   const { rows } = await db.query(
-    `INSERT INTO match_point_events (match_id, sequence_number, won_by, detail, first_serve_in)
-     VALUES ($1, $2, $3, $4, $5)
+    `INSERT INTO match_point_events
+       (match_id, sequence_number, won_by, detail, first_serve_in,
+        serve_direction, error_direction, rally_length, net_approach, is_return_error)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
      ON CONFLICT (match_id, sequence_number) DO NOTHING
      RETURNING *`,
-    [matchId, point.sequenceNumber, point.wonBy, point.detail, point.firstServeIn],
+    [
+      matchId,
+      point.sequenceNumber,
+      point.wonBy,
+      point.detail,
+      point.firstServeIn,
+      point.serveDirection,
+      point.errorDirection,
+      point.rallyLength,
+      point.netApproach,
+      point.isReturnError,
+    ],
   );
   if (rows.length > 0) return mapRow(rows[0]);
   const { rows: existing } = await db.query(

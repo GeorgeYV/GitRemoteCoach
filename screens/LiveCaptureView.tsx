@@ -1,42 +1,15 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import DetailSheet from '../components/DetailSheet';
+import PointFlow from '../components/PointFlow';
 import LiveStatsBar from '../components/LiveStatsBar';
-import ModeSwitch from '../components/ModeSwitch';
-import PointButtons from '../components/PointButtons';
 import ScoreHeader from '../components/ScoreHeader';
 import { useMatch } from '../context/MatchContext';
 import { colors, withOpacity } from '../lib/theme';
-import { PlayerId, PointDetail } from '../lib/types';
 
 export default function LiveCaptureView({ roundLabel }: { roundLabel: string }) {
-  const { reducerState, matchState, addPoint, undoLast, setMode, closeMatch, canUndo, syncError, retrySync } =
-    useMatch();
-  const [pendingWonBy, setPendingWonBy] = useState<PlayerId | null>(null);
-
+  const { matchState, undoLast, closeMatch, canUndo, syncError, retrySync } = useMatch();
   const matchEnded = matchState.matchEnded;
-
-  function handlePoint(wonBy: PlayerId) {
-    if (reducerState.mode === 'rapida') {
-      addPoint(wonBy, null);
-      return;
-    }
-    // A detail sheet may already be open for the previous point. Never make the
-    // coach wait for it: commit that one with no detail (same as a timeout) and
-    // immediately open the sheet for the new point.
-    if (pendingWonBy) {
-      addPoint(pendingWonBy, null);
-    }
-    setPendingWonBy(wonBy);
-  }
-
-  function handleDetailConfirm(detail: PointDetail | null) {
-    if (pendingWonBy) {
-      addPoint(pendingWonBy, detail);
-    }
-    setPendingWonBy(null);
-  }
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -56,11 +29,7 @@ export default function LiveCaptureView({ roundLabel }: { roundLabel: string }) 
           <Text style={styles.finishLabel}>{matchEnded ? 'Ver resumen ↓' : 'Finalizar partido'}</Text>
         </Pressable>
 
-        <ModeSwitch mode={reducerState.mode} onChange={setMode} />
-
-        <PointButtons disabled={matchEnded} onPoint={handlePoint} />
-
-        <DetailSheet pendingWonBy={pendingWonBy} onConfirm={handleDetailConfirm} />
+        <PointFlow />
       </View>
 
       <LiveStatsBar />
@@ -77,8 +46,7 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 16,
     paddingTop: 10,
-    gap: 14,
-    position: 'relative',
+    gap: 10,
   },
   finishLink: {
     alignSelf: 'center',

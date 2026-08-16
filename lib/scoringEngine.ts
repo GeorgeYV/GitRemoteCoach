@@ -231,6 +231,14 @@ export function getAllGames(state: MatchState): GameRecord[] {
   return [...state.completedSets.flatMap((s) => s.games), ...state.currentSetGames];
 }
 
+/** Who serves the next point right now — accounts for the mid-tiebreak rotation, unlike
+ * `state.server`, which only tracks the server of the current/next regular game. */
+export function getCurrentServer(state: MatchState): PlayerId {
+  if (!state.inTiebreak) return state.server;
+  const pointIndex = state.tiebreakPoints.player1 + state.tiebreakPoints.player2;
+  return tiebreakServerForPoint(pointIndex, state.tiebreakInitialServer as PlayerId);
+}
+
 export interface GamePointLabels {
   player1: string;
   player2: string;
@@ -254,4 +262,33 @@ export function getGamePointLabels(points: { player1: number; player2: number },
 
   if (a > b) return { player1: 'AD', player2: '40' };
   return { player1: '40', player2: 'AD' };
+}
+
+export type PressureLevel = 'alta' | 'media' | 'baja';
+
+/** (leader, trailer) game-point pairs the coach reads as a clear cushion: 40-0, 40-15, 30-0 and their mirrors. */
+const CLEAR_LEAD_PAIRS: ReadonlyArray<readonly [number, number]> = [
+  [3, 0],
+  [0, 3],
+  [3, 1],
+  [1, 3],
+  [2, 0],
+  [0, 2],
+];
+
+/** Derived, never captured by the coach: tie-break, deuce/advantage or a break point read as 'alta';
+ * a clear game-point cushion reads as 'baja'; everything else is 'media'. */
+export function getPressureLevel(state: MatchState, config: MatchConfig): PressureLevel {
+  if (state.inTiebreak) return 'alta';
+
+  const { player1: a, player2: b } = state.currentGamePoints;
+  if (a >= 3 && b >= 3) return 'alta';
+
+  const returner = otherPlayer(state.server);
+  const afterReturnerPoint = { ...state.currentGamePoints, [returner]: state.currentGamePoints[returner] + 1 };
+  if (gameWinner(afterReturnerPoint, config.noAd) === returner) return 'alta';
+
+  if (CLEAR_LEAD_PAIRS.some(([x, y]) => a === x && b === y)) return 'baja';
+
+  return 'media';
 }

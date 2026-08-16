@@ -12,6 +12,10 @@ export interface PlayerStats {
   returnGamesPlayed: number;
   breaksConverted: number;
   breaksSuffered: number;
+  /** "devoluciones regaladas": unforced errors made specifically on the return of serve. */
+  returnErrorsGifted: number;
+  /** points played while returning (server was the opponent) — denominator for the above. */
+  returnPointsPlayed: number;
 }
 
 export interface MatchStats {
@@ -31,6 +35,8 @@ function emptyStats(): PlayerStats {
     returnGamesPlayed: 0,
     breaksConverted: 0,
     breaksSuffered: 0,
+    returnErrorsGifted: 0,
+    returnPointsPlayed: 0,
   };
 }
 
@@ -40,10 +46,13 @@ export function computeMatchStats(state: MatchState): MatchStats {
   const firstServesIn: Record<PlayerId, number> = { player1: 0, player2: 0 };
 
   for (const { event, server } of state.pointHistory) {
+    const loser = otherPlayer(event.wonBy);
+
     switch (event.detail) {
       case 'winner_derecha':
       case 'winner_reves':
       case 'winner_volea':
+      case 'winner':
         stats[event.wonBy].winners += 1;
         break;
       case 'ace':
@@ -51,13 +60,15 @@ export function computeMatchStats(state: MatchState): MatchStats {
         stats[event.wonBy].aces += 1;
         break;
       case 'doble_falta':
-        stats[otherPlayer(event.wonBy)].doubleFaults += 1;
-        break;
-      case 'error_no_forzado':
-        stats[otherPlayer(event.wonBy)].unforcedErrors += 1;
+        stats[loser].doubleFaults += 1;
         break;
       case 'error_forzado':
-        stats[otherPlayer(event.wonBy)].forcedErrors += 1;
+        stats[loser].forcedErrors += 1;
+        break;
+      case 'error_no_forzado':
+      case 'error_no_forzado_derecha':
+      case 'error_no_forzado_reves':
+        stats[loser].unforcedErrors += 1;
         break;
       default:
         break;
@@ -65,6 +76,10 @@ export function computeMatchStats(state: MatchState): MatchStats {
 
     firstServeAttempts[server] += 1;
     if (event.firstServeIn) firstServesIn[server] += 1;
+
+    const returner = otherPlayer(server);
+    stats[returner].returnPointsPlayed += 1;
+    if (event.isReturnError) stats[returner].returnErrorsGifted += 1;
   }
 
   (['player1', 'player2'] as PlayerId[]).forEach((p) => {
@@ -84,4 +99,8 @@ export function computeMatchStats(state: MatchState): MatchStats {
   }
 
   return { player1: stats.player1, player2: stats.player2 };
+}
+
+export function returnErrorsGiftedPct(stats: PlayerStats): number | null {
+  return stats.returnPointsPlayed > 0 ? Math.round((stats.returnErrorsGifted / stats.returnPointsPlayed) * 100) : null;
 }
