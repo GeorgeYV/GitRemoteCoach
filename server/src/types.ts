@@ -333,7 +333,8 @@ export type PointDetail =
   | 'error_forzado'
   | 'error_no_forzado'
   | 'error_no_forzado_derecha'
-  | 'error_no_forzado_reves';
+  | 'error_no_forzado_reves'
+  | 'dato_no_capturado';
 export type ServeDirection = 'T' | 'cuerpo' | 'abierto';
 export type ErrorDirection = 'red' | 'larga' | 'ancha';
 export type RallyLength = 'corto' | 'medio' | 'largo';

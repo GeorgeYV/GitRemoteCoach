@@ -11,7 +11,9 @@ export type PointDetail =
   | 'error_forzado'
   | 'error_no_forzado'
   | 'error_no_forzado_derecha'
-  | 'error_no_forzado_reves';
+  | 'error_no_forzado_reves'
+  /** "Punto no visto" con Hija/Rival — el marcador avanza pero el punto queda fuera de los % (saque, etc). */
+  | 'dato_no_capturado';
 
 export type ServeDirection = 'T' | 'cuerpo' | 'abierto';
 export type ErrorDirection = 'red' | 'larga' | 'ancha';
@@ -56,4 +58,5 @@ export const POINT_DETAIL_LABELS: Record<PointDetail, string> = {
   error_no_forzado: 'Error no forzado',
   error_no_forzado_derecha: 'Error no forzado (derecha)',
   error_no_forzado_reves: 'Error no forzado (revés)',
+  dato_no_capturado: 'Punto no visto',
 };

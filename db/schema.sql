@@ -75,7 +75,9 @@ CREATE TYPE point_detail AS ENUM (
   'error_forzado',
   'error_no_forzado',
   'error_no_forzado_derecha',
-  'error_no_forzado_reves'
+  'error_no_forzado_reves',
+  -- "Punto no visto" (Hija/Rival) — el marcador avanza pero el punto queda fuera de los %.
+  'dato_no_capturado'
 );
 
 -- Metadatos opcionales del flujo de captura (Paso 1/3 de lib/types.ts) — ver match_point_events.

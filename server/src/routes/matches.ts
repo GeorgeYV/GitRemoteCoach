@@ -19,6 +19,7 @@ const POINT_DETAIL = [
   'error_no_forzado',
   'error_no_forzado_derecha',
   'error_no_forzado_reves',
+  'dato_no_capturado',
 ] as const;
 const SERVE_DIRECTION = ['T', 'cuerpo', 'abierto'] as const;
 const ERROR_DIRECTION = ['red', 'larga', 'ancha'] as const;

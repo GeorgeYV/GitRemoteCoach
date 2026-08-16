@@ -37,11 +37,15 @@ function PointScore({ player }: { player: PlayerId }) {
 export default function ScoreHeader({
   roundLabel,
   canUndo,
+  undoBudget,
   onUndo,
+  onOpenMenu,
 }: {
   roundLabel: string;
   canUndo: boolean;
+  undoBudget: number;
   onUndo: () => void;
+  onOpenMenu: () => void;
 }) {
   const { config, matchState } = useMatch();
   const currentServer = matchState.matchEnded ? null : getCurrentServer(matchState);
@@ -52,9 +56,14 @@ export default function ScoreHeader({
         <Text style={styles.matchTag} numberOfLines={1}>
           {matchState.matchEnded ? 'PARTIDO FINALIZADO' : roundLabel}
         </Text>
-        <Pressable disabled={!canUndo} onPress={onUndo} style={[styles.undoBtn, !canUndo && styles.undoBtnDisabled]}>
-          <Text style={styles.undoLabel}>↺ Deshacer</Text>
-        </Pressable>
+        <View style={styles.headerActions}>
+          <Pressable disabled={!canUndo} onPress={onUndo} style={[styles.undoBtn, !canUndo && styles.undoBtnDisabled]}>
+            <Text style={styles.undoLabel}>↺ Deshacer {undoBudget}/3</Text>
+          </Pressable>
+          <Pressable onPress={onOpenMenu} style={styles.menuBtn} hitSlop={8}>
+            <Text style={styles.menuLabel}>⋯</Text>
+          </Pressable>
+        </View>
       </View>
 
       <View style={styles.playersRow}>
@@ -109,6 +118,11 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     marginRight: 10,
   },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   undoBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -124,6 +138,19 @@ const styles = StyleSheet.create({
     color: colors.lineWhite,
     fontSize: 12,
     fontWeight: '600',
+  },
+  menuBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  menuLabel: {
+    color: colors.lineWhite,
+    fontSize: 16,
+    fontWeight: '800',
   },
   playersRow: {
     flexDirection: 'row',

@@ -74,6 +74,10 @@ export function computeMatchStats(state: MatchState): MatchStats {
         break;
     }
 
+    // "Punto no visto": el marcador ya avanzó al procesar el evento (scoringEngine no mira
+    // `detail`), pero el punto queda fuera de todos los % — no hay dato real que promediar.
+    if (event.detail === 'dato_no_capturado') continue;
+
     firstServeAttempts[server] += 1;
     if (event.firstServeIn) firstServesIn[server] += 1;
 

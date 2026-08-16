@@ -37,6 +37,8 @@ interface MatchContextValue {
   setObservations: (text: string) => void;
   resetMatch: () => void;
   canUndo: boolean;
+  /** 0-3: cuántos niveles de deshacer quedan disponibles ahora mismo. */
+  undoBudget: number;
   /** Error de la última sincronización con el servidor fallida (nunca bloquea la captura local). */
   syncError: string | null;
   /** Reenvía todos los puntos locales actuales — botón "Reintentar sincronización". */
@@ -101,13 +103,21 @@ export function MatchProvider({
     enqueue((authToken) => createMatchPointsBulk(authToken, matchId, events.map((event, i) => toPointInput(event, i + 1))));
   }
 
-  /** Compartido por undoLast y reopenMatch (que también deshace el punto final del partido). */
+  /** Undo del botón "Deshacer" del header — respeta la pila de 3 niveles. */
   function performUndo() {
+    if (reducerState.undoBudget <= 0) return;
     const sequenceNumber = reducerState.events.length;
     dispatch({ type: 'UNDO_LAST' });
-    if (sequenceNumber > 0) {
-      enqueue((authToken) => deleteMatchPoint(authToken, matchId, sequenceNumber));
-    }
+    enqueue((authToken) => deleteMatchPoint(authToken, matchId, sequenceNumber));
+  }
+
+  /** Deshace el último punto sin tocar la pila de 3 niveles — usado solo por reopenMatch para
+   * corregir el punto que acaba de cerrar el partido, que no es el caso que ese límite protege. */
+  function forceUndo() {
+    if (reducerState.events.length === 0) return;
+    const sequenceNumber = reducerState.events.length;
+    dispatch({ type: 'FORCE_UNDO_LAST' });
+    enqueue((authToken) => deleteMatchPoint(authToken, matchId, sequenceNumber));
   }
 
   useEffect(() => {
@@ -171,7 +181,7 @@ export function MatchProvider({
       // if the match ended on its own, undoing its final point is what actually
       // lets the coach get back into LiveCaptureView (matchEnded is derived from
       // events, not a flag REOPEN_MATCH alone can clear).
-      if (matchState.matchEnded) performUndo();
+      if (matchState.matchEnded) forceUndo();
       dispatch({ type: 'REOPEN_MATCH' });
       enqueue((authToken) => updateMatchStatus(authToken, matchId, 'in_progress'));
     },
@@ -181,7 +191,8 @@ export function MatchProvider({
       AsyncStorage.removeItem(STORAGE_KEY).catch(() => {});
       enqueue((authToken) => restartMatch(authToken, matchId));
     },
-    canUndo: reducerState.events.length > 0,
+    canUndo: reducerState.undoBudget > 0,
+    undoBudget: reducerState.undoBudget,
     syncError,
     retrySync: () => bulkSync(reducerState.events),
   };

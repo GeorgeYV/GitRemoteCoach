@@ -1,19 +1,43 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import ContingencyMenu from '../components/ContingencyMenu';
 import PointFlow from '../components/PointFlow';
 import LiveStatsBar from '../components/LiveStatsBar';
 import ScoreHeader from '../components/ScoreHeader';
 import { useMatch } from '../context/MatchContext';
 import { colors, withOpacity } from '../lib/theme';
+import { PlayerId } from '../lib/types';
 
 export default function LiveCaptureView({ roundLabel }: { roundLabel: string }) {
-  const { matchState, undoLast, closeMatch, canUndo, syncError, retrySync } = useMatch();
+  const { config, matchState, addPoint, undoLast, closeMatch, canUndo, undoBudget, syncError, retrySync } =
+    useMatch();
+  const [menuOpen, setMenuOpen] = useState(false);
   const matchEnded = matchState.matchEnded;
+
+  function handlePointNotSeen(winner: PlayerId) {
+    addPoint({
+      wonBy: winner,
+      detail: 'dato_no_capturado',
+      firstServeIn: true,
+      serveDirection: null,
+      errorDirection: null,
+      rallyLength: null,
+      netApproach: false,
+      isReturnError: false,
+    });
+    setMenuOpen(false);
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <ScoreHeader roundLabel={roundLabel} canUndo={canUndo} onUndo={undoLast} />
+      <ScoreHeader
+        roundLabel={roundLabel}
+        canUndo={canUndo}
+        undoBudget={undoBudget}
+        onUndo={undoLast}
+        onOpenMenu={() => setMenuOpen(true)}
+      />
 
       {syncError && (
         <View style={styles.syncBanner}>
@@ -33,6 +57,14 @@ export default function LiveCaptureView({ roundLabel }: { roundLabel: string }) 
       </View>
 
       <LiveStatsBar />
+
+      <ContingencyMenu
+        visible={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        player1Name={config.player1Name}
+        player2Name={config.player2Name}
+        onPointNotSeen={handlePointNotSeen}
+      />
     </SafeAreaView>
   );
 }
