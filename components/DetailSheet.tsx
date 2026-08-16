@@ -1,9 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors, radius } from '../lib/theme';
 import { PlayerId, POINT_DETAIL_LABELS, PointDetail } from '../lib/types';
 
-const AUTO_CONFIRM_SECONDS = 4;
 const CATEGORIES: PointDetail[] = [
   'winner_derecha',
   'winner_reves',
@@ -21,59 +20,21 @@ export default function DetailSheet({
   pendingWonBy: PlayerId | null;
   onConfirm: (detail: PointDetail | null) => void;
 }) {
-  const [secondsLeft, setSecondsLeft] = useState(AUTO_CONFIRM_SECONDS);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const resolvedRef = useRef(false);
-
-  const visible = pendingWonBy !== null;
-
-  useEffect(() => {
-    if (!visible) return;
-
-    resolvedRef.current = false;
-    setSecondsLeft(AUTO_CONFIRM_SECONDS);
-
-    intervalRef.current = setInterval(() => {
-      setSecondsLeft((s) => {
-        if (s <= 1) {
-          resolve(null);
-          return 0;
-        }
-        return s - 1;
-      });
-    }, 1000);
-
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, pendingWonBy]);
-
-  function resolve(detail: PointDetail | null) {
-    if (resolvedRef.current) return;
-    resolvedRef.current = true;
-    if (intervalRef.current) clearInterval(intervalRef.current);
-    onConfirm(detail);
-  }
-
-  if (!visible) return null;
+  if (pendingWonBy === null) return null;
 
   return (
     <View style={styles.sheet}>
-      <View style={styles.titleRow}>
-        <Text style={styles.title}>¿Cómo se ganó el punto?</Text>
-        <Text style={styles.timer}>{secondsLeft}s</Text>
-      </View>
+      <Text style={styles.title}>¿Cómo se ganó el punto?</Text>
 
       <View style={styles.grid}>
         {CATEGORIES.map((cat) => (
-          <Pressable key={cat} style={styles.categoryButton} onPress={() => resolve(cat)}>
+          <Pressable key={cat} style={styles.categoryButton} onPress={() => onConfirm(cat)}>
             <Text style={styles.categoryLabel}>{POINT_DETAIL_LABELS[cat]}</Text>
           </Pressable>
         ))}
       </View>
 
-      <Pressable style={styles.skipButton} onPress={() => resolve(null)}>
+      <Pressable style={styles.skipButton} onPress={() => onConfirm(null)}>
         <Text style={styles.skipLabel}>Omitir detalle</Text>
       </Pressable>
     </View>
@@ -97,22 +58,12 @@ const styles = StyleSheet.create({
     shadowRadius: 30,
     elevation: 12,
   },
-  titleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-  },
   title: {
     fontSize: 12,
     color: colors.textDim,
     letterSpacing: 1,
     textTransform: 'uppercase',
-  },
-  timer: {
-    color: colors.courtBlue,
-    fontVariant: ['tabular-nums'],
-    fontSize: 12,
-    fontWeight: '700',
+    marginBottom: 10,
   },
   grid: {
     flexDirection: 'row',
