@@ -111,6 +111,19 @@ export async function findSuspendedByCoach(coachId: string, db: Queryable = pool
   return { matchId: rows[0].match_id, bookingId: rows[0].booking_id, playerName: rows[0].player_name };
 }
 
+/** CoachSessionHistoryScreen: insignia roja "Partido Finalizado por Retiro" en la lista — un
+ * solo SELECT para toda la lista en vez de una llamada por reserva. */
+export async function listRetiredBookingIdsByCoach(coachId: string, db: Queryable = pool): Promise<string[]> {
+  const { rows } = await db.query(
+    `SELECT m.booking_id
+       FROM matches m
+       JOIN bookings b ON b.id = m.booking_id
+      WHERE b.coach_id = $1 AND m.retired_by IS NOT NULL`,
+    [coachId],
+  );
+  return rows.map((row) => row.booking_id);
+}
+
 /** Fija completed_at explícitamente (no depende del trigger, que pg-mem no ejecuta) —
  * mismo patrón que paymentService.completeBooking con bookings.completed_at. */
 export async function updateStatus(id: string, status: MatchStatus, db: Queryable = pool): Promise<Match> {

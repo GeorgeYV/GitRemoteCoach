@@ -476,6 +476,14 @@ export function getSuspendedMatch(authToken: string, coachId: string): Promise<S
   });
 }
 
+/** GET /coaches/:id/retired-bookings — CoachSessionHistoryScreen: ids de reserva cuyo partido
+ * terminó por retiro, para la insignia roja en la lista. */
+export function listRetiredBookingIds(authToken: string, coachId: string): Promise<string[]> {
+  return request(`/coaches/${coachId}/retired-bookings`, {
+    headers: { Authorization: `Bearer ${authToken}` },
+  });
+}
+
 /** Espeja server/src/types.ts#CoachSearchResult. */
 export interface CoachSearchResult {
   id: string;

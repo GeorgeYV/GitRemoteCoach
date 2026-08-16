@@ -103,6 +103,10 @@ export async function getSuspendedMatchForCoach(coachId: string) {
   return matchRepository.findSuspendedByCoach(coachId);
 }
 
+export async function getRetiredBookingIds(coachId: string): Promise<string[]> {
+  return matchRepository.listRetiredBookingIdsByCoach(coachId);
+}
+
 export async function setObservations(matchId: string, coachObservations: string): Promise<Match> {
   return matchRepository.updateObservations(matchId, coachObservations);
 }

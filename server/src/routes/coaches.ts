@@ -77,6 +77,15 @@ export async function coachRoutes(app: FastifyInstance): Promise<void> {
     return matchService.getSuspendedMatchForCoach(id);
   });
 
+  // CoachSessionHistoryScreen: insignia roja "Partido Finalizado por Retiro" en la lista —
+  // privado, igual criterio que suspended-match.
+  app.get('/coaches/:id/retired-bookings', { preHandler: app.authenticate }, async (req) => {
+    const { id } = req.params as { id: string };
+    const { sub } = req.user as { sub: string };
+    if (sub !== id) throw new ForbiddenError('Solo el propio entrenador puede ver esto');
+    return matchService.getRetiredBookingIds(id);
+  });
+
   // CoachAvailabilityScreen, CoachTournamentSearchScreen, CoachReputationScreen: insignias de
   // "entrenador oficial" — público, igual que /coaches/:id/reviews.
   app.get('/coaches/:id/club-tags', async (req) => {

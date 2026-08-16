@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import CoachBookingStatusPill from '../../components/coach/CoachBookingStatusPill';
 import InitialAvatar from '../../components/shared/InitialAvatar';
 import { useAuth } from '../../context/AuthContext';
-import { ApiError, BookingWithParticipants, listCoachBookings } from '../../lib/api';
+import { ApiError, BookingWithParticipants, listCoachBookings, listRetiredBookingIds } from '../../lib/api';
 import { toCoachBooking } from '../../lib/coachBookingDisplay';
 import { colors, radius } from '../../lib/theme';
 import { CoachBooking } from '../../mock/coachFlow';
@@ -24,6 +24,7 @@ const DECIDED_STATUSES: BookingWithParticipants['status'][] = [
 export default function CoachSessionHistoryScreen({ coachId, onBack }: { coachId: string; onBack?: () => void }) {
   const { token } = useAuth();
   const [bookings, setBookings] = useState<CoachBooking[] | null>(null);
+  const [retiredBookingIds, setRetiredBookingIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [cancelTarget, setCancelTarget] = useState<CoachBooking | null>(null);
   const [chatTarget, setChatTarget] = useState<CoachBooking | null>(null);
@@ -43,6 +44,21 @@ export default function CoachSessionHistoryScreen({ coachId, onBack }: { coachId
         if (cancelled) return;
         setError(err instanceof ApiError ? err.message : 'No se pudieron cargar tus sesiones.');
       });
+    return () => {
+      cancelled = true;
+    };
+  }, [coachId, token]);
+
+  // Insignia "Partido Finalizado por Retiro" — separado del efecto de arriba porque una falla acá
+  // no debe bloquear la lista de sesiones en sí, solo dejar la insignia sin mostrar.
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+    listRetiredBookingIds(token, coachId)
+      .then((ids) => {
+        if (!cancelled) setRetiredBookingIds(new Set(ids));
+      })
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -109,6 +125,7 @@ export default function CoachSessionHistoryScreen({ coachId, onBack }: { coachId
               <BookingRow
                 key={booking.id}
                 booking={booking}
+                retired={retiredBookingIds.has(booking.id)}
                 onCancel={() => setCancelTarget(booking)}
                 onChat={() => setChatTarget(booking)}
               />
@@ -119,7 +136,7 @@ export default function CoachSessionHistoryScreen({ coachId, onBack }: { coachId
         <Section label="Anteriores" hidden={past.length === 0}>
           <View style={styles.list}>
             {past.map((booking) => (
-              <BookingRow key={booking.id} booking={booking} />
+              <BookingRow key={booking.id} booking={booking} retired={retiredBookingIds.has(booking.id)} />
             ))}
           </View>
         </Section>
@@ -146,10 +163,12 @@ function Section({ label, hidden, children }: { label: string; hidden?: boolean;
 
 function BookingRow({
   booking,
+  retired,
   onCancel,
   onChat,
 }: {
   booking: CoachBooking;
+  retired?: boolean;
   onCancel?: () => void;
   onChat?: () => void;
 }) {
@@ -169,6 +188,11 @@ function BookingRow({
         <Text style={styles.meta} numberOfLines={1}>
           {booking.date} · {booking.time} · {booking.venue}
         </Text>
+        {retired && (
+          <View style={styles.retiredBadge}>
+            <Text style={styles.retiredBadgeLabel}>PARTIDO FINALIZADO POR RETIRO</Text>
+          </View>
+        )}
         <View style={styles.statusRow}>
           <CoachBookingStatusPill status={booking.status} />
           <View style={styles.rowActions}>
@@ -279,6 +303,20 @@ const styles = StyleSheet.create({
     color: colors.textDim,
     fontSize: 12,
     marginBottom: 10,
+  },
+  retiredBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: colors.errorCoral,
+    borderRadius: 8,
+    paddingVertical: 3,
+    paddingHorizontal: 7,
+    marginBottom: 8,
+  },
+  retiredBadgeLabel: {
+    color: '#fff',
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.4,
   },
   statusRow: {
     gap: 6,
