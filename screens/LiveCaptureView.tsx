@@ -29,7 +29,6 @@ export default function LiveCaptureView({ roundLabel }: { roundLabel: string }) 
     retrySync,
   } = useMatch();
   const [menuOpen, setMenuOpen] = useState(false);
-  const matchEnded = matchState.matchEnded;
 
   function handlePointNotSeen(winner: PlayerId) {
     addPoint({
@@ -59,6 +58,7 @@ export default function LiveCaptureView({ roundLabel }: { roundLabel: string }) 
       onResume={resumeMatch}
       onSuspend={suspendMatch}
       onRetire={retireMatch}
+      onFinish={closeMatch}
     />
   );
 
@@ -108,11 +108,7 @@ export default function LiveCaptureView({ roundLabel }: { roundLabel: string }) 
       )}
 
       <View style={styles.captureArea}>
-        <Pressable style={styles.finishLink} onPress={closeMatch} disabled={matchEnded}>
-          <Text style={styles.finishLabel}>{matchEnded ? 'Ver resumen ↓' : 'Finalizar partido'}</Text>
-        </Pressable>
-
-        <PointFlow />
+        <PointFlow onOpenMenu={() => setMenuOpen(true)} />
       </View>
 
       <LiveStatsBar />
@@ -132,14 +128,6 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingTop: 10,
     gap: 10,
-  },
-  finishLink: {
-    alignSelf: 'center',
-  },
-  finishLabel: {
-    color: colors.textDim,
-    fontSize: 12,
-    textDecorationLine: 'underline',
   },
   syncBanner: {
     flexDirection: 'row',

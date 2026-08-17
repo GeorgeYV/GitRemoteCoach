@@ -5,7 +5,8 @@
       "name": "tennis-live-capture-web",
       "runtimeExecutable": "C:\\Users\\jorge\\OneDrive\\Documents\\Claude\\Remote Coach\\.tools\\node-v20.18.1-win-x64\\node.exe",
       "runtimeArgs": ["node_modules/expo/bin/cli", "start", "--web"],
-      "port": 8081
+      "port": 8081,
+      "autoPort": true
     },
     {
       "name": "tennis-live-capture-attach",

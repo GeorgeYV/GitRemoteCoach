@@ -6,11 +6,13 @@ import { computeMatchStats, MatchStats } from '../lib/statsEngine';
 import {
   createPointEvent,
   createScoreAdjustment,
+  createVoiceNote,
   initialReducerState,
   matchReducer,
   MatchReducerState,
   NewAdjustmentInput,
   NewPointInput,
+  NewVoiceNoteInput,
 } from '../lib/matchReducer';
 import { MatchConfig, PlayerId, PointEvent, ScoreAdjustment } from '../lib/types';
 import {
@@ -45,6 +47,9 @@ interface MatchContextValue {
   match: Match;
   addPoint: (input: NewPointInput) => void;
   addAdjustment: (input: NewAdjustmentInput) => void;
+  /** Solo local — el clip de audio nunca sale del dispositivo, no hay sync a servidor. */
+  addVoiceNote: (input: NewVoiceNoteInput) => void;
+  deleteVoiceNote: (id: string) => void;
   undoLast: () => void;
   closeMatch: () => void;
   reopenMatch: () => void;
@@ -223,6 +228,8 @@ export function MatchProvider({
       dispatch({ type: 'ADD_ADJUSTMENT', payload: adjustment });
       enqueue((authToken) => createMatchScoreAdjustment(authToken, matchId, toAdjustmentInput(adjustment, sequenceNumber)));
     },
+    addVoiceNote: (input) => dispatch({ type: 'ADD_VOICE_NOTE', payload: createVoiceNote(input) }),
+    deleteVoiceNote: (id) => dispatch({ type: 'DELETE_VOICE_NOTE', payload: { id } }),
     undoLast: performUndo,
     closeMatch: () => {
       dispatch({ type: 'CLOSE_MATCH' });

@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useMatch } from '../context/MatchContext';
 import { NewPointInput } from '../lib/matchReducer';
 import { getCurrentServer } from '../lib/scoringEngine';
 import { colors, radius } from '../lib/theme';
 import { ErrorDirection, PlayerId, PointDetail, RallyLength, ServeDirection } from '../lib/types';
 import PointButtons from './PointButtons';
+import VoiceNoteRecorder from './VoiceNoteRecorder';
 
 type Step = 'serve' | 'outcome' | 'meta';
 
@@ -24,7 +25,7 @@ interface PendingPoint {
 
 const UNFORCED_ERROR_DETAILS: PointDetail[] = ['error_no_forzado', 'error_no_forzado_derecha', 'error_no_forzado_reves'];
 
-export default function PointFlow() {
+export default function PointFlow({ onOpenMenu }: { onOpenMenu: () => void }) {
   const { config, matchState, addPoint } = useMatch();
   const [pending, setPending] = useState<PendingPoint | null>(null);
 
@@ -72,7 +73,7 @@ export default function PointFlow() {
     return (
       <View style={styles.baseContainer}>
         <PointButtons disabled={false} onPoint={startPoint} player1Name={config.player1Name} player2Name={config.player2Name} />
-        <VoiceNoteFooter />
+        <VoiceNoteRecorder onOpenMenu={onOpenMenu} />
       </View>
     );
   }
@@ -120,29 +121,6 @@ export default function PointFlow() {
         />
       )}
     </ScrollView>
-  );
-}
-
-/** Placeholder: no real recording/transcription yet, same call as the end-of-match observations
- * mic button — avoids pulling in a speech-to-text engine for this pass. */
-function VoiceNoteFooter() {
-  return (
-    <View style={styles.voiceRow}>
-      <Pressable
-        style={styles.voiceButton}
-        onPress={() =>
-          Alert.alert('Nota de voz', 'Próximamente: grabá una nota de voz sin salir de la captura.')
-        }
-      >
-        <Text style={styles.voiceLabel}>● Mantené presionado para nota de voz</Text>
-      </Pressable>
-      <Pressable
-        style={styles.sosButton}
-        onPress={() => Alert.alert('SOS', 'Próximamente: contingencias (pausa, retiro, ajuste manual) desde acá.')}
-      >
-        <Text style={styles.sosLabel}>SOS</Text>
-      </Pressable>
-    </View>
   );
 }
 
@@ -410,39 +388,6 @@ const styles = StyleSheet.create({
   baseContainer: {
     flex: 1,
     gap: 10,
-  },
-  voiceRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  voiceButton: {
-    flex: 1,
-    backgroundColor: colors.panel,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    justifyContent: 'center',
-  },
-  voiceLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.textDim,
-  },
-  sosButton: {
-    width: 64,
-    backgroundColor: colors.panel,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sosLabel: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: colors.errorCoral,
   },
   metaHeaderRow: {
     flexDirection: 'row',

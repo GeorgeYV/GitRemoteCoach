@@ -6,7 +6,7 @@ import { getCurrentServer, MatchState } from '../lib/scoringEngine';
 import { colors, radius } from '../lib/theme';
 import { PlayerId } from '../lib/types';
 
-type SubView = 'menu' | 'pointNotSeen' | 'manualAdjustment' | 'suspendConfirm' | 'retire';
+type SubView = 'menu' | 'pointNotSeen' | 'manualAdjustment' | 'suspendConfirm' | 'retire' | 'finishConfirm';
 
 const GAME_POINT_LABELS = ['0', '15', '30', '40'];
 
@@ -27,6 +27,7 @@ export default function ContingencyMenu({
   onResume,
   onSuspend,
   onRetire,
+  onFinish,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -40,6 +41,9 @@ export default function ContingencyMenu({
   onResume: () => void;
   onSuspend: () => void;
   onRetire: (retiredBy: PlayerId) => void;
+  /** Cierre manual antes de que el marcador lo indique solo — ver LiveCaptureView, que ya no
+   * muestra el link "Finalizar partido" fuera de este menú. */
+  onFinish: () => void;
 }) {
   const [subView, setSubView] = useState<SubView>('menu');
   const [gamesP1, setGamesP1] = useState(0);
@@ -96,11 +100,37 @@ export default function ContingencyMenu({
                 }}
               />
               <MenuRow label="Suspender partido" onPress={() => setSubView('suspendConfirm')} />
+              <MenuRow label="Finalizar partido" hint="ANTES DE LO ESPERADO" onPress={() => setSubView('finishConfirm')} />
               <MenuRow
                 label="Terminar por retiro"
                 hint="LESIÓN · DESCALIF."
                 onPress={() => setSubView('retire')}
               />
+            </>
+          )}
+
+          {subView === 'finishConfirm' && (
+            <>
+              <View style={styles.titleRow}>
+                <Text style={styles.title}>Finalizar partido</Text>
+                <Pressable onPress={() => setSubView('menu')} hitSlop={8}>
+                  <Text style={styles.closeLabel}>Atrás</Text>
+                </Pressable>
+              </View>
+              <Text style={styles.subtitle}>
+                Cierra el partido con el marcador actual, aunque todavía no haya un resultado final. Vas a poder
+                volver a abrirlo desde el resumen si fue un error.
+              </Text>
+
+              <Pressable
+                style={styles.applyButton}
+                onPress={() => {
+                  onFinish();
+                  onClose();
+                }}
+              >
+                <Text style={styles.applyLabel}>Finalizar ahora</Text>
+              </Pressable>
             </>
           )}
 

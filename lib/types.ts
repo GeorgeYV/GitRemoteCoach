@@ -50,6 +50,15 @@ export interface ScoreAdjustment {
   server: PlayerId;
 }
 
+/** Clip de audio grabado durante la captura en vivo — solo local (uri de archivo/blob del
+ * dispositivo), sin transcripción ni sync a servidor. */
+export interface VoiceNote {
+  id: string;
+  timestamp: number;
+  uri: string;
+  durationMs: number;
+}
+
 export interface MatchConfig {
   bestOf: 1 | 3;
   noAd: boolean;

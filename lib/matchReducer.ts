@@ -1,10 +1,11 @@
-import { PointEvent, ScoreAdjustment } from './types';
+import { PointEvent, ScoreAdjustment, VoiceNote } from './types';
 
 export const UNDO_STACK_DEPTH = 3;
 
 export interface MatchReducerState {
   events: PointEvent[];
   adjustments: ScoreAdjustment[];
+  voiceNotes: VoiceNote[];
   matchClosed: boolean;
   observations: string;
   /** Bounded undo stack (0-UNDO_STACK_DEPTH): grows by 1 on each new point (capped), shrinks by
@@ -16,6 +17,8 @@ export interface MatchReducerState {
 export type MatchAction =
   | { type: 'ADD_POINT'; payload: PointEvent }
   | { type: 'ADD_ADJUSTMENT'; payload: ScoreAdjustment }
+  | { type: 'ADD_VOICE_NOTE'; payload: VoiceNote }
+  | { type: 'DELETE_VOICE_NOTE'; payload: { id: string } }
   | { type: 'UNDO_LAST' }
   /** Bypasses the 3-level cap — reopenMatch uses this to undo the point that just ended the
    * match, which isn't the "coach fixing a recent capture mistake" case the cap guards against. */
@@ -29,6 +32,7 @@ export type MatchAction =
 export const initialReducerState: MatchReducerState = {
   events: [],
   adjustments: [],
+  voiceNotes: [],
   matchClosed: false,
   observations: '',
   undoBudget: 0,
@@ -44,6 +48,10 @@ export function matchReducer(state: MatchReducerState, action: MatchAction): Mat
       };
     case 'ADD_ADJUSTMENT':
       return { ...state, adjustments: [...state.adjustments, action.payload] };
+    case 'ADD_VOICE_NOTE':
+      return { ...state, voiceNotes: [...state.voiceNotes, action.payload] };
+    case 'DELETE_VOICE_NOTE':
+      return { ...state, voiceNotes: state.voiceNotes.filter((note) => note.id !== action.payload.id) };
     case 'UNDO_LAST':
       if (state.undoBudget <= 0) return state;
       return { ...state, events: state.events.slice(0, -1), undoBudget: state.undoBudget - 1 };
@@ -79,6 +87,16 @@ export function createPointEvent(input: NewPointInput): PointEvent {
 export type NewAdjustmentInput = Omit<ScoreAdjustment, 'id' | 'timestamp'>;
 
 export function createScoreAdjustment(input: NewAdjustmentInput): ScoreAdjustment {
+  return {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    timestamp: Date.now(),
+    ...input,
+  };
+}
+
+export type NewVoiceNoteInput = Omit<VoiceNote, 'id' | 'timestamp'>;
+
+export function createVoiceNote(input: NewVoiceNoteInput): VoiceNote {
   return {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     timestamp: Date.now(),
