@@ -24,7 +24,7 @@ interface PendingPoint {
 
 const UNFORCED_ERROR_DETAILS: PointDetail[] = ['error_no_forzado', 'error_no_forzado_derecha', 'error_no_forzado_reves'];
 
-export default function PointFlow() {
+export default function PointFlow({ onOpenMenu }: { onOpenMenu: () => void }) {
   const { config, matchState, addPoint } = useMatch();
   const [pending, setPending] = useState<PendingPoint | null>(null);
 
@@ -72,7 +72,7 @@ export default function PointFlow() {
     return (
       <View style={styles.baseContainer}>
         <PointButtons disabled={false} onPoint={startPoint} player1Name={config.player1Name} player2Name={config.player2Name} />
-        <VoiceNoteFooter />
+        <VoiceNoteFooter onOpenMenu={onOpenMenu} />
       </View>
     );
   }
@@ -125,7 +125,7 @@ export default function PointFlow() {
 
 /** Placeholder: no real recording/transcription yet, same call as the end-of-match observations
  * mic button — avoids pulling in a speech-to-text engine for this pass. */
-function VoiceNoteFooter() {
+function VoiceNoteFooter({ onOpenMenu }: { onOpenMenu: () => void }) {
   return (
     <View style={styles.voiceRow}>
       <Pressable
@@ -136,10 +136,7 @@ function VoiceNoteFooter() {
       >
         <Text style={styles.voiceLabel}>● Mantené presionado para nota de voz</Text>
       </Pressable>
-      <Pressable
-        style={styles.sosButton}
-        onPress={() => Alert.alert('SOS', 'Próximamente: contingencias (pausa, retiro, ajuste manual) desde acá.')}
-      >
+      <Pressable style={styles.sosButton} onPress={onOpenMenu}>
         <Text style={styles.sosLabel}>SOS</Text>
       </Pressable>
     </View>

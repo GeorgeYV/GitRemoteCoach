@@ -112,7 +112,7 @@ export default function LiveCaptureView({ roundLabel }: { roundLabel: string }) 
           <Text style={styles.finishLabel}>{matchEnded ? 'Ver resumen ↓' : 'Finalizar partido'}</Text>
         </Pressable>
 
-        <PointFlow />
+        <PointFlow onOpenMenu={() => setMenuOpen(true)} />
       </View>
 
       <LiveStatsBar />
