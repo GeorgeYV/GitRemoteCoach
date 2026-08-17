@@ -8,7 +8,7 @@ import { useMatch } from '../context/MatchContext';
 import { colors, radius } from '../lib/theme';
 import { useVoiceRecorder } from '../lib/useVoiceRecorder';
 
-export default function MatchSummaryView() {
+export default function MatchSummaryView({ onGoHome }: { onGoHome?: () => void }) {
   const {
     config,
     matchState,
@@ -91,6 +91,15 @@ export default function MatchSummaryView() {
             <Text style={styles.finishLabel}>Nuevo partido</Text>
           </View>
         </Pressable>
+
+        {onGoHome && (
+          <Pressable style={styles.homeButton} onPress={onGoHome}>
+            <View style={styles.finishContent}>
+              <Ionicons name="home-outline" size={18} color="#FFFFFF" />
+              <Text style={styles.homeLabel}>Ir al inicio</Text>
+            </View>
+          </Pressable>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -218,6 +227,18 @@ const styles = StyleSheet.create({
   },
   finishLabel: {
     color: colors.courtBlueDeep,
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  homeButton: {
+    backgroundColor: colors.courtBlue,
+    borderRadius: radius,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  homeLabel: {
+    color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '800',
   },

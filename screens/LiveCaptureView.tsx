@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import ContingencyMenu from '../components/ContingencyMenu';
 import PointFlow from '../components/PointFlow';
 import ScoreHeader from '../components/ScoreHeader';
+import UndoMenuRow from '../components/UndoMenuRow';
 import { useMatch } from '../context/MatchContext';
 import { colors, radius, withOpacity } from '../lib/theme';
 import { PlayerId } from '../lib/types';
@@ -64,7 +65,7 @@ export default function LiveCaptureView({ roundLabel }: { roundLabel: string }) 
   if (match.status === 'suspended') {
     return (
       <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-        <ScoreHeader roundLabel={roundLabel} canUndo={canUndo} undoBudget={undoBudget} onUndo={undoLast} />
+        <ScoreHeader roundLabel={roundLabel} />
 
         <View style={styles.suspendedArea}>
           <Text style={styles.suspendedTitle}>Partido suspendido</Text>
@@ -74,9 +75,9 @@ export default function LiveCaptureView({ roundLabel }: { roundLabel: string }) 
           <Pressable style={styles.resumeButton} onPress={resumeSuspendedMatch}>
             <Text style={styles.resumeLabel}>Reanudar partido</Text>
           </Pressable>
-          <Pressable style={styles.sosButton} onPress={() => setMenuOpen(true)}>
-            <Text style={styles.sosLabel}>SOS</Text>
-          </Pressable>
+          <View style={styles.suspendedUndoRow}>
+            <UndoMenuRow canUndo={canUndo} undoBudget={undoBudget} onUndo={undoLast} onOpenMenu={() => setMenuOpen(true)} />
+          </View>
         </View>
 
         {contingencyMenu}
@@ -86,7 +87,7 @@ export default function LiveCaptureView({ roundLabel }: { roundLabel: string }) 
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <ScoreHeader roundLabel={roundLabel} canUndo={canUndo} undoBudget={undoBudget} onUndo={undoLast} />
+      <ScoreHeader roundLabel={roundLabel} />
 
       {syncError && (
         <View style={styles.syncBanner}>
@@ -168,18 +169,8 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '800',
   },
-  sosButton: {
+  suspendedUndoRow: {
     marginTop: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius,
-    paddingVertical: 10,
-    paddingHorizontal: 24,
-    backgroundColor: colors.panel,
-  },
-  sosLabel: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: colors.errorCoral,
+    width: '100%',
   },
 });

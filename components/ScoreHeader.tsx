@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { Match } from '../lib/api';
 import { useMatch } from '../context/MatchContext';
 import { getCurrentServer, getGamePointLabels } from '../lib/scoringEngine';
@@ -69,17 +69,7 @@ function PointScore({ player }: { player: PlayerId }) {
   return <Text style={styles.pointScore}>{value}</Text>;
 }
 
-export default function ScoreHeader({
-  roundLabel,
-  canUndo,
-  undoBudget,
-  onUndo,
-}: {
-  roundLabel: string;
-  canUndo: boolean;
-  undoBudget: number;
-  onUndo: () => void;
-}) {
+export default function ScoreHeader({ roundLabel }: { roundLabel: string }) {
   const { config, matchState, match } = useMatch();
   const currentServer = matchState.matchEnded ? null : getCurrentServer(matchState);
 
@@ -91,11 +81,6 @@ export default function ScoreHeader({
             {matchState.matchEnded ? 'PARTIDO FINALIZADO' : roundLabel}
           </Text>
           {!matchState.matchEnded && <MatchTimerLabel match={match} />}
-        </View>
-        <View style={styles.headerActions}>
-          <Pressable disabled={!canUndo} onPress={onUndo} style={[styles.undoBtn, !canUndo && styles.undoBtnDisabled]}>
-            <Text style={styles.undoLabel}>↺ Deshacer {undoBudget}/3</Text>
-          </Pressable>
         </View>
       </View>
 
@@ -158,27 +143,6 @@ const styles = StyleSheet.create({
     color: colors.textDim,
     marginTop: 2,
     fontVariant: ['tabular-nums'],
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  undoBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    paddingVertical: 7,
-    paddingHorizontal: 12,
-    borderRadius: 20,
-  },
-  undoBtnDisabled: {
-    opacity: 0.4,
-  },
-  undoLabel: {
-    color: colors.lineWhite,
-    fontSize: 12,
-    fontWeight: '600',
   },
   playersRow: {
     flexDirection: 'row',

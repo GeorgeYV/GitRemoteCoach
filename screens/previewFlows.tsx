@@ -67,10 +67,18 @@ import ClubRegistrationScreen from './club/ClubRegistrationScreen';
  * del lado coach opera como este entrenador hasta que exista una sesión/login real. */
 export const COACH_ID = mockCarlosMedinaProfile.trainer.id;
 
-export function CoachFlow({ roundLabel = mockRoundLabel }: { roundLabel?: string }) {
+export function CoachFlow({
+  roundLabel = mockRoundLabel,
+  onExit,
+}: {
+  roundLabel?: string;
+  /** Solo se usa en la pantalla de resumen final — volver a capturar/nuevo partido siguen sin
+   * salida, la captura activa sigue siendo forward-only a propósito. */
+  onExit?: () => void;
+}) {
   const { matchState, reducerState } = useMatch();
   const showSummary = matchState.matchEnded || reducerState.matchClosed;
-  return showSummary ? <MatchSummaryView /> : <LiveCaptureView roundLabel={roundLabel} />;
+  return showSummary ? <MatchSummaryView onGoHome={onExit} /> : <LiveCaptureView roundLabel={roundLabel} />;
 }
 
 /** Local two-step flow: pick a tournament, then configure days/rate within it. */
@@ -390,6 +398,13 @@ export function CoachHomeFlow({ coachId, coachName }: { coachId: string; coachNa
     setStep('home');
   }
 
+  // "Ir al inicio" desde el resumen final del partido — a diferencia de handleBookingCompleted
+  // (atado a nextBookingRaw), acá el booking relevante puede ser el de un partido reanudado.
+  function completeBookingAndGoHome(id: string) {
+    setBookings((prev) => prev?.map((b) => (b.id === id ? { ...b, status: 'completed' } : b)) ?? null);
+    setStep('home');
+  }
+
   if (step === 'detail' && nextBooking) {
     return (
       <CoachBookingDetailScreen
@@ -416,12 +431,18 @@ export function CoachHomeFlow({ coachId, coachName }: { coachId: string; coachNa
   if (step === 'resumeSuspended' && suspendedBookingRaw) {
     // Mismo flujo que "Iniciar partido" — createOrGetMatch es idempotente por booking_id, así
     // que devuelve la misma fila 'suspended' y LiveCaptureView muestra la pantalla de reanudar.
-    return <CoachMatchDayFlow booking={suspendedBookingRaw} />;
+    return (
+      <CoachMatchDayFlow
+        booking={suspendedBookingRaw}
+        onExit={() => completeBookingAndGoHome(suspendedBookingRaw.id)}
+      />
+    );
   }
 
   if (step === 'match' && nextBookingRaw) {
-    // Sin onBack: una vez iniciado el partido es forward-only, igual que CoachCapturePreview en /dev-preview.
-    return <CoachMatchDayFlow booking={nextBookingRaw} />;
+    // Sin onBack durante la captura activa (a propósito, igual que CoachCapturePreview en
+    // /dev-preview) — onExit solo habilita "Ir al inicio" desde la pantalla de resumen final.
+    return <CoachMatchDayFlow booking={nextBookingRaw} onExit={() => completeBookingAndGoHome(nextBookingRaw.id)} />;
   }
 
   if (step === 'requests') {
@@ -500,7 +521,13 @@ export function CoachHomeFlow({ coachId, coachName }: { coachId: string; coachNa
  * existing, unmodified live-capture wireframe. Chat is a side-step off the reminder screen,
  * back to it on close.
  */
-export function CoachMatchDayFlow({ booking: initialBooking }: { booking: BookingWithParticipants }) {
+export function CoachMatchDayFlow({
+  booking: initialBooking,
+  onExit,
+}: {
+  booking: BookingWithParticipants;
+  onExit?: () => void;
+}) {
   const { token } = useAuth();
   const [booking, setBooking] = useState(initialBooking);
   const bookingId = booking.id;
@@ -583,7 +610,7 @@ export function CoachMatchDayFlow({ booking: initialBooking }: { booking: Bookin
 
   return (
     <MatchProvider config={session.config} initialMatch={match}>
-      <CoachFlow roundLabel={session.roundLabel} />
+      <CoachFlow roundLabel={session.roundLabel} onExit={onExit} />
     </MatchProvider>
   );
 }
