@@ -74,13 +74,11 @@ export default function ScoreHeader({
   canUndo,
   undoBudget,
   onUndo,
-  onOpenMenu,
 }: {
   roundLabel: string;
   canUndo: boolean;
   undoBudget: number;
   onUndo: () => void;
-  onOpenMenu: () => void;
 }) {
   const { config, matchState, match } = useMatch();
   const currentServer = matchState.matchEnded ? null : getCurrentServer(matchState);
@@ -97,9 +95,6 @@ export default function ScoreHeader({
         <View style={styles.headerActions}>
           <Pressable disabled={!canUndo} onPress={onUndo} style={[styles.undoBtn, !canUndo && styles.undoBtnDisabled]}>
             <Text style={styles.undoLabel}>↺ Deshacer {undoBudget}/3</Text>
-          </Pressable>
-          <Pressable onPress={onOpenMenu} style={styles.menuBtn} hitSlop={8}>
-            <Text style={styles.menuLabel}>⋯</Text>
           </Pressable>
         </View>
       </View>
@@ -184,19 +179,6 @@ const styles = StyleSheet.create({
     color: colors.lineWhite,
     fontSize: 12,
     fontWeight: '600',
-  },
-  menuBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  menuLabel: {
-    color: colors.lineWhite,
-    fontSize: 16,
-    fontWeight: '800',
   },
   playersRow: {
     flexDirection: 'row',

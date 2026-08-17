@@ -387,7 +387,7 @@ const styles = StyleSheet.create({
   },
   baseContainer: {
     flex: 1,
-    gap: 10,
+    gap: 24,
   },
   metaHeaderRow: {
     flexDirection: 'row',

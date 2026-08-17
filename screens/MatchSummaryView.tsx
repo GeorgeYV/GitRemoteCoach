@@ -1,14 +1,28 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import React from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import IconTextInput from '../components/shared/IconTextInput';
+import VoiceNotesList from '../components/VoiceNotesList';
 import { useMatch } from '../context/MatchContext';
 import { colors, radius } from '../lib/theme';
+import { useVoiceRecorder } from '../lib/useVoiceRecorder';
 
 export default function MatchSummaryView() {
-  const { config, matchState, match, stats, reducerState, setObservations, resetMatch, reopenMatch } = useMatch();
+  const {
+    config,
+    matchState,
+    match,
+    stats,
+    reducerState,
+    setObservations,
+    resetMatch,
+    reopenMatch,
+    addVoiceNote,
+    deleteVoiceNote,
+  } = useMatch();
   const p1 = stats.player1;
+  const { isRecording, pressHandlers } = useVoiceRecorder(addVoiceNote);
 
   const setScoresLine = matchState.completedSets.map((s) => `${s.gamesPlayer1}-${s.gamesPlayer2}`).join(', ');
 
@@ -43,16 +57,17 @@ export default function MatchSummaryView() {
         </View>
 
         <View style={styles.obsLabel}>
-          <Text style={styles.obsLabelText}>Observaciones del entrenador</Text>
+          <Text style={styles.obsLabelText}>
+            {isRecording ? 'Grabando nota de voz…' : 'Observaciones del entrenador'}
+          </Text>
           <Pressable
-            style={styles.micButton}
-            onPress={() =>
-              Alert.alert('Dictado por voz', 'Próximamente: dictado por voz para agregar observaciones más rápido.')
-            }
+            style={[styles.micButton, isRecording && styles.micButtonActive]}
+            {...(pressHandlers as object)}
           >
-            <Ionicons name="mic-outline" size={13} color={colors.courtBlueDeep} />
+            <Ionicons name="mic-outline" size={13} color={isRecording ? '#FFFFFF' : colors.courtBlueDeep} />
           </Pressable>
         </View>
+        <VoiceNotesList notes={reducerState.voiceNotes} onDelete={deleteVoiceNote} style={styles.notesList} />
         <IconTextInput
           icon="create-outline"
           containerStyle={styles.obsWrapper}
@@ -167,6 +182,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.ballLime,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  micButtonActive: {
+    backgroundColor: colors.errorCoral,
+  },
+  notesList: {
+    marginBottom: 12,
   },
   obsWrapper: {
     marginBottom: 20,

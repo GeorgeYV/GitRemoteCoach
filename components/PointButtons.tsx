@@ -17,23 +17,26 @@ export default function PointButtons({
   player2Name: string;
 }) {
   return (
-    <View style={styles.container}>
-      <PointButton
-        name={player1Name}
-        colorsRange={[colors.ballLime, colors.ballLimeDim]}
-        textColor={colors.courtBlueDeep}
-        disabled={disabled}
-        onPress={() => onPoint('player1')}
-      />
-      <PointButton
-        name={player2Name}
-        colorsRange={[colors.errorCoral, colors.errorCoralDeep]}
-        // lineWhite es ahora tinta oscura (tema claro) — este botón sigue con gradiente rojo
-        // oscuro de fondo, así que su texto necesita quedarse claro, no lineWhite.
-        textColor="#FFFFFF"
-        disabled={disabled}
-        onPress={() => onPoint('player2')}
-      />
+    <View style={styles.wrapper}>
+      <Text style={styles.title}>¿Quién ganó el punto?</Text>
+      <View style={styles.container}>
+        <PointButton
+          name={player1Name}
+          colorsRange={[colors.ballLime, colors.ballLimeDim]}
+          textColor={colors.courtBlueDeep}
+          disabled={disabled}
+          onPress={() => onPoint('player1')}
+        />
+        <PointButton
+          name={player2Name}
+          colorsRange={[colors.errorCoral, colors.errorCoralDeep]}
+          // lineWhite es ahora tinta oscura (tema claro) — este botón sigue con gradiente rojo
+          // oscuro de fondo, así que su texto necesita quedarse claro, no lineWhite.
+          textColor="#FFFFFF"
+          disabled={disabled}
+          onPress={() => onPoint('player2')}
+        />
+      </View>
     </View>
   );
 }
@@ -71,7 +74,6 @@ function PointButton({
     >
       <LinearGradient colors={colorsRange} start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }} style={styles.gradient}>
         <Text style={[styles.caption, { color: textColor }]}>PUNTO PARA</Text>
-        <Text style={[styles.label, { color: textColor }]}>GANÓ</Text>
         <Text style={[styles.name, { color: textColor }]} numberOfLines={2}>
           {name}
         </Text>
@@ -81,6 +83,16 @@ function PointButton({
 }
 
 const styles = StyleSheet.create({
+  wrapper: {
+    flex: 1,
+    gap: 10,
+  },
+  title: {
+    textAlign: 'center',
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.lineWhite,
+  },
   container: {
     flex: 1,
     flexDirection: 'row',
@@ -109,10 +121,6 @@ const styles = StyleSheet.create({
     opacity: 0.75,
     letterSpacing: 0.8,
     marginBottom: 4,
-  },
-  label: {
-    fontSize: 22,
-    fontWeight: '800',
   },
   name: {
     fontSize: 19,

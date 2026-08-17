@@ -3,7 +3,6 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ContingencyMenu from '../components/ContingencyMenu';
 import PointFlow from '../components/PointFlow';
-import LiveStatsBar from '../components/LiveStatsBar';
 import ScoreHeader from '../components/ScoreHeader';
 import { useMatch } from '../context/MatchContext';
 import { colors, radius, withOpacity } from '../lib/theme';
@@ -65,13 +64,7 @@ export default function LiveCaptureView({ roundLabel }: { roundLabel: string }) 
   if (match.status === 'suspended') {
     return (
       <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-        <ScoreHeader
-          roundLabel={roundLabel}
-          canUndo={canUndo}
-          undoBudget={undoBudget}
-          onUndo={undoLast}
-          onOpenMenu={() => setMenuOpen(true)}
-        />
+        <ScoreHeader roundLabel={roundLabel} canUndo={canUndo} undoBudget={undoBudget} onUndo={undoLast} />
 
         <View style={styles.suspendedArea}>
           <Text style={styles.suspendedTitle}>Partido suspendido</Text>
@@ -80,6 +73,9 @@ export default function LiveCaptureView({ roundLabel }: { roundLabel: string }) 
           </Text>
           <Pressable style={styles.resumeButton} onPress={resumeSuspendedMatch}>
             <Text style={styles.resumeLabel}>Reanudar partido</Text>
+          </Pressable>
+          <Pressable style={styles.sosButton} onPress={() => setMenuOpen(true)}>
+            <Text style={styles.sosLabel}>SOS</Text>
           </Pressable>
         </View>
 
@@ -90,13 +86,7 @@ export default function LiveCaptureView({ roundLabel }: { roundLabel: string }) 
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <ScoreHeader
-        roundLabel={roundLabel}
-        canUndo={canUndo}
-        undoBudget={undoBudget}
-        onUndo={undoLast}
-        onOpenMenu={() => setMenuOpen(true)}
-      />
+      <ScoreHeader roundLabel={roundLabel} canUndo={canUndo} undoBudget={undoBudget} onUndo={undoLast} />
 
       {syncError && (
         <View style={styles.syncBanner}>
@@ -110,8 +100,6 @@ export default function LiveCaptureView({ roundLabel }: { roundLabel: string }) 
       <View style={styles.captureArea}>
         <PointFlow onOpenMenu={() => setMenuOpen(true)} />
       </View>
-
-      <LiveStatsBar />
 
       {contingencyMenu}
     </SafeAreaView>
@@ -179,5 +167,19 @@ const styles = StyleSheet.create({
     color: colors.courtBlueDeep,
     fontSize: 15,
     fontWeight: '800',
+  },
+  sosButton: {
+    marginTop: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius,
+    paddingVertical: 10,
+    paddingHorizontal: 24,
+    backgroundColor: colors.panel,
+  },
+  sosLabel: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: colors.errorCoral,
   },
 });
