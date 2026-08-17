@@ -135,6 +135,8 @@ export interface CoachBooking {
   playerInitial: string;
   category: string;
   tournamentName: string;
+  /** ISO datetime crudo del partido — para ordenar/agrupar por fecha. `date`/`time` son solo para mostrar. */
+  matchDatetime: string;
   date: string;
   time: string;
   venue: string;

@@ -23,7 +23,8 @@ export default function CoachHomeScreen({
   rating,
   pendingRequests,
   pendingEarnings,
-  nextBooking,
+  nextSessions,
+  upcomingCount,
   pendingInvitation,
   suspendedMatchPlayerName,
   onOpenSuspendedMatch,
@@ -40,11 +41,14 @@ export default function CoachHomeScreen({
   rating: string;
   pendingRequests: number;
   pendingEarnings: number;
-  nextBooking?: CoachBooking;
+  /** Sesiones confirmadas que caen en la fecha más próxima — puede ser más de una. */
+  nextSessions?: CoachBooking[];
+  /** Total de sesiones próximas (todas las fechas), para el link "Ver todas". */
+  upcomingCount?: number;
   pendingInvitation?: ClubCoachInvitationWithNames | null;
   suspendedMatchPlayerName?: string;
   onOpenSuspendedMatch?: () => void;
-  onOpenBooking?: () => void;
+  onOpenBooking?: (bookingId: string) => void;
   onOpenRequests?: () => void;
   onOpenAvailability?: () => void;
   onOpenSessions?: () => void;
@@ -103,31 +107,41 @@ export default function CoachHomeScreen({
           </Pressable>
         )}
 
-        <Text style={styles.sectionLabel}>Próxima sesión</Text>
-        {nextBooking ? (
-          <Pressable style={styles.nextCard} onPress={onOpenBooking}>
-            <View style={styles.nextTopRow}>
-              <InitialAvatar initial={nextBooking.playerInitial} size={44} />
-              <View style={styles.nextInfo}>
-                <Text style={styles.nextPlayerName} numberOfLines={1}>
-                  {nextBooking.playerName}
-                </Text>
-                <Text style={styles.nextMeta}>{nextBooking.category}</Text>
-              </View>
-              {nextBooking.hasUnreadMessages && (
-                <View style={styles.unreadPill}>
-                  <Ionicons name="chatbubble-ellipses" size={12} color={colors.bg} />
-                  <Text style={styles.unreadPillLabel}>Nuevo mensaje</Text>
+        <Text style={styles.sectionLabel}>{nextSessions && nextSessions.length > 1 ? 'Próximas sesiones' : 'Próxima sesión'}</Text>
+        {nextSessions && nextSessions.length > 0 ? (
+          <View style={styles.nextGroup}>
+            {nextSessions.map((session) => (
+              <Pressable key={session.id} style={styles.nextCard} onPress={() => onOpenBooking?.(session.id)}>
+                <View style={styles.nextTopRow}>
+                  <InitialAvatar initial={session.playerInitial} size={44} />
+                  <View style={styles.nextInfo}>
+                    <Text style={styles.nextPlayerName} numberOfLines={1}>
+                      {session.playerName}
+                    </Text>
+                    <Text style={styles.nextMeta}>{session.category}</Text>
+                  </View>
+                  {session.hasUnreadMessages && (
+                    <View style={styles.unreadPill}>
+                      <Ionicons name="chatbubble-ellipses" size={12} color={colors.bg} />
+                      <Text style={styles.unreadPillLabel}>Nuevo mensaje</Text>
+                    </View>
+                  )}
+                  <Text style={styles.chevron}>›</Text>
                 </View>
-              )}
-              <Text style={styles.chevron}>›</Text>
-            </View>
-            <View style={styles.nextDivider} />
-            <Text style={styles.nextLine}>
-              {nextBooking.date} · {nextBooking.time}
-            </Text>
-            <Text style={styles.nextLine}>{nextBooking.venue}</Text>
-          </Pressable>
+                <View style={styles.nextDivider} />
+                <Text style={styles.nextLine}>
+                  {session.date} · {session.time}
+                </Text>
+                <Text style={styles.nextLine}>{session.venue}</Text>
+              </Pressable>
+            ))}
+            {!!upcomingCount && upcomingCount > nextSessions.length && (
+              <Pressable style={styles.seeAllRow} onPress={onOpenSessions}>
+                <Text style={styles.seeAllLabel}>Ver todas ({upcomingCount})</Text>
+                <Text style={styles.chevron}>›</Text>
+              </Pressable>
+            )}
+          </View>
         ) : (
           <View style={styles.emptyCard}>
             <Text style={styles.emptyText}>No tienes sesiones confirmadas por ahora.</Text>
@@ -307,13 +321,28 @@ const styles = StyleSheet.create({
     color: colors.textSoft,
     fontSize: 12,
   },
+  nextGroup: {
+    marginBottom: 24,
+    gap: 12,
+  },
   nextCard: {
     backgroundColor: colors.panelLight,
     borderRadius: radius,
     padding: 16,
-    marginBottom: 24,
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  seeAllRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+  },
+  seeAllLabel: {
+    color: colors.courtBlue,
+    fontSize: 13,
+    fontWeight: '700',
+    marginRight: 4,
   },
   nextTopRow: {
     flexDirection: 'row',

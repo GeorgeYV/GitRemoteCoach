@@ -311,6 +311,7 @@ export function CoachHomeFlow({ coachId, coachName }: { coachId: string; coachNa
   const [invitationRefreshKey, setInvitationRefreshKey] = useState(0);
   const [suspendedMatch, setSuspendedMatch] = useState<SuspendedMatchSummary | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
   const [step, setStep] = useState<
     | 'home'
     | 'detail'
@@ -374,26 +375,35 @@ export function CoachHomeFlow({ coachId, coachName }: { coachId: string; coachNa
     };
   }, [coachId, token]);
 
-  const nextBookingRaw =
-    bookings
-      ?.filter(isUpcoming)
-      .sort((a, b) => new Date(a.matchDatetime).getTime() - new Date(b.matchDatetime).getTime())[0] ?? null;
-  const nextBooking = nextBookingRaw ? toCoachBooking(nextBookingRaw) : undefined;
+  // Todas las próximas, ordenadas por fecha — CoachHomeScreen muestra las que caen en la fecha
+  // más próxima (puede ser más de una) y linkea al resto vía "Ver todas".
+  const upcomingBookingsRaw = (bookings ?? [])
+    .filter(isUpcoming)
+    .sort((a, b) => new Date(a.matchDatetime).getTime() - new Date(b.matchDatetime).getTime());
+  const upcomingBookings = upcomingBookingsRaw.map(toCoachBooking);
+  const nextDate = upcomingBookings[0]?.date;
+  const nextSessions = nextDate ? upcomingBookings.filter((b) => b.date === nextDate) : [];
+
+  // Booking elegido al tocar una tarjeta en el home — puede ser cualquiera de nextSessions, no
+  // necesariamente la más próxima, así que detail/cancel/chat/match se resuelven contra esto.
+  const selectedBookingRaw = bookings?.find((b) => b.id === selectedBookingId) ?? null;
+  const selectedBooking = selectedBookingRaw ? toCoachBooking(selectedBookingRaw) : undefined;
+
   const suspendedBookingRaw = suspendedMatch ? bookings?.find((b) => b.id === suspendedMatch.bookingId) ?? null : null;
   const pendingRequests = bookings?.filter((b) => b.status === 'requested').length ?? 0;
   const pendingEarnings =
     bookings?.filter((b) => b.status === 'paid').reduce((sum, b) => sum + Number(b.coachNetAmount ?? 0), 0) ?? 0;
 
   function confirmCancel(_reason: string) {
-    if (!nextBookingRaw) return;
-    const targetId = nextBookingRaw.id;
+    if (!selectedBookingRaw) return;
+    const targetId = selectedBookingRaw.id;
     setBookings((prev) => prev?.map((b) => (b.id === targetId ? { ...b, status: 'cancelled' } : b)) ?? null);
     setStep('home');
   }
 
   function handleBookingCompleted() {
-    if (!nextBookingRaw) return;
-    const targetId = nextBookingRaw.id;
+    if (!selectedBookingRaw) return;
+    const targetId = selectedBookingRaw.id;
     setBookings((prev) => prev?.map((b) => (b.id === targetId ? { ...b, status: 'completed' } : b)) ?? null);
     setStep('home');
   }
@@ -405,27 +415,27 @@ export function CoachHomeFlow({ coachId, coachName }: { coachId: string; coachNa
     setStep('home');
   }
 
-  if (step === 'detail' && nextBooking) {
+  if (step === 'detail' && selectedBooking) {
     return (
       <CoachBookingDetailScreen
-        booking={nextBooking}
+        booking={selectedBooking}
         onBack={() => setStep('home')}
         onCancel={() => setStep('cancel')}
         onChat={() => setStep('chat')}
-        onStartMatch={nextBooking.status === 'confirmed' ? () => setStep('match') : undefined}
+        onStartMatch={selectedBooking.status === 'confirmed' ? () => setStep('match') : undefined}
         onCompleted={handleBookingCompleted}
       />
     );
   }
 
-  if (step === 'cancel' && nextBooking) {
+  if (step === 'cancel' && selectedBooking) {
     return (
-      <CoachBookingCancelScreen booking={nextBooking} onBack={() => setStep('detail')} onConfirm={confirmCancel} />
+      <CoachBookingCancelScreen booking={selectedBooking} onBack={() => setStep('detail')} onConfirm={confirmCancel} />
     );
   }
 
-  if (step === 'chat' && nextBooking) {
-    return <CoachChatScreen booking={nextBooking} onBack={() => setStep('detail')} />;
+  if (step === 'chat' && selectedBooking) {
+    return <CoachChatScreen booking={selectedBooking} onBack={() => setStep('detail')} />;
   }
 
   if (step === 'resumeSuspended' && suspendedBookingRaw) {
@@ -439,10 +449,12 @@ export function CoachHomeFlow({ coachId, coachName }: { coachId: string; coachNa
     );
   }
 
-  if (step === 'match' && nextBookingRaw) {
+  if (step === 'match' && selectedBookingRaw) {
     // Sin onBack durante la captura activa (a propósito, igual que CoachCapturePreview en
     // /dev-preview) — onExit solo habilita "Ir al inicio" desde la pantalla de resumen final.
-    return <CoachMatchDayFlow booking={nextBookingRaw} onExit={() => completeBookingAndGoHome(nextBookingRaw.id)} />;
+    return (
+      <CoachMatchDayFlow booking={selectedBookingRaw} onExit={() => completeBookingAndGoHome(selectedBookingRaw.id)} />
+    );
   }
 
   if (step === 'requests') {
@@ -499,11 +511,15 @@ export function CoachHomeFlow({ coachId, coachName }: { coachId: string; coachNa
       rating={rating}
       pendingRequests={pendingRequests}
       pendingEarnings={pendingEarnings}
-      nextBooking={nextBooking}
+      nextSessions={nextSessions}
+      upcomingCount={upcomingBookings.length}
       pendingInvitation={pendingInvitation}
       suspendedMatchPlayerName={suspendedBookingRaw ? suspendedMatch?.playerName : undefined}
       onOpenSuspendedMatch={suspendedBookingRaw ? () => setStep('resumeSuspended') : undefined}
-      onOpenBooking={() => setStep('detail')}
+      onOpenBooking={(bookingId) => {
+        setSelectedBookingId(bookingId);
+        setStep('detail');
+      }}
       onOpenRequests={() => setStep('requests')}
       onOpenAvailability={() => setStep('availability')}
       onOpenSessions={() => setStep('sessions')}

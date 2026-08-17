@@ -21,6 +21,21 @@ const DECIDED_STATUSES: BookingWithParticipants['status'][] = [
   'expired',
 ];
 
+/** Agrupa una lista ya ordenada en buckets consecutivos que comparten el mismo `date` mostrado
+ * (p. ej. "jue 20 de ago") — sirve para poner un encabezado de fecha sobre cada grupo. */
+function groupByDate(bookings: CoachBooking[]): { date: string; bookings: CoachBooking[] }[] {
+  const groups: { date: string; bookings: CoachBooking[] }[] = [];
+  for (const booking of bookings) {
+    const lastGroup = groups[groups.length - 1];
+    if (lastGroup && lastGroup.date === booking.date) {
+      lastGroup.bookings.push(booking);
+    } else {
+      groups.push({ date: booking.date, bookings: [booking] });
+    }
+  }
+  return groups;
+}
+
 export default function CoachSessionHistoryScreen({ coachId, onBack }: { coachId: string; onBack?: () => void }) {
   const { token } = useAuth();
   const [bookings, setBookings] = useState<CoachBooking[] | null>(null);
@@ -101,8 +116,11 @@ export default function CoachSessionHistoryScreen({ coachId, onBack }: { coachId
     );
   }
 
-  const upcoming = bookings.filter((b) => b.status === 'confirmed');
+  const upcoming = bookings
+    .filter((b) => b.status === 'confirmed')
+    .sort((a, b) => new Date(a.matchDatetime).getTime() - new Date(b.matchDatetime).getTime());
   const past = bookings.filter((b) => b.status !== 'confirmed');
+  const upcomingByDate = groupByDate(upcoming);
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -120,17 +138,22 @@ export default function CoachSessionHistoryScreen({ coachId, onBack }: { coachId
 
       <ScrollView contentContainerStyle={styles.content}>
         <Section label="Próximas" hidden={upcoming.length === 0}>
-          <View style={styles.list}>
-            {upcoming.map((booking) => (
-              <BookingRow
-                key={booking.id}
-                booking={booking}
-                retired={retiredBookingIds.has(booking.id)}
-                onCancel={() => setCancelTarget(booking)}
-                onChat={() => setChatTarget(booking)}
-              />
-            ))}
-          </View>
+          {upcomingByDate.map((group) => (
+            <View key={group.date} style={styles.dateGroup}>
+              <Text style={styles.dateGroupLabel}>{group.date}</Text>
+              <View style={styles.list}>
+                {group.bookings.map((booking) => (
+                  <BookingRow
+                    key={booking.id}
+                    booking={booking}
+                    retired={retiredBookingIds.has(booking.id)}
+                    onCancel={() => setCancelTarget(booking)}
+                    onChat={() => setChatTarget(booking)}
+                  />
+                ))}
+              </View>
+            </View>
+          ))}
         </Section>
 
         <Section label="Anteriores" hidden={past.length === 0}>
@@ -264,6 +287,15 @@ const styles = StyleSheet.create({
   },
   list: {
     gap: 12,
+  },
+  dateGroup: {
+    marginBottom: 16,
+  },
+  dateGroupLabel: {
+    color: colors.courtBlue,
+    fontSize: 12,
+    fontWeight: '700',
+    marginBottom: 8,
   },
   row: {
     flexDirection: 'row',

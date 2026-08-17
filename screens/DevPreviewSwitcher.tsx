@@ -101,6 +101,7 @@ const PREVIEW_COACH_CHAT_BOOKING: CoachBooking = {
   playerInitial: '?',
   category: '—',
   tournamentName: '—',
+  matchDatetime: new Date().toISOString(),
   date: '—',
   time: '—',
   venue: '—',
