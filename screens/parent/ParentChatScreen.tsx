@@ -108,7 +108,7 @@ export default function ParentChatScreen({ booking, onBack }: { booking: Booking
 
       <KeyboardAvoidingView
         style={styles.flexArea}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={8}
       >
         {loadError ? (

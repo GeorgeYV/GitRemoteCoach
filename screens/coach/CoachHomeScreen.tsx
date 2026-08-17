@@ -69,8 +69,8 @@ export default function CoachHomeScreen({
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.greeting}>Hola, {firstName}</Text>
-        <Text style={styles.headline}>Este es el resumen de tu actividad como entrenador</Text>
+        <Text style={styles.greeting}>Hola coach, {firstName}</Text>
+        <Text style={styles.headline}>Resumen de tu actividad</Text>
 
         {suspendedMatchPlayerName && (
           <Pressable style={styles.suspendedBanner} onPress={onOpenSuspendedMatch}>
@@ -109,9 +109,17 @@ export default function CoachHomeScreen({
             <View style={styles.nextTopRow}>
               <InitialAvatar initial={nextBooking.playerInitial} size={44} />
               <View style={styles.nextInfo}>
-                <Text style={styles.nextPlayerName}>{nextBooking.playerName}</Text>
+                <Text style={styles.nextPlayerName} numberOfLines={1}>
+                  {nextBooking.playerName}
+                </Text>
                 <Text style={styles.nextMeta}>{nextBooking.category}</Text>
               </View>
+              {nextBooking.hasUnreadMessages && (
+                <View style={styles.unreadPill}>
+                  <Ionicons name="chatbubble-ellipses" size={12} color={colors.bg} />
+                  <Text style={styles.unreadPillLabel}>Nuevo mensaje</Text>
+                </View>
+              )}
               <Text style={styles.chevron}>›</Text>
             </View>
             <View style={styles.nextDivider} />
@@ -325,6 +333,21 @@ const styles = StyleSheet.create({
   nextMeta: {
     color: colors.textDim,
     fontSize: 12,
+  },
+  unreadPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.amber,
+    borderRadius: 12,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    gap: 4,
+    marginRight: 8,
+  },
+  unreadPillLabel: {
+    color: colors.bg,
+    fontSize: 10,
+    fontWeight: '800',
   },
   nextDivider: {
     height: 1,

@@ -107,7 +107,7 @@ export default function CoachChatScreen({ booking, onBack }: { booking: CoachBoo
 
       <KeyboardAvoidingView
         style={styles.flexArea}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={8}
       >
         {loadError ? (
