@@ -17,7 +17,7 @@ export type TournamentStatus = 'scheduled' | 'in_progress' | 'completed' | 'canc
 
 export type AgeCategory = 'U10' | 'U12' | 'U14' | 'U16' | 'U18';
 export type PlayingLevel = 'recreativo' | 'competitivo' | 'alto_rendimiento';
-export type RateMode = 'per_match' | 'per_day' | 'per_tournament';
+export type RateMode = 'per_day' | 'per_tournament';
 export type ClubInvitationStatus = 'pending' | 'accepted' | 'declined';
 export type MessageSenderType = 'coach' | 'parent' | 'system';
 export type VerificationStatus = 'pending' | 'approved' | 'rejected';

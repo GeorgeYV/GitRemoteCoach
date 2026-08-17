@@ -3,7 +3,7 @@ import { z } from 'zod';
 import * as coachTournamentService from '../services/coachTournamentService.js';
 import { ForbiddenError, ValidationError } from '../lib/errors.js';
 
-const RATE_MODES = ['per_match', 'per_day', 'per_tournament'] as const;
+const RATE_MODES = ['per_day', 'per_tournament'] as const;
 
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
 

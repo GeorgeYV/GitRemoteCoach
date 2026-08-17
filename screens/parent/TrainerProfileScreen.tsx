@@ -17,6 +17,7 @@ import {
   getCoachTournamentBookingCount,
   listCoachReviews,
   PlayingLevel,
+  RateMode,
   ReviewWithParent,
   TournamentSearchResult,
   VerificationStatus,
@@ -35,6 +36,13 @@ const VERIFICATION_LABELS: Record<VerificationStatus, string> = {
   approved: 'Entrenador verificado',
   pending: 'Verificación en proceso',
   rejected: 'Verificación no aprobada',
+};
+
+/** Sufijo junto al precio del header — null cuando el coach no fijó tarifa para este torneo
+ * todavía y se muestra su hourlyRate de catálogo (sin unidad asociada). */
+const PRICE_SUFFIX: Record<RateMode, string> = {
+  per_day: '/ día',
+  per_tournament: '/ torneo completo',
 };
 
 /** slotDate llega como datetime ISO completo (pg serializa DATE como Date → JSON), no como
@@ -85,6 +93,7 @@ export default function TrainerProfileScreen({
   const [profile, setProfile] = useState<CoachProfileWithTraining | null>(null);
   const [availability, setAvailability] = useState<AvailabilityDay[] | null>(null);
   const [price, setPrice] = useState<number | null>(null);
+  const [rateMode, setRateMode] = useState<RateMode | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const [reviews, setReviews] = useState<ReviewWithParent[] | null>(null);
@@ -105,6 +114,7 @@ export default function TrainerProfileScreen({
         setProfile(profileResult);
         setAvailability(toAvailabilityDays(tournament, availabilityResult.availability));
         setPrice(Number(availabilityResult.rate?.amount ?? profileResult.profile.hourlyRate));
+        setRateMode(availabilityResult.rate?.rateMode ?? null);
       })
       .catch((err) => {
         if (cancelled) return;
@@ -200,7 +210,7 @@ export default function TrainerProfileScreen({
         </View>
         <View style={styles.priceBlock}>
           <Text style={styles.price}>
-            ${price} <Text style={styles.priceSuffix}>/ partido</Text>
+            ${price} <Text style={styles.priceSuffix}>{rateMode ? PRICE_SUFFIX[rateMode] : '/ sesión'}</Text>
           </Text>
         </View>
       </View>

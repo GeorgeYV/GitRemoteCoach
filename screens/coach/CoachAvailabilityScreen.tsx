@@ -52,13 +52,11 @@ function parseTime(value: string): string | null | undefined {
 }
 
 const RATE_MODE_TO_API: Record<RateMode, ApiRateMode> = {
-  partido: 'per_match',
   dia: 'per_day',
   torneo: 'per_tournament',
 };
 
 const API_RATE_MODE_TO_LOCAL: Record<ApiRateMode, RateMode> = {
-  per_match: 'partido',
   per_day: 'dia',
   per_tournament: 'torneo',
 };
@@ -74,7 +72,7 @@ export default function CoachAvailabilityScreen({
   const [clubTags, setClubTags] = useState<CoachClubTag[]>([]);
   const tagging = clubTags.find((t) => t.tournamentId === tournament.id);
   const [days, setDays] = useState<DaySlot[]>(() => buildDaySlotsFromRange(tournament.startDate, tournament.endDate));
-  const [rateMode, setRateMode] = useState<RateMode>('partido');
+  const [rateMode, setRateMode] = useState<RateMode>('dia');
   const [rateAmount, setRateAmount] = useState('');
   const [saved, setSaved] = useState(false);
   const [submitting, setSubmitting] = useState(false);

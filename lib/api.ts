@@ -601,7 +601,7 @@ export function registerPlayer(
   });
 }
 
-export type RateMode = 'per_match' | 'per_day' | 'per_tournament';
+export type RateMode = 'per_day' | 'per_tournament';
 
 export interface CoachTournamentAvailability {
   id: string;

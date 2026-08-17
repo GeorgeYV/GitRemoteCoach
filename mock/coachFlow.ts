@@ -51,10 +51,9 @@ export const VERIFICATION_DOC_LABELS: Record<VerificationDocType, { title: strin
   club_reference: VERIFICATION_DOC_CHECKLIST[3],
 };
 
-export type RateMode = 'partido' | 'dia' | 'torneo';
+export type RateMode = 'dia' | 'torneo';
 
 export const RATE_MODE_LABELS: Record<RateMode, string> = {
-  partido: 'Por partido',
   dia: 'Por día',
   torneo: 'Torneo completo',
 };

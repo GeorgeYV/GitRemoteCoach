@@ -31,8 +31,8 @@ CREATE TYPE club_type AS ENUM ('club', 'federation');
 CREATE TYPE playing_level AS ENUM ('recreativo', 'competitivo', 'alto_rendimiento');
 
 -- Unidad sobre la que el entrenador cotiza su tarifa para un torneo
--- específico (se fija en CoachAvailabilityScreen).
-CREATE TYPE rate_mode AS ENUM ('per_match', 'per_day', 'per_tournament');
+-- específico (se fija en CoachAvailabilityScreen). Sin 'per_match' — ver #34.
+CREATE TYPE rate_mode AS ENUM ('per_day', 'per_tournament');
 
 CREATE TYPE club_invitation_status AS ENUM ('pending', 'accepted', 'declined');
 
@@ -660,7 +660,7 @@ FOR EACH ROW EXECUTE FUNCTION fn_coach_tournament_availability_before_write();
 CREATE TABLE coach_tournament_rates (
   coach_id      UUID NOT NULL REFERENCES coach_profiles (user_id) ON DELETE CASCADE,
   tournament_id UUID NOT NULL REFERENCES tournaments (id) ON DELETE CASCADE,
-  rate_mode     rate_mode NOT NULL DEFAULT 'per_match',
+  rate_mode     rate_mode NOT NULL DEFAULT 'per_day',
   amount        NUMERIC(10, 2) NOT NULL CHECK (amount >= 0),
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (coach_id, tournament_id)
@@ -1593,4 +1593,13 @@ CREATE INDEX idx_push_tokens_user_id ON push_tokens (user_id);
 --     match_datetime, que sigue sin tener franja horaria elegible (ver
 --     comentario de idx_bookings_no_duplicate_active) — la hora real se
 --     coordina por chat después de aceptar la reserva.
+--
+-- 34. rate_mode perdió el valor 'per_match' (a pedido de producto: la
+--     tarifa de un coach para un torneo ahora es solo 'per_day' o
+--     'per_tournament'). Postgres no soporta quitar un valor de un ENUM
+--     existente, así que esto requirió recrear el tipo (CREATE TYPE
+--     nuevo sin 'per_match' → ALTER TABLE ... USING para mapear filas
+--     'per_match' existentes a 'per_day' → DROP TYPE viejo → rename),
+--     no un simple ALTER TYPE ADD VALUE como en #32. coach_tournament_rates
+--     también cambió su DEFAULT de 'per_match' a 'per_day'.
 -- =====================================================================
