@@ -21,7 +21,7 @@ import {
   TournamentSearchResult,
   VerificationStatus,
 } from '../../lib/api';
-import { buildDaySlotsFromRange } from '../../lib/dateSlots';
+import { buildDaySlotsFromRange, PRE_TOURNAMENT_DAYS } from '../../lib/dateSlots';
 import { colors, radius } from '../../lib/theme';
 import { AvailabilityDay, buildMatchDatetime } from '../../mock/parentFlow';
 
@@ -45,19 +45,30 @@ function isDayStillFuture(dayLabel: string, isoDate: string): boolean {
   return new Date(buildMatchDatetime({ dayLabel, isoDate })).getTime() > Date.now();
 }
 
+/** El padre debe ver el bloque de excepción explícito, no solo que el día está "disponible". */
+function exceptionLabel(day: AvailabilityDay): string | null {
+  if (!day.unavailableFrom || !day.unavailableTo) return null;
+  return `No disp. ${day.unavailableFrom}–${day.unavailableTo}`;
+}
+
 function toAvailabilityDays(
   tournament: TournamentSearchResult,
   availability: CoachTournamentAvailability[],
 ): AvailabilityDay[] {
   const byDate = new Map(availability.map((a) => [a.slotDate.slice(0, 10), a]));
-  return buildDaySlotsFromRange(tournament.startDate, tournament.endDate).map(({ dayLabel, isoDate }) => {
-    const slot = byDate.get(isoDate);
-    return {
-      dayLabel,
-      isoDate,
-      available: (slot?.available ?? false) && isDayStillFuture(dayLabel, isoDate),
-    };
-  });
+  return buildDaySlotsFromRange(tournament.startDate, tournament.endDate, PRE_TOURNAMENT_DAYS).map(
+    ({ dayLabel, isoDate, isPreTournament }) => {
+      const slot = byDate.get(isoDate);
+      return {
+        dayLabel,
+        isoDate,
+        isPreTournament,
+        available: (slot?.available ?? false) && isDayStillFuture(dayLabel, isoDate),
+        unavailableFrom: slot?.unavailableFrom ?? null,
+        unavailableTo: slot?.unavailableTo ?? null,
+      };
+    },
+  );
 }
 
 export default function TrainerProfileScreen({
@@ -250,14 +261,19 @@ export default function TrainerProfileScreen({
           )}
         </Section>
 
-        <Section label="Disponibilidad para este torneo">
+        <Section label="Disponibilidad">
           <View style={styles.availabilityGrid}>
-            {availability.map((day) => (
-              <View key={day.dayLabel} style={styles.availabilityColumn}>
-                <Text style={styles.availabilityDay}>{day.dayLabel}</Text>
-                <AvailabilitySlotPill label="Disponible" available={day.available} />
-              </View>
-            ))}
+            {availability.map((day) => {
+              const exception = day.available ? exceptionLabel(day) : null;
+              return (
+                <View key={day.isoDate} style={styles.availabilityColumn}>
+                  <Text style={styles.availabilityDay}>{day.dayLabel}</Text>
+                  {day.isPreTournament && <Text style={styles.availabilityPreTag}>Previo</Text>}
+                  <AvailabilitySlotPill label="Disponible" available={day.available} />
+                  {exception && <Text style={styles.availabilityException}>{exception}</Text>}
+                </View>
+              );
+            })}
           </View>
         </Section>
       </ScrollView>
@@ -439,6 +455,22 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textAlign: 'center',
     marginBottom: 6,
+  },
+  availabilityPreTag: {
+    color: colors.courtBlue,
+    fontSize: 8,
+    fontWeight: '800',
+    textAlign: 'center',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+    marginBottom: 4,
+  },
+  availabilityException: {
+    color: colors.errorCoral,
+    fontSize: 9,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginTop: 4,
   },
   footer: {
     borderTopWidth: 1,

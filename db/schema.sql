@@ -587,18 +587,31 @@ FOR EACH ROW
 WHEN (NEW.status = 'accepted' AND OLD.status = 'pending')
 EXECUTE FUNCTION fn_club_coach_invitations_apply_acceptance();
 
--- Disponibilidad del entrenador por día dentro de un torneo
--- (CoachAvailabilityScreen). Una fila por día; un solo flag `available` en
--- vez de morning/afternoon — la hora exacta de la sesión se coordina por
--- chat después de aceptar, igual que ya pasa con el punto de encuentro.
+-- Disponibilidad del entrenador por día dentro de un torneo (más el día
+-- previo, ver trigger más abajo) — CoachAvailabilityScreen. Una fila por
+-- día; un solo flag `available` en vez de morning/afternoon — la hora
+-- exacta de la sesión se coordina por chat después de aceptar, igual que
+-- ya pasa con el punto de encuentro. unavailable_from/unavailable_to son
+-- un bloque horario opcional de excepción dentro de un día disponible
+-- (ej. el coach da clases en su academia de 3pm a 5pm) — puramente
+-- informativo para que el padre lo vea explícito al elegir día; no
+-- restringe match_datetime, que sigue siendo un valor fijo por día
+-- (ver mock/parentFlow.ts#buildMatchDatetime).
 CREATE TABLE coach_tournament_availability (
-  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  coach_id      UUID NOT NULL REFERENCES coach_profiles (user_id) ON DELETE CASCADE,
-  tournament_id UUID NOT NULL REFERENCES tournaments (id) ON DELETE CASCADE,
-  slot_date     DATE NOT NULL,
-  available     BOOLEAN NOT NULL DEFAULT FALSE,
-  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
-  UNIQUE (coach_id, tournament_id, slot_date)
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  coach_id          UUID NOT NULL REFERENCES coach_profiles (user_id) ON DELETE CASCADE,
+  tournament_id     UUID NOT NULL REFERENCES tournaments (id) ON DELETE CASCADE,
+  slot_date         DATE NOT NULL,
+  available         BOOLEAN NOT NULL DEFAULT FALSE,
+  unavailable_from  TIME,
+  unavailable_to    TIME,
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (coach_id, tournament_id, slot_date),
+  CONSTRAINT chk_coach_tournament_availability_exception_range
+    CHECK (
+      (unavailable_from IS NULL) = (unavailable_to IS NULL)
+      AND (unavailable_to IS NULL OR unavailable_to > unavailable_from)
+    )
 );
 
 -- (tournament_id, slot_date), excluyendo días marcados sin disponibilidad:
@@ -610,9 +623,11 @@ CREATE INDEX idx_coach_tournament_availability_tournament_id
   WHERE available;
 
 -- ---------------------------------------------------------------------
--- Trigger: valida que slot_date caiga dentro de las fechas del torneo
--- (un entrenador no debería poder marcarse disponible fuera de las
--- fechas reales) y mantiene updated_at al día en cada escritura.
+-- Trigger: valida que slot_date caiga dentro de las fechas del torneo,
+-- permitiendo hasta 2 días antes de start_date para entrenamientos
+-- previos al torneo (1 día antes es lo habitual; 2 días antes es la
+-- excepción, no algo que valga la pena distinguir en DB — ver
+-- CoachAvailabilityScreen) y mantiene updated_at al día en cada escritura.
 -- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION fn_coach_tournament_availability_before_write() RETURNS TRIGGER AS $$
 DECLARE
@@ -623,9 +638,9 @@ BEGIN
     FROM tournaments
    WHERE id = NEW.tournament_id;
 
-  IF NEW.slot_date < v_start OR NEW.slot_date > v_end THEN
+  IF NEW.slot_date < v_start - INTERVAL '2 days' OR NEW.slot_date > v_end THEN
     RAISE EXCEPTION
-      'slot_date % está fuera de las fechas del torneo % (% a %)',
+      'slot_date % está fuera del rango permitido para el torneo % (% - 2 días a %)',
       NEW.slot_date, NEW.tournament_id, v_start, v_end;
   END IF;
 
@@ -1450,9 +1465,11 @@ CREATE INDEX idx_push_tokens_user_id ON push_tokens (user_id);
 --
 -- 25. coach_tournament_availability combina las dos estrategias
 --     anteriores en un solo trigger BEFORE INSERT OR UPDATE: (a) valida
---     que slot_date esté dentro de [start_date, end_date] del torneo
---     (mismo espíritu que #24: relación de tres tablas más barata de
---     garantizar una vez en DB que repetir en cada pantalla), y (b)
+--     que slot_date esté dentro de [start_date - 2 días, end_date] del
+--     torneo — los 2 días previos habilitan entrenamientos antes del
+--     torneo, ver #33 — (mismo espíritu que #24: relación de tres tablas
+--     más barata de garantizar una vez en DB que repetir en cada
+--     pantalla), y (b)
 --     mantiene updated_at al día, para no depender de que cada UPDATE de
 --     la aplicación se acuerde de setearlo. idx_coach_tournament_availability_tournament_id
 --     pasó a (tournament_id, slot_date) WHERE available —
@@ -1558,4 +1575,22 @@ CREATE INDEX idx_push_tokens_user_id ON push_tokens (user_id);
 --     una cuenta creada solo por Google nunca tiene contraseña propia —
 --     login() debe descartar ese caso antes de intentar verificarla (ver
 --     authService.ts), no intentarlo y fallar.
+--
+-- 33. coach_tournament_availability se extendió en dos frentes, ambos a
+--     pedido de producto: (a) fn_coach_tournament_availability_before_write
+--     (#25) ahora acepta slot_date desde start_date - 2 días, no solo
+--     dentro del torneo — un coach puede entrenar a un jugador el día (o
+--     excepcionalmente los dos días) antes de que arranque el torneo, y
+--     antes esos días quedaban fuera de rango sin excepción posible; (b)
+--     unavailable_from/unavailable_to (TIME, ambas NULL o ambas seteadas
+--     vía chk_coach_tournament_availability_exception_range) declaran un
+--     bloque horario de excepción dentro de un día disponible (ej. el
+--     coach da clases en su academia de 3pm a 5pm). Deliberadamente un
+--     solo bloque por día, no una tabla aparte de múltiples bloques — el
+--     caso de uso real es "tengo un compromiso fijo ese día", no una
+--     agenda de franjas. Es puramente informativo hacia el padre
+--     (TrainerProfileScreen/BookingConfirmScreen); no restringe
+--     match_datetime, que sigue sin tener franja horaria elegible (ver
+--     comentario de idx_bookings_no_duplicate_active) — la hora real se
+--     coordina por chat después de aceptar la reserva.
 -- =====================================================================

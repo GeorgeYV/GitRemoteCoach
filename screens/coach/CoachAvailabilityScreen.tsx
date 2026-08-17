@@ -15,18 +15,40 @@ import {
   setCoachTournamentRate,
   TournamentSearchResult,
 } from '../../lib/api';
-import { buildDaySlotsFromRange as buildDateSlotsFromRange, dateRangeLabel } from '../../lib/dateSlots';
+import {
+  buildDaySlotsFromRange as buildDateSlotsFromRange,
+  dateRangeLabel,
+  PRE_TOURNAMENT_DAYS,
+} from '../../lib/dateSlots';
 import { colors, radius, withOpacity } from '../../lib/theme';
 import { RATE_MODE_LABELS, RateMode } from '../../mock/coachFlow';
 
 interface DaySlot {
   dayLabel: string;
   isoDate: string;
+  isPreTournament: boolean;
   available: boolean;
+  /** Texto crudo del input HH:MM — vacío significa "sin excepción de horario ese día". */
+  unavailableFrom: string;
+  unavailableTo: string;
 }
 
 function buildDaySlotsFromRange(startDate: string, endDate: string): DaySlot[] {
-  return buildDateSlotsFromRange(startDate, endDate).map((slot) => ({ ...slot, available: false }));
+  return buildDateSlotsFromRange(startDate, endDate, PRE_TOURNAMENT_DAYS).map((slot) => ({
+    ...slot,
+    available: false,
+    unavailableFrom: '',
+    unavailableTo: '',
+  }));
+}
+
+const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/** undefined = campo vacío (sin excepción), null = texto inválido, string = HH:MM válido. */
+function parseTime(value: string): string | null | undefined {
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return undefined;
+  return TIME_PATTERN.test(trimmed) ? trimmed : null;
 }
 
 const RATE_MODE_TO_API: Record<RateMode, ApiRateMode> = {
@@ -80,7 +102,14 @@ export default function CoachAvailabilityScreen({
         setDays((prev) =>
           prev.map((day) => {
             const savedDay = availability.find((a) => a.slotDate.slice(0, 10) === day.isoDate);
-            return savedDay ? { ...day, available: savedDay.available } : day;
+            return savedDay
+              ? {
+                  ...day,
+                  available: savedDay.available,
+                  unavailableFrom: savedDay.unavailableFrom ?? '',
+                  unavailableTo: savedDay.unavailableTo ?? '',
+                }
+              : day;
           }),
         );
       }
@@ -97,6 +126,24 @@ export default function CoachAvailabilityScreen({
   function toggleDay(dayIndex: number) {
     setSaved(false);
     setDays((prev) => prev.map((d, i) => (i === dayIndex ? { ...d, available: !d.available } : d)));
+  }
+
+  function changeExceptionTime(dayIndex: number, field: 'unavailableFrom' | 'unavailableTo', value: string) {
+    setSaved(false);
+    setDays((prev) => prev.map((d, i) => (i === dayIndex ? { ...d, [field]: value } : d)));
+  }
+
+  /** null = sin error; una excepción de horario es válida solo si ambos campos están vacíos o
+   * ambos son HH:MM válidos con "hasta" posterior a "desde" (ver chk_..._exception_range en DB). */
+  function dayExceptionError(day: DaySlot): string | null {
+    if (!day.available) return null;
+    const from = parseTime(day.unavailableFrom);
+    const to = parseTime(day.unavailableTo);
+    if (from === undefined && to === undefined) return null;
+    if (from === null || to === null) return 'Formato de hora inválido (HH:MM)';
+    if (from === undefined || to === undefined) return 'Completa "desde" y "hasta", o deja los dos vacíos';
+    if (to <= from) return '"Hasta" debe ser posterior a "Desde"';
+    return null;
   }
 
   function changeRateMode(mode: RateMode) {
@@ -121,7 +168,12 @@ export default function CoachAvailabilityScreen({
         token,
         user.id,
         tournament.id,
-        days.map((d) => ({ slotDate: d.isoDate, available: d.available })),
+        days.map((d) => ({
+          slotDate: d.isoDate,
+          available: d.available,
+          unavailableFrom: parseTime(d.unavailableFrom) ?? null,
+          unavailableTo: parseTime(d.unavailableTo) ?? null,
+        })),
       );
       await setCoachTournamentRate(token, user.id, tournament.id, {
         rateMode: RATE_MODE_TO_API[rateMode],
@@ -136,7 +188,11 @@ export default function CoachAvailabilityScreen({
   }
 
   const selectedDaysCount = days.filter((d) => d.available).length;
-  const canSave = selectedDaysCount > 0 && rateAmount.trim().length > 0 && !submitting;
+  const canSave =
+    selectedDaysCount > 0 &&
+    rateAmount.trim().length > 0 &&
+    !submitting &&
+    days.every((d) => dayExceptionError(d) === null);
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -165,13 +221,53 @@ export default function CoachAvailabilityScreen({
 
       <ScrollView contentContainerStyle={styles.content}>
         <Section label="Días disponibles">
-          <View style={styles.daysGrid}>
-            {days.map((day, i) => (
-              <View key={day.dayLabel} style={styles.dayColumn}>
-                <Text style={styles.dayLabel}>{day.dayLabel}</Text>
-                <TogglePill label="Disponible" active={day.available} onPress={() => toggleDay(i)} />
-              </View>
-            ))}
+          <View style={styles.daysList}>
+            {days.map((day, i) => {
+              const exceptionError = dayExceptionError(day);
+              return (
+                <View key={day.isoDate} style={styles.dayRow}>
+                  <View style={styles.dayRowTop}>
+                    <View style={styles.dayRowLabelWrap}>
+                      <Text style={styles.dayRowLabel}>{day.dayLabel}</Text>
+                      {day.isPreTournament && (
+                        <View style={styles.preTournamentTag}>
+                          <Text style={styles.preTournamentTagLabel}>Previo al torneo</Text>
+                        </View>
+                      )}
+                    </View>
+                    <TogglePill label="Disponible" active={day.available} onPress={() => toggleDay(i)} />
+                  </View>
+
+                  {day.available && (
+                    <View style={styles.exceptionBlock}>
+                      <Text style={styles.exceptionHint}>
+                        Excepción de horario (opcional) — ej. clases en la academia
+                      </Text>
+                      <View style={styles.exceptionInputsRow}>
+                        <TextInput
+                          style={styles.exceptionInput}
+                          value={day.unavailableFrom}
+                          onChangeText={(v) => changeExceptionTime(i, 'unavailableFrom', v)}
+                          placeholder="Desde (15:00)"
+                          placeholderTextColor={colors.textDim}
+                          maxLength={5}
+                        />
+                        <Text style={styles.exceptionDash}>–</Text>
+                        <TextInput
+                          style={styles.exceptionInput}
+                          value={day.unavailableTo}
+                          onChangeText={(v) => changeExceptionTime(i, 'unavailableTo', v)}
+                          placeholder="Hasta (17:00)"
+                          placeholderTextColor={colors.textDim}
+                          maxLength={5}
+                        />
+                      </View>
+                      {exceptionError && <Text style={styles.exceptionError}>{exceptionError}</Text>}
+                    </View>
+                  )}
+                </View>
+              );
+            })}
           </View>
           <Text style={styles.daysHint}>
             {selectedDaysCount > 0
@@ -301,21 +397,81 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
     marginBottom: 14,
   },
-  daysGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 6,
+  daysList: {
+    gap: 10,
     marginBottom: 12,
   },
-  dayColumn: {
-    flex: 1,
+  dayRow: {
+    backgroundColor: colors.panel,
+    borderRadius: radius,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 12,
   },
-  dayLabel: {
+  dayRowTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  dayRowLabelWrap: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  dayRowLabel: {
+    color: colors.textSoft,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  preTournamentTag: {
+    backgroundColor: withOpacity(colors.courtBlue, 0.14),
+    borderRadius: 8,
+    paddingVertical: 3,
+    paddingHorizontal: 7,
+  },
+  preTournamentTagLabel: {
+    color: colors.courtBlue,
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  exceptionBlock: {
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderSoft,
+  },
+  exceptionHint: {
     color: colors.textDim,
     fontSize: 11,
-    fontWeight: '700',
-    textAlign: 'center',
     marginBottom: 8,
+  },
+  exceptionInputsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  exceptionInput: {
+    flex: 1,
+    backgroundColor: colors.panelLight,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    color: colors.lineWhite,
+    fontSize: 13,
+  },
+  exceptionDash: {
+    color: colors.textDim,
+    fontSize: 13,
+  },
+  exceptionError: {
+    color: colors.errorCoral,
+    fontSize: 11,
+    marginTop: 6,
   },
   daysHint: {
     color: colors.textDim,

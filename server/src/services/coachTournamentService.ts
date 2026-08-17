@@ -21,12 +21,24 @@ export async function getAvailabilityAndRate(coachId: string, tournamentId: stri
 export async function setAvailability(
   coachId: string,
   tournamentId: string,
-  days: Array<{ slotDate: string; available: boolean }>,
+  days: Array<{ slotDate: string; available: boolean; unavailableFrom?: string | null; unavailableTo?: string | null }>,
 ): Promise<CoachTournamentAvailability[]> {
   return withTransaction(async (client) => {
     const saved: CoachTournamentAvailability[] = [];
     for (const day of days) {
-      saved.push(await coachTournamentRepository.upsertAvailabilityDay({ coachId, tournamentId, ...day }, client));
+      saved.push(
+        await coachTournamentRepository.upsertAvailabilityDay(
+          {
+            coachId,
+            tournamentId,
+            slotDate: day.slotDate,
+            available: day.available,
+            unavailableFrom: day.unavailableFrom ?? null,
+            unavailableTo: day.unavailableTo ?? null,
+          },
+          client,
+        ),
+      );
     }
     return saved;
   });

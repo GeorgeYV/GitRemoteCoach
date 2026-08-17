@@ -279,9 +279,13 @@ export interface CoachTournamentAvailability {
   id: string;
   coachId: string;
   tournamentId: string;
-  /** Fecha del día del torneo al que aplica esta disponibilidad (YYYY-MM-DD). */
+  /** Fecha del día del torneo (o hasta 2 días previos) al que aplica esta disponibilidad (YYYY-MM-DD). */
   slotDate: string;
   available: boolean;
+  /** Bloque horario de excepción dentro de un día disponible (HH:MM), ej. "15:00"/"17:00" —
+   * ambos null o ambos seteados (ver chk_coach_tournament_availability_exception_range). */
+  unavailableFrom: string | null;
+  unavailableTo: string | null;
   updatedAt: string;
 }
 

@@ -5,13 +5,26 @@ import { ForbiddenError, ValidationError } from '../lib/errors.js';
 
 const RATE_MODES = ['per_match', 'per_day', 'per_tournament'] as const;
 
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+const dayAvailabilitySchema = z
+  .object({
+    slotDate: z.string().date(),
+    available: z.boolean(),
+    // Bloque horario de excepción dentro del día (ej. "15:00"/"17:00") — ambos presentes o
+    // ambos ausentes; ver chk_coach_tournament_availability_exception_range en el schema.
+    unavailableFrom: z.string().regex(HHMM).nullish(),
+    unavailableTo: z.string().regex(HHMM).nullish(),
+  })
+  .refine((day) => (day.unavailableFrom == null) === (day.unavailableTo == null), {
+    message: 'unavailableFrom y unavailableTo deben venir juntos o ninguno de los dos',
+  })
+  .refine((day) => day.unavailableFrom == null || day.unavailableTo! > day.unavailableFrom, {
+    message: 'unavailableTo debe ser posterior a unavailableFrom',
+  });
+
 const setAvailabilitySchema = z.object({
-  days: z.array(
-    z.object({
-      slotDate: z.string().date(),
-      available: z.boolean(),
-    }),
-  ),
+  days: z.array(dayAvailabilitySchema),
 });
 
 const setRateSchema = z.object({

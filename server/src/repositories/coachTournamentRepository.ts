@@ -4,6 +4,12 @@ import type { CoachTournamentAvailability, CoachTournamentRate, RateMode } from 
 
 type Queryable = Pool | PoolClient;
 
+// pg devuelve TIME como 'HH:MM:SS' (sin timezone) — recortarlo a 'HH:MM' para que coincida con
+// el formato que espera el cliente (y el que se envía al guardar).
+function toHHMM(value: string | null): string | null {
+  return value ? value.slice(0, 5) : null;
+}
+
 function mapAvailabilityRow(row: any): CoachTournamentAvailability {
   return {
     id: row.id,
@@ -11,22 +17,32 @@ function mapAvailabilityRow(row: any): CoachTournamentAvailability {
     tournamentId: row.tournament_id,
     slotDate: row.slot_date,
     available: row.available,
+    unavailableFrom: toHHMM(row.unavailable_from),
+    unavailableTo: toHHMM(row.unavailable_to),
     updatedAt: row.updated_at,
   };
 }
 
 /** Alta o actualización de la disponibilidad de un día puntual (CoachAvailabilityScreen). */
 export async function upsertAvailabilityDay(
-  params: { coachId: string; tournamentId: string; slotDate: string; available: boolean },
+  params: {
+    coachId: string;
+    tournamentId: string;
+    slotDate: string;
+    available: boolean;
+    unavailableFrom: string | null;
+    unavailableTo: string | null;
+  },
   db: Queryable = pool,
 ): Promise<CoachTournamentAvailability> {
   const { rows } = await db.query(
-    `INSERT INTO coach_tournament_availability (coach_id, tournament_id, slot_date, available)
-     VALUES ($1, $2, $3, $4)
+    `INSERT INTO coach_tournament_availability
+       (coach_id, tournament_id, slot_date, available, unavailable_from, unavailable_to)
+     VALUES ($1, $2, $3, $4, $5, $6)
      ON CONFLICT (coach_id, tournament_id, slot_date)
-     DO UPDATE SET available = $4, updated_at = now()
+     DO UPDATE SET available = $4, unavailable_from = $5, unavailable_to = $6, updated_at = now()
      RETURNING *`,
-    [params.coachId, params.tournamentId, params.slotDate, params.available],
+    [params.coachId, params.tournamentId, params.slotDate, params.available, params.unavailableFrom, params.unavailableTo],
   );
   return mapAvailabilityRow(rows[0]);
 }

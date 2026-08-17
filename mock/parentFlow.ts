@@ -24,6 +24,14 @@ export interface AvailabilityDay {
    * construir el matchDatetime real al reservar, ya no se busca por dayLabel en una tabla fija. */
   isoDate: string;
   available: boolean;
+  /** true para los días previos al torneo que el coach también puede ofrecer (ver
+   * lib/dateSlots.ts#buildDaySlotsFromRange) — no es un día oficial del torneo. */
+  isPreTournament: boolean;
+  /** Bloque horario en que el coach NO está disponible ese día (HH:MM), ej. clases en su
+   * academia de 15:00 a 17:00 — null cuando no declaró ninguna excepción. Debe mostrarse
+   * explícito al padre, no solo quedar como dato interno del coach. */
+  unavailableFrom: string | null;
+  unavailableTo: string | null;
 }
 
 export interface BookingSlotSelection {
@@ -165,11 +173,11 @@ export const mockCarlosMedinaProfile: TrainerProfile = {
     { value: '4/6', label: 'Quiebres' },
   ],
   availability: [
-    { dayLabel: 'Vie 5', isoDate: '2026-08-05', available: true },
-    { dayLabel: 'Sáb 6', isoDate: '2026-08-06', available: true },
-    { dayLabel: 'Dom 7', isoDate: '2026-08-07', available: false },
-    { dayLabel: 'Lun 8', isoDate: '2026-08-08', available: true },
-    { dayLabel: 'Mar 9', isoDate: '2026-08-09', available: true },
+    { dayLabel: 'Vie 5', isoDate: '2026-08-05', available: true, isPreTournament: false, unavailableFrom: null, unavailableTo: null },
+    { dayLabel: 'Sáb 6', isoDate: '2026-08-06', available: true, isPreTournament: false, unavailableFrom: '15:00', unavailableTo: '17:00' },
+    { dayLabel: 'Dom 7', isoDate: '2026-08-07', available: false, isPreTournament: false, unavailableFrom: null, unavailableTo: null },
+    { dayLabel: 'Lun 8', isoDate: '2026-08-08', available: true, isPreTournament: false, unavailableFrom: null, unavailableTo: null },
+    { dayLabel: 'Mar 9', isoDate: '2026-08-09', available: true, isPreTournament: false, unavailableFrom: null, unavailableTo: null },
   ],
   officialClub: 'Club Deportivo Bosques',
 };

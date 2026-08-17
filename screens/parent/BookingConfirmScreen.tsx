@@ -94,9 +94,13 @@ export default function BookingConfirmScreen({
           <View style={styles.daysGrid}>
             {availability.map((day) => {
               const active = selection?.dayLabel === day.dayLabel;
+              const exception = day.available && day.unavailableFrom && day.unavailableTo
+                ? `No disp. ${day.unavailableFrom}–${day.unavailableTo}`
+                : null;
               return (
-                <View key={day.dayLabel} style={styles.dayColumn}>
+                <View key={day.isoDate} style={styles.dayColumn}>
                   <Text style={styles.dayLabel}>{day.dayLabel}</Text>
+                  {day.isPreTournament && <Text style={styles.dayPreTag}>Previo</Text>}
                   <Pressable
                     disabled={!day.available}
                     onPress={() => selectDay(day)}
@@ -116,6 +120,7 @@ export default function BookingConfirmScreen({
                       Disponible
                     </Text>
                   </Pressable>
+                  {exception && <Text style={styles.dayException}>{exception}</Text>}
                 </View>
               );
             })}
@@ -237,6 +242,22 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textAlign: 'center',
     marginBottom: 8,
+  },
+  dayPreTag: {
+    color: colors.courtBlue,
+    fontSize: 8,
+    fontWeight: '800',
+    textAlign: 'center',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+    marginTop: -4,
+    marginBottom: 6,
+  },
+  dayException: {
+    color: colors.errorCoral,
+    fontSize: 9,
+    fontWeight: '700',
+    textAlign: 'center',
   },
   slotPill: {
     borderRadius: 10,

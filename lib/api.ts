@@ -609,6 +609,10 @@ export interface CoachTournamentAvailability {
   tournamentId: string;
   slotDate: string;
   available: boolean;
+  /** Bloque horario de excepción dentro de un día disponible (HH:MM), ej. coach da clases de
+   * 15:00 a 17:00 — ambos null o ambos presentes. */
+  unavailableFrom: string | null;
+  unavailableTo: string | null;
   updatedAt: string;
 }
 
@@ -655,7 +659,7 @@ export function setCoachTournamentAvailability(
   authToken: string,
   coachId: string,
   tournamentId: string,
-  days: Array<{ slotDate: string; available: boolean }>,
+  days: Array<{ slotDate: string; available: boolean; unavailableFrom?: string | null; unavailableTo?: string | null }>,
 ): Promise<CoachTournamentAvailability[]> {
   return request(`/coaches/${coachId}/tournaments/${tournamentId}/availability`, {
     method: 'PUT',

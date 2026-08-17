@@ -1,6 +1,16 @@
+// Cuántos días antes de start_date se ofrecen además de los días oficiales del torneo, para
+// entrenamientos previos (1 día antes es lo habitual, 2 es la excepción) — ver
+// db/schema.sql#33 y el trigger fn_coach_tournament_availability_before_write, que acepta el
+// mismo rango. Compartido entre CoachAvailabilityScreen y TrainerProfileScreen para que ambos
+// lados (coach y padre) vean exactamente los mismos días.
+export const PRE_TOURNAMENT_DAYS = 2;
+
 export interface DateSlot {
   dayLabel: string;
   isoDate: string;
+  /** true para los días previos al torneo (ver daysBefore) — el coach puede declararse
+   * disponible ahí para entrenar antes de que arranque, pero no es un día oficial del torneo. */
+  isPreTournament: boolean;
 }
 
 function capitalize(s: string): string {
@@ -15,19 +25,25 @@ function capitalize(s: string): string {
  * la zona horaria del navegador. Compartido entre CoachAvailabilityScreen y el flujo de reserva del
  * padre (TrainerProfileScreen/BookingConfirmScreen) — ambos generan slots reales a partir del rango
  * de un torneo en vez de un checklist de fechas fijo.
+ *
+ * daysBefore agrega esa cantidad de días previos a startDate, marcados isPreTournament — refleja
+ * la ventana que acepta el trigger de coach_tournament_availability (hasta 2 días antes, ver
+ * db/schema.sql#33) para entrenamientos previos al torneo.
  */
-export function buildDaySlotsFromRange(startDate: string, endDate: string): DateSlot[] {
+export function buildDaySlotsFromRange(startDate: string, endDate: string, daysBefore = 0): DateSlot[] {
   const days: DateSlot[] = [];
   const start = new Date(startDate);
   const end = new Date(endDate);
-  const cursor = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate()));
+  const startUtc = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate()));
   const endUtc = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate()));
+  const cursor = new Date(startUtc);
+  cursor.setUTCDate(cursor.getUTCDate() - daysBefore);
   while (cursor <= endUtc) {
     const isoDate = cursor.toISOString().slice(0, 10);
     const dayLabel = capitalize(
       cursor.toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric', timeZone: 'UTC' }),
     );
-    days.push({ dayLabel, isoDate });
+    days.push({ dayLabel, isoDate, isPreTournament: cursor < startUtc });
     cursor.setUTCDate(cursor.getUTCDate() + 1);
   }
   return days;
