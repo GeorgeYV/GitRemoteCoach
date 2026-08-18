@@ -35,7 +35,9 @@ export default function ParentHomeScreen() {
   useEffect(() => {
     if (!token) return;
     listPlayers(token)
-      .then((players) => setChildName(players[0]?.fullName ?? null))
+      // Nombrar a un hijo/a específico solo tiene sentido si es el único — con 2+ registrados
+      // no hay forma de saber para cuál está buscando el padre en este momento.
+      .then((players) => setChildName(players.length === 1 ? players[0].fullName : null))
       .catch(() => setChildName(null));
   }, [token]);
 

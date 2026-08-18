@@ -7,6 +7,7 @@ import InitialAvatar from '../../components/shared/InitialAvatar';
 import { useAuth } from '../../context/AuthContext';
 import { ApiError, listPlayers, Player } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
+import PlayerRegistrationScreen from './PlayerRegistrationScreen';
 
 const AGE_CATEGORY_LABELS: Record<string, string> = {
   U10: 'Sub-10',
@@ -20,6 +21,7 @@ export default function ParentProfileScreen() {
   const { user, token, logout } = useAuth();
   const [players, setPlayers] = useState<Player[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showRegistration, setShowRegistration] = useState(false);
 
   useEffect(() => {
     if (!token) {
@@ -42,6 +44,18 @@ export default function ParentProfileScreen() {
   }, [token]);
 
   const firstInitial = user?.fullName[0] ?? '?';
+
+  if (showRegistration) {
+    return (
+      <PlayerRegistrationScreen
+        onBack={() => setShowRegistration(false)}
+        onSubmit={(player) => {
+          setPlayers((prev) => [...(prev ?? []), player]);
+          setShowRegistration(false);
+        }}
+      />
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -85,6 +99,10 @@ export default function ParentProfileScreen() {
               ))}
             </View>
           )}
+          <Pressable style={styles.addPlayerButton} onPress={() => setShowRegistration(true)}>
+            <Ionicons name="add-circle-outline" size={18} color={colors.courtBlue} />
+            <Text style={styles.addPlayerLabel}>Agregar jugador</Text>
+          </Pressable>
         </Section>
 
         <Pressable style={styles.logoutButton} onPress={logout}>
@@ -170,6 +188,22 @@ const styles = StyleSheet.create({
   },
   playerList: {
     gap: 10,
+  },
+  addPlayerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius,
+    paddingVertical: 12,
+    marginTop: 12,
+  },
+  addPlayerLabel: {
+    color: colors.courtBlue,
+    fontSize: 13,
+    fontWeight: '700',
   },
   playerRow: {
     flexDirection: 'row',
