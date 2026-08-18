@@ -368,14 +368,22 @@ FOR EACH ROW EXECUTE FUNCTION fn_club_admins_prevent_last_removal();
 -- ---------------------------------------------------------------------
 CREATE TABLE tournaments (
   id                       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  club_id                  UUID NOT NULL REFERENCES clubs (id),
+  -- NULL = todavía sin reclamar por un club (sembrado por platform_admin, ver decisión #36).
+  club_id                  UUID REFERENCES clubs (id),
   name                     TEXT NOT NULL,
   venue                    TEXT NOT NULL,
   start_date               DATE NOT NULL,
   end_date                 DATE NOT NULL CHECK (end_date >= start_date),
   status                   tournament_status NOT NULL DEFAULT 'scheduled',
   commission_rate_override NUMERIC(5, 4) CHECK (commission_rate_override BETWEEN 0 AND 1),
-  created_at               TIMESTAMPTZ NOT NULL DEFAULT now()
+  -- Solo se usan mientras club_id es NULL — un torneo sin club sigue teniendo una ubicación
+  -- real y conocida. Una vez reclamado, la ciudad/país mostrados siguen viniendo del club
+  -- (JOIN, ver tournamentRepository.search) igual que siempre; estas columnas no se limpian.
+  city                     TEXT,
+  country                  TEXT,
+  created_at               TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT chk_tournaments_country CHECK (country IS NULL OR country IN ('EC', 'PE', 'CO', 'CL', 'BO', 'AR', 'VE', 'BR', 'PY', 'UY')),
+  CONSTRAINT chk_tournaments_unclaimed_has_location CHECK (club_id IS NOT NULL OR (city IS NOT NULL AND country IS NOT NULL))
 );
 
 CREATE INDEX idx_tournaments_club_id ON tournaments (club_id);
@@ -1628,4 +1636,22 @@ CREATE INDEX idx_push_tokens_user_id ON push_tokens (user_id);
 --     clubs.country (no tournaments.country) porque el club es la entidad
 --     físicamente fija — el torneo hereda el país de su club vía el mismo
 --     JOIN que ya usa city (ver tournamentRepository.search).
+--
+-- 36. tournaments.club_id pasó a ser nullable, y tournaments ganó sus
+--     propias columnas city/country (nullable) — a pedido de producto:
+--     un club puede no estar interesado en crear con anticipación un
+--     torneo que igual va a tener demanda, así que un platform_admin
+--     puede sembrarlo sin club ("sin reclamar") y cualquier club de ese
+--     país puede después reclamarlo (asignarse el club_id) desde
+--     ClubTournamentListScreen. Esto no contradice la decisión #35: un
+--     torneo *con* club sigue sin duplicar city/country (siguen viniendo
+--     del club vía JOIN); las columnas nuevas solo se llenan para el caso
+--     sin club, donde no hay de qué club heredarlas. La comisión de club
+--     de un torneo sin reclamar es 0 (COALESCE en
+--     tournamentRepository.getTournamentCommissionInfo) — el coach cobra
+--     su parte completa y la plataforma su comisión fija de siempre, pero
+--     nadie cobra la parte de "club" hasta que alguien lo reclame. Esa
+--     comisión no se recalcula en retrospectiva: un pago ya hecho antes
+--     del reclamo queda en 0 para siempre, solo los pagos posteriores al
+--     reclamo generan comisión para el club.
 -- =====================================================================

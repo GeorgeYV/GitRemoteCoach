@@ -70,7 +70,7 @@ export default function PlatformAdminReviewScreen() {
   const groups = documents ? groupByCoach(documents) : null;
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+    <SafeAreaView style={styles.container} edges={['bottom']}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Revisión de documentos</Text>
         <Text style={styles.headerSubtitle}>Aprueba o rechaza los documentos de verificación pendientes.</Text>

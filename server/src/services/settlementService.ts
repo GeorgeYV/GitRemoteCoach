@@ -13,6 +13,11 @@ import type { ClubSettlement } from '../types.js';
 export async function settleTournamentCommissions(tournamentId: string): Promise<ClubSettlement | null> {
   return withTransaction(async (client) => {
     const tournament = await tournamentRepository.getTournamentCommissionInfo(tournamentId, client);
+    // Sin club (torneo sin reclamar, ver decisión #36 en db/schema.sql) no hay a quién liquidar —
+    // sus bookings quedan con club_commission_amount 0 y club_commission_status 'generated' hasta
+    // que alguien lo reclame; este job los vuelve a intentar en cada corrida sin efecto, lo cual
+    // es aceptable (no hay volumen esperado de torneos que queden sin reclamar indefinidamente).
+    if (tournament.clubId === null) return null;
     const pendingBookings = await bookingRepository.findPendingCommissionsForTournament(tournamentId, client);
 
     if (pendingBookings.length === 0) return null;

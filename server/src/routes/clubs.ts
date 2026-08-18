@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import * as clubService from '../services/clubService.js';
 import * as clubRepository from '../repositories/clubRepository.js';
+import * as tournamentService from '../services/tournamentService.js';
 import { ForbiddenError, ValidationError } from '../lib/errors.js';
 
 const createTournamentSchema = z
@@ -97,6 +98,32 @@ export async function clubRoutes(app: FastifyInstance): Promise<void> {
     const tournament = await clubService.createTournamentForClub(id, parsed.data);
     reply.code(201);
     return tournament;
+  });
+
+  // ClubTournamentListScreen, sección "Torneos disponibles para reclamar" — torneos sin club
+  // en el mismo país que este club (ver decisión #36 en db/schema.sql).
+  app.get('/clubs/:id/unclaimed-tournaments', async (req) => {
+    const { id } = req.params as { id: string };
+    return tournamentService.listUnclaimedTournamentsForClub(id);
+  });
+
+  // Reclamar un torneo sin club — mismo chequeo de pertenencia que crear/editar torneos.
+  app.post('/clubs/:id/tournaments/:tournamentId/claim', { preHandler: app.authenticate }, async (req) => {
+    const { id, tournamentId } = req.params as { id: string; tournamentId: string };
+    const { sub } = req.user as { sub: string };
+
+    let adminClubId: string;
+    try {
+      adminClubId = await clubRepository.getClubIdForAdminUser(sub);
+    } catch {
+      throw new ForbiddenError('Solo un administrador del club puede reclamar torneos');
+    }
+    if (adminClubId !== id) {
+      throw new ForbiddenError('Solo un administrador del club puede reclamar torneos');
+    }
+
+    await tournamentService.claimTournamentForClub(tournamentId, id);
+    return { claimed: true };
   });
 
   // ClubFlow: resuelve qué club administra el club_admin logueado.

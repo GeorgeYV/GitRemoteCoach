@@ -930,6 +930,46 @@ export function searchTournaments(query?: string, country?: CountryCode): Promis
   return request(`/tournaments${suffix ? `?${suffix}` : ''}`);
 }
 
+/** Espeja server/src/types.ts#UnclaimedTournament — torneo sembrado por platform_admin sin
+ * club todavía. */
+export interface UnclaimedTournament {
+  id: string;
+  name: string;
+  venue: string;
+  city: string;
+  country: CountryCode;
+  startDate: string;
+  endDate: string;
+}
+
+/** POST /tournaments — PlatformAdminTournamentScreen: solo platform_admin puede sembrar un
+ * torneo sin club (ver decisión #36 en db/schema.sql). */
+export function createUnclaimedTournament(
+  authToken: string,
+  params: { name: string; venue: string; city: string; country: CountryCode; startDate: string; endDate: string },
+): Promise<UnclaimedTournament> {
+  return request('/tournaments', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${authToken}` },
+    body: JSON.stringify(params),
+  });
+}
+
+/** GET /clubs/:id/unclaimed-tournaments — ClubTournamentListScreen, sección "Torneos
+ * disponibles para reclamar" (mismo país que este club). */
+export function listUnclaimedTournaments(clubId: string): Promise<UnclaimedTournament[]> {
+  return request(`/clubs/${clubId}/unclaimed-tournaments`);
+}
+
+/** POST /clubs/:id/tournaments/:tournamentId/claim — asigna este club como dueño de un torneo
+ * sin reclamar. 409 si otro club lo reclamó primero. */
+export function claimTournament(authToken: string, clubId: string, tournamentId: string): Promise<{ claimed: true }> {
+  return request(`/clubs/${clubId}/tournaments/${tournamentId}/claim`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${authToken}` },
+  });
+}
+
 /** Espeja server/src/types.ts#CoachClubTag — insignias de "oficial" del propio entrenador. */
 export interface CoachClubTag {
   tournamentId: string;

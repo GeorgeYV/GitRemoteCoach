@@ -242,6 +242,18 @@ export interface TournamentSearchResult {
   endDate: string;
 }
 
+/** Torneo sembrado por platform_admin sin club todavía (PlatformAdminTournamentScreen,
+ * ClubTournamentListScreen — sección "Torneos disponibles para reclamar"). */
+export interface UnclaimedTournament {
+  id: string;
+  name: string;
+  venue: string;
+  city: string;
+  country: CountryCode;
+  startDate: string;
+  endDate: string;
+}
+
 /** Entrenador etiquetado como oficial en un torneo (ClubTournamentDetailScreen) — nombre/ciudad/rating vienen de un JOIN. */
 export interface TournamentCoachTagWithProfile {
   coachId: string;

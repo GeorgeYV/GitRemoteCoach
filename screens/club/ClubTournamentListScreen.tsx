@@ -3,7 +3,15 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import TournamentStatusPill from '../../components/club/TournamentStatusPill';
-import { ApiError, listClubTournaments, TournamentSummary } from '../../lib/api';
+import { useAuth } from '../../context/AuthContext';
+import {
+  ApiError,
+  claimTournament,
+  listClubTournaments,
+  listUnclaimedTournaments,
+  TournamentSummary,
+  UnclaimedTournament,
+} from '../../lib/api';
 import { colors, radius } from '../../lib/theme';
 
 function dateRangeLabel(startIso: string, endIso: string): string {
@@ -28,8 +36,15 @@ export default function ClubTournamentListScreen({
   onCreate: () => void;
   onBack?: () => void;
 }) {
+  const { token } = useAuth();
   const [tournaments, setTournaments] = useState<TournamentSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [unclaimed, setUnclaimed] = useState<UnclaimedTournament[] | null>(null);
+  const [claimingId, setClaimingId] = useState<string | null>(null);
+  const [claimError, setClaimError] = useState<string | null>(null);
+  // Se incrementa tras reclamar un torneo con éxito, para refrescar ambas listas — separado del
+  // refreshKey del padre (que solo se usa tras crear un torneo nuevo).
+  const [localRefreshKey, setLocalRefreshKey] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -45,7 +60,38 @@ export default function ClubTournamentListScreen({
     return () => {
       cancelled = true;
     };
-  }, [clubId, refreshKey]);
+  }, [clubId, refreshKey, localRefreshKey]);
+
+  useEffect(() => {
+    let cancelled = false;
+    listUnclaimedTournaments(clubId)
+      .then((result) => {
+        if (!cancelled) setUnclaimed(result);
+      })
+      .catch(() => {
+        if (!cancelled) setUnclaimed([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [clubId, localRefreshKey]);
+
+  async function handleClaim(tournamentId: string) {
+    if (!token) {
+      setClaimError('No hay una sesión activa.');
+      return;
+    }
+    setClaimingId(tournamentId);
+    setClaimError(null);
+    try {
+      await claimTournament(token, clubId, tournamentId);
+      setLocalRefreshKey((k) => k + 1);
+    } catch (err) {
+      setClaimError(err instanceof ApiError ? err.message : 'No se pudo reclamar el torneo. Intenta de nuevo.');
+    } finally {
+      setClaimingId(null);
+    }
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -84,9 +130,53 @@ export default function ClubTournamentListScreen({
           {tournaments.length === 0 && (
             <Text style={styles.emptyText}>Todavía no hay torneos organizados por este club.</Text>
           )}
+
+          {unclaimed && unclaimed.length > 0 && (
+            <View style={styles.unclaimedSection}>
+              <Text style={styles.unclaimedLabel}>Torneos disponibles para reclamar</Text>
+              {claimError && <Text style={styles.claimErrorText}>{claimError}</Text>}
+              {unclaimed.map((tournament) => (
+                <UnclaimedTournamentCard
+                  key={tournament.id}
+                  tournament={tournament}
+                  claiming={claimingId === tournament.id}
+                  onClaim={() => handleClaim(tournament.id)}
+                />
+              ))}
+            </View>
+          )}
         </ScrollView>
       )}
     </SafeAreaView>
+  );
+}
+
+function UnclaimedTournamentCard({
+  tournament,
+  claiming,
+  onClaim,
+}: {
+  tournament: UnclaimedTournament;
+  claiming: boolean;
+  onClaim: () => void;
+}) {
+  return (
+    <View style={styles.unclaimedCard}>
+      <Text style={styles.tournamentName}>{tournament.name}</Text>
+      <Text style={styles.tournamentMeta}>{tournament.venue}</Text>
+      <Text style={styles.tournamentMeta}>{tournament.city}</Text>
+      <Text style={styles.tournamentMeta}>{dateRangeLabel(tournament.startDate, tournament.endDate)}</Text>
+      <Pressable style={styles.claimButton} onPress={onClaim} disabled={claiming}>
+        {claiming ? (
+          <ActivityIndicator color={colors.courtBlueDeep} size="small" />
+        ) : (
+          <View style={styles.buttonContent}>
+            <Ionicons name="flag-outline" size={14} color={colors.courtBlueDeep} />
+            <Text style={styles.claimButtonLabel}>Reclamar</Text>
+          </View>
+        )}
+      </Pressable>
+    </View>
   );
 }
 
@@ -229,5 +319,45 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 20,
     textAlign: 'center',
+  },
+  unclaimedSection: {
+    marginTop: 8,
+    gap: 12,
+  },
+  unclaimedLabel: {
+    color: colors.textDim,
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  claimErrorText: {
+    color: colors.errorCoral,
+    fontSize: 12,
+  },
+  unclaimedCard: {
+    backgroundColor: colors.panel,
+    borderRadius: radius,
+    padding: 16,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: colors.border,
+  },
+  claimButton: {
+    marginTop: 12,
+    backgroundColor: colors.ballLime,
+    borderRadius: 16,
+    paddingVertical: 9,
+    alignItems: 'center',
+  },
+  buttonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  claimButtonLabel: {
+    color: colors.courtBlueDeep,
+    fontSize: 12,
+    fontWeight: '800',
   },
 });

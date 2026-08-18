@@ -1,7 +1,7 @@
 import type { Pool, PoolClient } from 'pg';
 import { pool } from '../lib/db.js';
 import { NotFoundError } from '../lib/errors.js';
-import type { CountryCode, TournamentSearchResult, TournamentSummary } from '../types.js';
+import type { CountryCode, TournamentSearchResult, TournamentSummary, UnclaimedTournament } from '../types.js';
 
 type Queryable = Pool | PoolClient;
 
@@ -23,7 +23,9 @@ function mapSearchRow(row: any): TournamentSearchResult {
  * transiciona el status de un torneo (sin job ni endpoint que lo mueva a 'completed'/'cancelled'),
  * así que por sí solo nunca excluye nada — nos apoyamos también en end_date para no listar
  * torneos cuyas fechas ya pasaron. country filtra por el país del club (toggle "mi país"/"todos"
- * de ambas pantallas) — opcional, sin él devuelve todos los países. */
+ * de ambas pantallas) — opcional, sin él devuelve todos los países. LEFT JOIN (no JOIN) porque un
+ * torneo sin reclamar (club_id NULL, ver decisión #36) también debe aparecer aquí — su
+ * ciudad/país salen de las columnas propias del torneo en vez del club vía COALESCE. */
 export async function search(
   params: { query?: string; country?: CountryCode },
   db: Queryable = pool,
@@ -33,18 +35,21 @@ export async function search(
 
   if (params.query) {
     values.push(`%${params.query}%`);
-    conditions.push(`(t.name ILIKE $${values.length} OR t.venue ILIKE $${values.length} OR c.city ILIKE $${values.length})`);
+    conditions.push(
+      `(t.name ILIKE $${values.length} OR t.venue ILIKE $${values.length} OR COALESCE(c.city, t.city) ILIKE $${values.length})`,
+    );
   }
 
   if (params.country) {
     values.push(params.country);
-    conditions.push(`c.country = $${values.length}`);
+    conditions.push(`COALESCE(c.country, t.country) = $${values.length}`);
   }
 
   const { rows } = await db.query(
-    `SELECT t.id, t.name, t.venue, c.city, c.country, t.start_date, t.end_date
+    `SELECT t.id, t.name, t.venue, COALESCE(c.city, t.city) AS city, COALESCE(c.country, t.country) AS country,
+            t.start_date, t.end_date
      FROM tournaments t
-     JOIN clubs c ON c.id = t.club_id
+     LEFT JOIN clubs c ON c.id = t.club_id
      WHERE ${conditions.join(' AND ')}
      ORDER BY t.start_date
      LIMIT 25`,
@@ -97,10 +102,11 @@ export async function listByClub(clubId: string, db: Queryable = pool): Promise<
 
 export interface TournamentCommissionInfo {
   tournamentId: string;
-  clubId: string;
+  clubId: string | null;
   startDate: string;
   endDate: string;
-  /** commission_rate_override si existe, si no default_commission_rate del club. */
+  /** commission_rate_override si existe, si no default_commission_rate del club, si no 0
+   * (torneo sin reclamar todavía — nadie cobra la parte de "club", ver decisión #36). */
   clubCommissionRate: number;
 }
 
@@ -110,9 +116,9 @@ export async function getTournamentCommissionInfo(
 ): Promise<TournamentCommissionInfo> {
   const { rows } = await db.query(
     `SELECT t.id AS tournament_id, t.club_id, t.start_date, t.end_date,
-            COALESCE(t.commission_rate_override, c.default_commission_rate) AS club_commission_rate
+            COALESCE(t.commission_rate_override, c.default_commission_rate, 0) AS club_commission_rate
      FROM tournaments t
-     JOIN clubs c ON c.id = t.club_id
+     LEFT JOIN clubs c ON c.id = t.club_id
      WHERE t.id = $1`,
     [tournamentId],
   );
@@ -164,6 +170,56 @@ export async function create(
     officialCoachCount: 0,
     pendingCommissionAmount: '0',
   };
+}
+
+function mapUnclaimedRow(row: any): UnclaimedTournament {
+  return {
+    id: row.id,
+    name: row.name,
+    venue: row.venue,
+    city: row.city,
+    country: row.country,
+    startDate: row.start_date,
+    endDate: row.end_date,
+  };
+}
+
+/** PlatformAdminTournamentScreen: platform_admin siembra un torneo con demanda conocida antes de
+ * que algún club se anime a crearlo — sin club_id, con su propia ciudad/país (ver decisión #36). */
+export async function createUnclaimed(
+  params: { name: string; venue: string; city: string; country: CountryCode; startDate: string; endDate: string },
+  db: Queryable = pool,
+): Promise<UnclaimedTournament> {
+  const { rows } = await db.query(
+    `INSERT INTO tournaments (club_id, name, venue, city, country, start_date, end_date, status)
+     VALUES (NULL, $1, $2, $3, $4, $5, $6, 'scheduled')
+     RETURNING id, name, venue, city, country, start_date, end_date`,
+    [params.name, params.venue, params.city, params.country, params.startDate, params.endDate],
+  );
+  return mapUnclaimedRow(rows[0]);
+}
+
+/** ClubTournamentListScreen, sección "Torneos disponibles para reclamar" — torneos sin club en
+ * el país del club que consulta. */
+export async function listUnclaimed(country: CountryCode, db: Queryable = pool): Promise<UnclaimedTournament[]> {
+  const { rows } = await db.query(
+    `SELECT id, name, venue, city, country, start_date, end_date
+     FROM tournaments
+     WHERE club_id IS NULL AND country = $1
+     ORDER BY start_date`,
+    [country],
+  );
+  return rows.map(mapUnclaimedRow);
+}
+
+/** Reclamar un torneo sin club — WHERE club_id IS NULL evita que dos clubes lo reclamen a la vez
+ * (el segundo en llegar recibe 0 filas y el route responde 409). */
+export async function claim(tournamentId: string, clubId: string, db: Queryable = pool): Promise<boolean> {
+  const { rowCount } = await db.query(`UPDATE tournaments SET club_id = $2 WHERE id = $1 AND club_id IS NULL`, [
+    tournamentId,
+    clubId,
+  ]);
+  return (rowCount ?? 0) > 0;
 }
 
 export async function findTournamentsEndedWithoutFullSettlement(db: Queryable = pool): Promise<string[]> {

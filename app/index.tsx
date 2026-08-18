@@ -6,7 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { ApiError, getCoachProfile, PublicUser } from '../lib/api';
 import { colors, radius } from '../lib/theme';
 import { ClubFlow, CoachHomeFlow } from '../screens/previewFlows';
-import PlatformAdminReviewScreen from '../screens/admin/PlatformAdminReviewScreen';
+import PlatformAdminFlow from '../screens/admin/PlatformAdminFlow';
 import CoachRegistrationScreen from '../screens/coach/CoachRegistrationScreen';
 import CoachVerificationPendingScreen from '../screens/coach/CoachVerificationPendingScreen';
 import ParentHomeScreen from '../screens/parent/ParentHomeScreen';
@@ -80,7 +80,7 @@ function RoleHome({ user }: { user: PublicUser }) {
     case 'club_admin':
       return <ClubFlow adminUserId={user.id} />;
     case 'platform_admin':
-      return <PlatformAdminReviewScreen />;
+      return <PlatformAdminFlow />;
     default:
       return (
         <View style={styles.placeholder}>
