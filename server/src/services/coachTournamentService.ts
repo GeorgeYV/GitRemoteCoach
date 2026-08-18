@@ -47,9 +47,15 @@ export async function setAvailability(
 export async function setRate(
   coachId: string,
   tournamentId: string,
-  params: { rateMode: RateMode; amount: number },
+  params: { rateMode: RateMode; amount: number; approachDescription?: string },
 ): Promise<CoachTournamentRate> {
-  return coachTournamentRepository.upsertRate({ coachId, tournamentId, ...params });
+  return coachTournamentRepository.upsertRate({
+    coachId,
+    tournamentId,
+    rateMode: params.rateMode,
+    amount: params.amount,
+    approachDescription: params.approachDescription ?? null,
+  });
 }
 
 /** TrainerProfileScreen: reemplaza el detalle de "estadísticas de partidos" por algo con más

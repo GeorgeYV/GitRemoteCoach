@@ -317,6 +317,9 @@ export interface CoachTournamentRate {
   tournamentId: string;
   rateMode: RateMode;
   amount: string;
+  /** Cómo va a ser el entrenamiento/seguimiento/activación del coach durante ESTE torneo — texto
+   * libre que el padre lee en TrainerProfileScreen antes de reservar (ver decisión #38). */
+  approachDescription: string | null;
   updatedAt: string;
 }
 

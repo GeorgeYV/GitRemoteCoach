@@ -94,6 +94,7 @@ export default function TrainerProfileScreen({
   const [availability, setAvailability] = useState<AvailabilityDay[] | null>(null);
   const [price, setPrice] = useState<number | null>(null);
   const [rateMode, setRateMode] = useState<RateMode | null>(null);
+  const [approachDescription, setApproachDescription] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const [reviews, setReviews] = useState<ReviewWithParent[] | null>(null);
@@ -115,6 +116,7 @@ export default function TrainerProfileScreen({
         setAvailability(toAvailabilityDays(tournament, availabilityResult.availability));
         setPrice(Number(availabilityResult.rate?.amount ?? profileResult.profile.hourlyRate));
         setRateMode(availabilityResult.rate?.rateMode ?? null);
+        setApproachDescription(availabilityResult.rate?.approachDescription ?? null);
       })
       .catch((err) => {
         if (cancelled) return;
@@ -271,6 +273,12 @@ export default function TrainerProfileScreen({
           )}
         </Section>
 
+        {approachDescription && (
+          <Section label={`Enfoque de ${firstName} para este torneo`}>
+            <Text style={styles.approachText}>{approachDescription}</Text>
+          </Section>
+        )}
+
         <Section label="Disponibilidad">
           <View style={styles.availabilityGrid}>
             {availability.map((day) => {
@@ -385,6 +393,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
     marginBottom: 12,
+  },
+  approachText: {
+    color: colors.textSoft,
+    fontSize: 13,
+    lineHeight: 19,
   },
   tagRow: {
     flexDirection: 'row',

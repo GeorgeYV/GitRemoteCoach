@@ -74,6 +74,7 @@ export default function CoachAvailabilityScreen({
   const [days, setDays] = useState<DaySlot[]>(() => buildDaySlotsFromRange(tournament.startDate, tournament.endDate));
   const [rateMode, setRateMode] = useState<RateMode>('dia');
   const [rateAmount, setRateAmount] = useState('');
+  const [approachDescription, setApproachDescription] = useState('');
   const [saved, setSaved] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -114,6 +115,7 @@ export default function CoachAvailabilityScreen({
       if (rate) {
         setRateMode(API_RATE_MODE_TO_LOCAL[rate.rateMode]);
         setRateAmount(String(Number(rate.amount)));
+        setApproachDescription(rate.approachDescription ?? '');
       }
     });
     return () => {
@@ -154,6 +156,11 @@ export default function CoachAvailabilityScreen({
     setRateAmount(value);
   }
 
+  function changeApproachDescription(value: string) {
+    setSaved(false);
+    setApproachDescription(value);
+  }
+
   async function handleSave() {
     if (!user || !token) {
       setError('No hay una sesión activa.');
@@ -176,6 +183,7 @@ export default function CoachAvailabilityScreen({
       await setCoachTournamentRate(token, user.id, tournament.id, {
         rateMode: RATE_MODE_TO_API[rateMode],
         amount: Number(rateAmount),
+        approachDescription: approachDescription.trim() || undefined,
       });
       setSaved(true);
     } catch (err) {
@@ -301,6 +309,23 @@ export default function CoachAvailabilityScreen({
             />
             <Text style={styles.amountSuffix}>{RATE_MODE_LABELS[rateMode].toLowerCase()}</Text>
           </View>
+        </Section>
+
+        <Section label="Tu enfoque para este torneo">
+          <Text style={styles.approachHint}>
+            Opcional — cómo va a ser el entrenamiento, el seguimiento y la activación durante el torneo. Los padres lo
+            ven antes de reservar contigo.
+          </Text>
+          <TextInput
+            style={styles.approachInput}
+            value={approachDescription}
+            onChangeText={changeApproachDescription}
+            placeholder="Ej. Trabajo la activación 30 min antes de cada partido, reviso video entre sets y mando un resumen al padre al terminar el día…"
+            placeholderTextColor={colors.textDim}
+            multiline
+            maxLength={1000}
+          />
+          <Text style={styles.approachCounter}>{approachDescription.length}/1000</Text>
         </Section>
       </ScrollView>
 
@@ -531,6 +556,30 @@ const styles = StyleSheet.create({
     fontSize: 13,
     flex: 1,
     textAlign: 'right',
+  },
+  approachHint: {
+    color: colors.textDim,
+    fontSize: 12,
+    lineHeight: 17,
+    marginBottom: 10,
+  },
+  approachInput: {
+    backgroundColor: colors.panel,
+    borderRadius: radius,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 14,
+    color: colors.lineWhite,
+    fontSize: 13,
+    lineHeight: 19,
+    minHeight: 110,
+    textAlignVertical: 'top',
+  },
+  approachCounter: {
+    color: colors.textDim,
+    fontSize: 11,
+    textAlign: 'right',
+    marginTop: 6,
   },
   footer: {
     borderTopWidth: 1,

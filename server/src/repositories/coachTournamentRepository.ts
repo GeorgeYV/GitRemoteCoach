@@ -67,22 +67,29 @@ function mapRateRow(row: any): CoachTournamentRate {
     tournamentId: row.tournament_id,
     rateMode: row.rate_mode,
     amount: row.amount,
+    approachDescription: row.approach_description,
     updatedAt: row.updated_at,
   };
 }
 
 /** Alta o actualización de la tarifa de catálogo del entrenador para un torneo (misma pantalla que la disponibilidad). */
 export async function upsertRate(
-  params: { coachId: string; tournamentId: string; rateMode: RateMode; amount: number },
+  params: {
+    coachId: string;
+    tournamentId: string;
+    rateMode: RateMode;
+    amount: number;
+    approachDescription: string | null;
+  },
   db: Queryable = pool,
 ): Promise<CoachTournamentRate> {
   const { rows } = await db.query(
-    `INSERT INTO coach_tournament_rates (coach_id, tournament_id, rate_mode, amount)
-     VALUES ($1, $2, $3, $4)
+    `INSERT INTO coach_tournament_rates (coach_id, tournament_id, rate_mode, amount, approach_description)
+     VALUES ($1, $2, $3, $4, $5)
      ON CONFLICT (coach_id, tournament_id)
-     DO UPDATE SET rate_mode = $3, amount = $4, updated_at = now()
+     DO UPDATE SET rate_mode = $3, amount = $4, approach_description = $5, updated_at = now()
      RETURNING *`,
-    [params.coachId, params.tournamentId, params.rateMode, params.amount],
+    [params.coachId, params.tournamentId, params.rateMode, params.amount, params.approachDescription],
   );
   return mapRateRow(rows[0]);
 }

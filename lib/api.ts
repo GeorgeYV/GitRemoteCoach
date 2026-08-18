@@ -683,6 +683,9 @@ export interface CoachTournamentRate {
   tournamentId: string;
   rateMode: RateMode;
   amount: string;
+  /** Cómo va a ser el entrenamiento/seguimiento/activación del coach durante este torneo — texto
+   * libre que el padre lee en TrainerProfileScreen antes de reservar. */
+  approachDescription: string | null;
   updatedAt: string;
 }
 
@@ -735,7 +738,7 @@ export function setCoachTournamentRate(
   authToken: string,
   coachId: string,
   tournamentId: string,
-  params: { rateMode: RateMode; amount: number },
+  params: { rateMode: RateMode; amount: number; approachDescription?: string },
 ): Promise<CoachTournamentRate> {
   return request(`/coaches/${coachId}/tournaments/${tournamentId}/rate`, {
     method: 'PUT',

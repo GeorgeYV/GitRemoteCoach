@@ -675,6 +675,11 @@ CREATE TABLE coach_tournament_rates (
   tournament_id UUID NOT NULL REFERENCES tournaments (id) ON DELETE CASCADE,
   rate_mode     rate_mode NOT NULL DEFAULT 'per_day',
   amount        NUMERIC(10, 2) NOT NULL CHECK (amount >= 0),
+  -- Texto libre del coach para ESTE torneo (entrenamiento, seguimiento, activación) que el padre
+  -- lee en TrainerProfileScreen antes de reservar — ver decisión #38. Vive acá (no en una tabla
+  -- nueva) porque coach_tournament_rates ya es la única fila por (coach, torneo); sin CHECK de
+  -- largo, igual que bio/coachObservations — el límite lo pone Zod en setRateSchema.
+  approach_description TEXT,
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (coach_id, tournament_id)
 );
@@ -1672,4 +1677,15 @@ CREATE INDEX idx_push_tokens_user_id ON push_tokens (user_id);
 --     tiebreak) viven en lib/matchFormats.ts (espejado en
 --     server/src/lib/matchFormats.ts), no en la base — la columna solo
 --     guarda el id. Filas existentes: '1' → 'single_set', '3' → 'best_of_3'.
+--
+-- 38. coach_tournament_rates.approach_description (TEXT, nullable) — a
+--     pedido de producto: el coach puede describir cómo va a ser el
+--     entrenamiento/seguimiento/activación durante ESE torneo puntual,
+--     para que el padre lo lea antes de reservar (TrainerProfileScreen).
+--     No es una tabla nueva porque coach_tournament_rates ya es la única
+--     fila por (coach, torneo) — incómodo que el nombre diga "rates" y
+--     ahora también tenga esto, pero crear una tabla de una sola columna
+--     solo para evitar ese nombre no valía la pena. Sin CHECK de largo,
+--     igual que bio/coachObservations — el límite (1000 caracteres) lo
+--     pone Zod en setRateSchema, no la base.
 -- =====================================================================

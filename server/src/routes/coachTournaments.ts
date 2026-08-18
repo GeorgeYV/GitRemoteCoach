@@ -30,6 +30,7 @@ const setAvailabilitySchema = z.object({
 const setRateSchema = z.object({
   rateMode: z.enum(RATE_MODES),
   amount: z.number().positive(),
+  approachDescription: z.string().max(1000).optional(),
 });
 
 function assertOwnsCoachId(coachId: string, sub: string): void {
