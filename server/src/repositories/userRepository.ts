@@ -15,6 +15,7 @@ function mapRow(row: any): UserRecord {
     id: row.id,
     email: row.email,
     fullName: row.full_name,
+    phone: row.phone,
     primaryRole: row.primary_role,
     passwordHash: row.password_hash,
   };
@@ -46,4 +47,21 @@ export async function create(
 
 export async function updatePasswordHash(userId: string, passwordHash: string, db: Queryable = pool): Promise<void> {
   await db.query(`UPDATE users SET password_hash = $2, updated_at = now() WHERE id = $1`, [userId, passwordHash]);
+}
+
+/** ParentProfileScreen "Editar perfil" — nombre y teléfono son los únicos campos de perfil
+ * editables por el propio usuario; email/contraseña quedan fuera (van por flujos aparte:
+ * cambiar el correo necesitaría reverificación, y la contraseña ya tiene su propio flujo vía
+ * password_reset_tokens). phone ya existía en la tabla pero nunca se exponía al cliente. */
+export async function update(
+  userId: string,
+  params: { fullName: string; phone: string | null },
+  db: Queryable = pool,
+): Promise<UserRecord> {
+  const { rows } = await db.query(
+    `UPDATE users SET full_name = $2, phone = $3, updated_at = now() WHERE id = $1 RETURNING *`,
+    [userId, params.fullName, params.phone],
+  );
+  if (rows.length === 0) throw new NotFoundError('User', userId);
+  return mapRow(rows[0]);
 }

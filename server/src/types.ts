@@ -30,6 +30,7 @@ export interface PublicUser {
   id: string;
   email: string;
   fullName: string;
+  phone: string | null;
   primaryRole: UserRole;
 }
 

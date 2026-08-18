@@ -44,6 +44,7 @@ export interface PublicUser {
   id: string;
   email: string;
   fullName: string;
+  phone: string | null;
   primaryRole: UserRole;
 }
 
@@ -70,6 +71,15 @@ export function loginUser(params: { email: string; password: string }): Promise<
 /** GET /auth/me — AuthContext, para hidratar/validar la sesión persistida al abrir la app. */
 export function getCurrentUser(token: string): Promise<PublicUser> {
   return request('/auth/me', { headers: { Authorization: `Bearer ${token}` } });
+}
+
+/** PUT /auth/me — ParentProfileScreen "Editar perfil". Solo nombre y teléfono. */
+export function updateProfile(authToken: string, params: { fullName: string; phone?: string }): Promise<PublicUser> {
+  return request('/auth/me', {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${authToken}` },
+    body: JSON.stringify(params),
+  });
 }
 
 /** POST /auth/forgot-password — ForgotPasswordScreen paso 1. Siempre resuelve 200

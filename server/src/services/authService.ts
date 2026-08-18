@@ -6,7 +6,7 @@ import type { PublicUser, UserRole } from '../types.js';
 export const SELF_SERVICE_ROLES: UserRole[] = ['parent', 'coach', 'club_admin'];
 
 export function toPublicUser(user: userRepository.UserRecord): PublicUser {
-  return { id: user.id, email: user.email, fullName: user.fullName, primaryRole: user.primaryRole };
+  return { id: user.id, email: user.email, fullName: user.fullName, phone: user.phone, primaryRole: user.primaryRole };
 }
 
 export async function register(params: {
@@ -43,4 +43,8 @@ export async function login(params: { email: string; password: string }): Promis
 
 export async function getById(id: string): Promise<PublicUser> {
   return toPublicUser(await userRepository.findById(id));
+}
+
+export async function updateProfile(id: string, params: { fullName: string; phone: string | null }): Promise<PublicUser> {
+  return toPublicUser(await userRepository.update(id, params));
 }

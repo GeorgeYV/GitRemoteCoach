@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ParentTabBar from '../../components/parent/ParentTabBar';
+import IconTextInput from '../../components/shared/IconTextInput';
 import InitialAvatar from '../../components/shared/InitialAvatar';
 import { useAuth } from '../../context/AuthContext';
 import { ApiError, listPlayers, Player } from '../../lib/api';
@@ -19,11 +20,16 @@ const AGE_CATEGORY_LABELS: Record<string, string> = {
 };
 
 export default function ParentProfileScreen() {
-  const { user, token, logout } = useAuth();
+  const { user, token, logout, updateProfile } = useAuth();
   const [players, setPlayers] = useState<Player[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showRegistration, setShowRegistration] = useState(false);
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [nameInput, setNameInput] = useState('');
+  const [phoneInput, setPhoneInput] = useState('');
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!token) {
@@ -46,6 +52,27 @@ export default function ParentProfileScreen() {
   }, [token]);
 
   const firstInitial = user?.fullName[0] ?? '?';
+  const canSaveProfile = nameInput.trim().length > 0 && !savingProfile;
+
+  function startEditingProfile() {
+    setNameInput(user?.fullName ?? '');
+    setPhoneInput(user?.phone ?? '');
+    setProfileError(null);
+    setEditingProfile(true);
+  }
+
+  async function handleSaveProfile() {
+    setSavingProfile(true);
+    setProfileError(null);
+    try {
+      await updateProfile({ fullName: nameInput.trim(), phone: phoneInput.trim() || undefined });
+      setEditingProfile(false);
+    } catch (err) {
+      setProfileError(err instanceof ApiError ? err.message : 'No se pudo actualizar tu perfil.');
+    } finally {
+      setSavingProfile(false);
+    }
+  }
 
   if (showRegistration || editingPlayer) {
     return (
@@ -76,13 +103,68 @@ export default function ParentProfileScreen() {
         <View style={styles.profileCard}>
           <InitialAvatar initial={firstInitial} size={56} />
           <View style={styles.profileInfo}>
-            <Text style={styles.profileName}>{user?.fullName}</Text>
-            <View style={styles.profileEmailRow}>
-              <Ionicons name="mail-outline" size={14} color={colors.textDim} />
-              <Text style={styles.profileEmail}>{user?.email}</Text>
+            {editingProfile ? (
+              <>
+                <IconTextInput
+                  icon="person-outline"
+                  placeholder="Nombre completo"
+                  value={nameInput}
+                  onChangeText={setNameInput}
+                  containerStyle={styles.profileInput}
+                />
+                <IconTextInput
+                  icon="call-outline"
+                  placeholder="Teléfono (opcional)"
+                  value={phoneInput}
+                  onChangeText={setPhoneInput}
+                  keyboardType="phone-pad"
+                  containerStyle={styles.profileInputLast}
+                />
+              </>
+            ) : (
+              <>
+                <Text style={styles.profileName}>{user?.fullName}</Text>
+                <View style={styles.profileEmailRow}>
+                  <Ionicons name="mail-outline" size={14} color={colors.textDim} />
+                  <Text style={styles.profileEmail}>{user?.email}</Text>
+                </View>
+                {user?.phone && (
+                  <View style={styles.profileEmailRow}>
+                    <Ionicons name="call-outline" size={14} color={colors.textDim} />
+                    <Text style={styles.profileEmail}>{user.phone}</Text>
+                  </View>
+                )}
+              </>
+            )}
+          </View>
+          {!editingProfile && (
+            <Pressable style={styles.editButton} onPress={startEditingProfile}>
+              <Ionicons name="pencil-outline" size={16} color={colors.textDim} />
+            </Pressable>
+          )}
+        </View>
+
+        {editingProfile && (
+          <View style={styles.profileEditFooter}>
+            {profileError && <Text style={styles.errorText}>{profileError}</Text>}
+            <View style={styles.profileEditActions}>
+              <Pressable style={styles.cancelButton} onPress={() => setEditingProfile(false)}>
+                <Text style={styles.cancelLabel}>Cancelar</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.saveProfileButton, !canSaveProfile && styles.submitButtonDisabled]}
+                disabled={!canSaveProfile}
+                onPress={handleSaveProfile}
+              >
+                {savingProfile ? (
+                  <ActivityIndicator color={colors.courtBlueDeep} />
+                ) : (
+                  <Text style={styles.saveProfileLabel}>Guardar</Text>
+                )}
+              </Pressable>
             </View>
           </View>
-        </View>
+        )}
 
         <Section label="Jugadores registrados">
           {error ? (
@@ -187,6 +269,54 @@ const styles = StyleSheet.create({
   profileEmail: {
     color: colors.textDim,
     fontSize: 13,
+  },
+  profileInput: {
+    marginBottom: 8,
+  },
+  profileInputLast: {
+    marginBottom: 0,
+  },
+  profileEditFooter: {
+    marginTop: -14,
+    marginBottom: 26,
+  },
+  errorText: {
+    color: colors.errorCoral,
+    fontSize: 12,
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  profileEditActions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  cancelButton: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderRadius: radius,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  cancelLabel: {
+    color: colors.textSoft,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  saveProfileButton: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderRadius: radius,
+    backgroundColor: colors.ballLime,
+  },
+  submitButtonDisabled: {
+    backgroundColor: withOpacity(colors.ballLime, 0.3),
+  },
+  saveProfileLabel: {
+    color: colors.courtBlueDeep,
+    fontSize: 13,
+    fontWeight: '800',
   },
   section: {
     marginBottom: 26,

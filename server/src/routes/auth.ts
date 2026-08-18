@@ -19,6 +19,11 @@ const loginSchema = z.object({
   password: z.string().min(1),
 });
 
+const updateProfileSchema = z.object({
+  fullName: z.string().min(1),
+  phone: z.string().min(1).optional(),
+});
+
 const forgotPasswordSchema = z.object({
   email: z.string().email(),
 });
@@ -70,6 +75,15 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   app.get('/auth/me', { preHandler: app.authenticate }, async (req) => {
     const { sub } = req.user as { sub: string };
     return authService.getById(sub);
+  });
+
+  // ParentProfileScreen "Editar perfil" — solo nombre y teléfono; email/contraseña van por
+  // flujos aparte (ver comentario en userRepository.update).
+  app.put('/auth/me', { preHandler: app.authenticate }, async (req) => {
+    const parsed = updateProfileSchema.safeParse(req.body);
+    if (!parsed.success) throw new ValidationError(parsed.error.message);
+    const { sub } = req.user as { sub: string };
+    return authService.updateProfile(sub, { fullName: parsed.data.fullName, phone: parsed.data.phone ?? null });
   });
 
   // Enumeration-safe: siempre 200 sin importar si el correo existe (el servicio decide en

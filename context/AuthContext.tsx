@@ -10,6 +10,7 @@ import {
   registerUser,
   signInWithGoogle,
   unregisterPushToken,
+  updateProfile as updateProfileRequest,
   UserRole,
 } from '../lib/api';
 import { registerForPushNotificationsAsync } from '../lib/notifications';
@@ -38,6 +39,7 @@ interface AuthContextValue {
     pendingToken: string;
     primaryRole: Exclude<UserRole, 'platform_admin'>;
   }) => Promise<void>;
+  updateProfile: (params: { fullName: string; phone?: string }) => Promise<void>;
   logout: () => void;
 }
 
@@ -134,6 +136,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await persistSession(await completeGoogleRegistrationRequest(params));
       } catch (err) {
         setError(err instanceof ApiError ? err.message : 'No se pudo crear la cuenta');
+        throw err;
+      }
+    },
+    updateProfile: async (params) => {
+      if (!token) throw new Error('No hay una sesión activa.');
+      setError(null);
+      try {
+        setUser(await updateProfileRequest(token, params));
+      } catch (err) {
+        setError(err instanceof ApiError ? err.message : 'No se pudo actualizar tu perfil');
         throw err;
       }
     },
