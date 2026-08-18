@@ -586,7 +586,7 @@ export function CoachMatchDayFlow({
     createOrGetMatch(token, {
       bookingId,
       player2Label: session.config.player2Name,
-      bestOf: String(session.config.bestOf) as '1' | '3',
+      format: session.config.format,
       noAd: session.config.noAd,
       initialServer: session.config.initialServer,
       captureMode: 'rapida',
@@ -670,7 +670,7 @@ export function CoachCapturePreview() {
     createOrGetMatch(token, {
       bookingId: REAL_COMPLETED_BOOKING_ID,
       player2Label: mockMatchConfig.player2Name,
-      bestOf: String(mockMatchConfig.bestOf) as '1' | '3',
+      format: mockMatchConfig.format,
       noAd: mockMatchConfig.noAd,
       initialServer: mockMatchConfig.initialServer,
       captureMode: 'rapida',

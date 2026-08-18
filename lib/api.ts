@@ -1,3 +1,5 @@
+import type { MatchFormatId } from './matchFormats';
+
 /** Cliente HTTP mínimo hacia server/ (ver server/src/routes). Sin auth todavía: los
  * IDs de padre/coach se pasan explícitamente hasta que exista sesión real. */
 const DEFAULT_API_BASE_URL = 'http://localhost:3000';
@@ -1020,7 +1022,6 @@ export function settleTournament(
   });
 }
 
-export type MatchBestOf = '1' | '3';
 export type MatchPlayerSlot = 'player1' | 'player2';
 export type MatchStatus = 'in_progress' | 'completed' | 'suspended';
 export type CaptureMode = 'rapida' | 'detallada';
@@ -1046,7 +1047,7 @@ export interface Match {
   bookingId: string;
   player1Id: string;
   player2Label: string;
-  bestOf: MatchBestOf;
+  format: MatchFormatId;
   noAd: boolean;
   initialServer: MatchPlayerSlot;
   captureMode: CaptureMode;
@@ -1130,7 +1131,7 @@ export function createOrGetMatch(
   params: {
     bookingId: string;
     player2Label: string;
-    bestOf: MatchBestOf;
+    format: MatchFormatId;
     noAd: boolean;
     initialServer: MatchPlayerSlot;
     captureMode: CaptureMode;

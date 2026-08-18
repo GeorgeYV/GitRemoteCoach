@@ -55,8 +55,6 @@ CREATE TYPE payment_transaction_type AS ENUM ('charge', 'refund', 'transfer', 'c
 
 CREATE TYPE payment_transaction_status AS ENUM ('succeeded', 'failed', 'pending');
 
-CREATE TYPE match_best_of AS ENUM ('1', '3');
-
 CREATE TYPE match_player_slot AS ENUM ('player1', 'player2');
 
 CREATE TYPE match_status AS ENUM ('in_progress', 'completed', 'suspended');
@@ -1106,7 +1104,14 @@ CREATE TABLE matches (
   -- del torneo puede no estar registrado, de ahí el texto libre.
   player1_id         UUID NOT NULL REFERENCES players (id),
   player2_label      TEXT NOT NULL,
-  best_of            match_best_of NOT NULL DEFAULT '3',
+  -- 'single_set' | 'best_of_3' | 'best_of_3_short' | 'match_tiebreak' | 'match_tiebreak_short' |
+  -- 'super_tiebreak_only' — ver decisión #37 y lib/matchFormats.ts (fuente de verdad de las reglas
+  -- de cada uno: games por set, sets para ganar, si el set decisivo es un match tiebreak).
+  format             TEXT NOT NULL DEFAULT 'best_of_3'
+    CONSTRAINT chk_matches_format CHECK (format IN (
+      'single_set', 'best_of_3', 'best_of_3_short',
+      'match_tiebreak', 'match_tiebreak_short', 'super_tiebreak_only'
+    )),
   no_ad              BOOLEAN NOT NULL DEFAULT FALSE,
   initial_server     match_player_slot NOT NULL,
   capture_mode       capture_mode NOT NULL DEFAULT 'rapida',
@@ -1654,4 +1659,17 @@ CREATE INDEX idx_push_tokens_user_id ON push_tokens (user_id);
 --     comisión no se recalcula en retrospectiva: un pago ya hecho antes
 --     del reclamo queda en 0 para siempre, solo los pagos posteriores al
 --     reclamo generan comisión para el club.
+--
+-- 37. matches.best_of (ENUM match_best_of, solo '1'/'3') se reemplazó por
+--     matches.format (TEXT + CHECK, 6 valores) — a pedido de producto:
+--     además de "1 set" y "mejor de 3" hacían falta sets de 4 games,
+--     y un 3er set jugado como match tiebreak (a 10 puntos) en vez de un
+--     set completo, más un formato de un solo super tie-break sin sets.
+--     TEXT + CHECK en vez de ampliar el ENUM — mismo motivo que la
+--     decisión #35: un ENUM es caro de ampliar (#34), esto es un
+--     ALTER TABLE ... DROP/ADD CONSTRAINT. Las reglas de cada formato
+--     (games por set, sets para ganar, si el set decisivo es un match
+--     tiebreak) viven en lib/matchFormats.ts (espejado en
+--     server/src/lib/matchFormats.ts), no en la base — la columna solo
+--     guarda el id. Filas existentes: '1' → 'single_set', '3' → 'best_of_3'.
 -- =====================================================================

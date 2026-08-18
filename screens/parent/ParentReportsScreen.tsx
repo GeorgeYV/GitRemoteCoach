@@ -14,7 +14,7 @@ import { BookingHistoryEntry } from '../../mock/parentFlow';
 
 function toReportConfig(report: MatchReport, playerName: string): MatchConfig {
   return {
-    bestOf: Number(report.match.bestOf) as 1 | 3,
+    format: report.match.format,
     noAd: report.match.noAd,
     player1Name: playerName,
     player2Name: report.match.player2Label,

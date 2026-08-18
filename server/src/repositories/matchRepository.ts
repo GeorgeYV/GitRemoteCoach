@@ -1,7 +1,8 @@
 import type { Pool, PoolClient } from 'pg';
 import { pool } from '../lib/db.js';
 import { NotFoundError } from '../lib/errors.js';
-import type { CaptureMode, Match, MatchBestOf, MatchPlayerSlot, MatchStatus } from '../types.js';
+import type { MatchFormatId } from '../lib/matchFormats.js';
+import type { CaptureMode, Match, MatchPlayerSlot, MatchStatus } from '../types.js';
 
 type Queryable = Pool | PoolClient;
 
@@ -11,7 +12,7 @@ function mapRow(row: any): Match {
     bookingId: row.booking_id,
     player1Id: row.player1_id,
     player2Label: row.player2_label,
-    bestOf: row.best_of,
+    format: row.format,
     noAd: row.no_ad,
     initialServer: row.initial_server,
     captureMode: row.capture_mode,
@@ -36,7 +37,7 @@ export async function getOrCreate(
     bookingId: string;
     player1Id: string;
     player2Label: string;
-    bestOf: MatchBestOf;
+    format: MatchFormatId;
     noAd: boolean;
     initialServer: MatchPlayerSlot;
     captureMode: CaptureMode;
@@ -44,7 +45,7 @@ export async function getOrCreate(
   db: Queryable = pool,
 ): Promise<Match> {
   const { rows } = await db.query(
-    `INSERT INTO matches (booking_id, player1_id, player2_label, best_of, no_ad, initial_server, capture_mode)
+    `INSERT INTO matches (booking_id, player1_id, player2_label, format, no_ad, initial_server, capture_mode)
      VALUES ($1, $2, $3, $4, $5, $6, $7)
      ON CONFLICT (booking_id) DO NOTHING
      RETURNING *`,
@@ -52,7 +53,7 @@ export async function getOrCreate(
       params.bookingId,
       params.player1Id,
       params.player2Label,
-      params.bestOf,
+      params.format,
       params.noAd,
       params.initialServer,
       params.captureMode,

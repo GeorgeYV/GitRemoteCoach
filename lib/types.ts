@@ -1,3 +1,5 @@
+import type { MatchFormatId } from './matchFormats';
+
 export type PlayerId = 'player1' | 'player2';
 
 export type PointDetail =
@@ -60,7 +62,7 @@ export interface VoiceNote {
 }
 
 export interface MatchConfig {
-  bestOf: 1 | 3;
+  format: MatchFormatId;
   noAd: boolean;
   player1Name: string;
   player2Name: string;

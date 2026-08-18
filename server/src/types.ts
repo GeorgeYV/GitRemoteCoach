@@ -1,3 +1,5 @@
+import type { MatchFormatId } from './lib/matchFormats.js';
+
 export type BookingStatus =
   | 'requested'
   | 'accepted'
@@ -343,8 +345,6 @@ export interface ReviewWithParent extends Review {
   parentName: string;
 }
 
-/** El enum de DB usa strings ('1'/'3'), no números — ver CREATE TYPE match_best_of en db/schema.sql. */
-export type MatchBestOf = '1' | '3';
 export type MatchPlayerSlot = 'player1' | 'player2';
 export type MatchStatus = 'in_progress' | 'completed' | 'suspended';
 export type CaptureMode = 'rapida' | 'detallada';
@@ -369,7 +369,7 @@ export interface Match {
   bookingId: string;
   player1Id: string;
   player2Label: string;
-  bestOf: MatchBestOf;
+  format: MatchFormatId;
   noAd: boolean;
   initialServer: MatchPlayerSlot;
   captureMode: CaptureMode;

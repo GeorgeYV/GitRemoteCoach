@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import IconTextInput from '../../components/shared/IconTextInput';
+import { MATCH_FORMAT_IDS, MATCH_FORMAT_LABELS, MatchFormatId } from '../../lib/matchFormats';
 import { colors, radius, withOpacity } from '../../lib/theme';
 import { MatchConfig, PlayerId } from '../../lib/types';
 
@@ -17,7 +18,7 @@ export default function CoachMatchSetupScreen({
 }) {
   const [opponentName, setOpponentName] = useState('');
   const [roundLabel, setRoundLabel] = useState('');
-  const [bestOf, setBestOf] = useState<1 | 3>(3);
+  const [format, setFormat] = useState<MatchFormatId>('best_of_3');
   const [noAd, setNoAd] = useState(false);
   const [initialServer, setInitialServer] = useState<PlayerId>('player1');
 
@@ -27,7 +28,7 @@ export default function CoachMatchSetupScreen({
     if (!canStart) return;
     onStart(
       {
-        bestOf,
+        format,
         noAd,
         player1Name: playerName,
         player2Name: opponentName.trim(),
@@ -66,15 +67,15 @@ export default function CoachMatchSetupScreen({
         </Section>
 
         <Section label="Formato">
-          <View style={styles.chipRow}>
-            {([1, 3] as const).map((value) => (
+          <View style={styles.formatChipRow}>
+            {MATCH_FORMAT_IDS.map((value) => (
               <Pressable
                 key={value}
-                style={[styles.chip, bestOf === value && styles.chipActive]}
-                onPress={() => setBestOf(value)}
+                style={[styles.formatChip, format === value && styles.chipActive]}
+                onPress={() => setFormat(value)}
               >
-                <Text style={[styles.chipLabel, bestOf === value && styles.chipLabelActive]}>
-                  {value === 1 ? '1 set' : 'Mejor de 3'}
+                <Text style={[styles.chipLabel, format === value && styles.chipLabelActive]}>
+                  {MATCH_FORMAT_LABELS[value]}
                 </Text>
               </Pressable>
             ))}
@@ -214,6 +215,19 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingVertical: 12,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  formatChipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  formatChip: {
+    backgroundColor: colors.panel,
+    borderRadius: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
     borderWidth: 1,
     borderColor: colors.border,
   },

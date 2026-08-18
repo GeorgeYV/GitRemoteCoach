@@ -4,7 +4,16 @@ import * as bookingRepository from '../repositories/bookingRepository.js';
 import * as matchService from '../services/matchService.js';
 import { ForbiddenError, ValidationError } from '../lib/errors.js';
 
-const BEST_OF = ['1', '3'] as const;
+// Mismos 6 ids que lib/matchFormats.ts#MatchFormatId — repetidos como tupla literal para que
+// z.enum() los acepte (mismo patrón que COUNTRY_CODES en routes/clubs.ts y routes/tournaments.ts).
+const MATCH_FORMAT = [
+  'single_set',
+  'best_of_3',
+  'best_of_3_short',
+  'match_tiebreak',
+  'match_tiebreak_short',
+  'super_tiebreak_only',
+] as const;
 const PLAYER_SLOT = ['player1', 'player2'] as const;
 const CAPTURE_MODE = ['rapida', 'detallada'] as const;
 const MATCH_STATUS = ['in_progress', 'completed'] as const;
@@ -28,7 +37,7 @@ const RALLY_LENGTH = ['corto', 'medio', 'largo'] as const;
 const getOrCreateMatchSchema = z.object({
   bookingId: z.string().uuid(),
   player2Label: z.string().min(1).max(200),
-  bestOf: z.enum(BEST_OF),
+  format: z.enum(MATCH_FORMAT),
   noAd: z.boolean(),
   initialServer: z.enum(PLAYER_SLOT),
   captureMode: z.enum(CAPTURE_MODE),

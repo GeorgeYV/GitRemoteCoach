@@ -1,7 +1,7 @@
 import { MatchConfig } from '../lib/types';
 
 export const mockMatchConfig: MatchConfig = {
-  bestOf: 3,
+  format: 'best_of_3',
   noAd: false,
   player1Name: 'Valentina Ríos',
   player2Name: 'Camila Torres',

@@ -6,11 +6,11 @@ import type { PointInput } from '../repositories/matchPointEventRepository.js';
 import * as matchScoreAdjustmentRepository from '../repositories/matchScoreAdjustmentRepository.js';
 import type { AdjustmentInput } from '../repositories/matchScoreAdjustmentRepository.js';
 import * as matchRepository from '../repositories/matchRepository.js';
+import type { MatchFormatId } from '../lib/matchFormats.js';
 import type {
   CaptureMode,
   CoachReportSummary,
   Match,
-  MatchBestOf,
   MatchPlayerSlot,
   MatchPointEvent,
   MatchScoreAdjustment,
@@ -20,7 +20,7 @@ import type {
 export interface GetOrCreateMatchParams {
   bookingId: string;
   player2Label: string;
-  bestOf: MatchBestOf;
+  format: MatchFormatId;
   noAd: boolean;
   initialServer: MatchPlayerSlot;
   captureMode: CaptureMode;
@@ -41,7 +41,7 @@ export async function getOrCreateMatch(params: GetOrCreateMatchParams): Promise<
     bookingId: params.bookingId,
     player1Id: booking.playerId,
     player2Label: params.player2Label,
-    bestOf: params.bestOf,
+    format: params.format,
     noAd: params.noAd,
     initialServer: params.initialServer,
     captureMode: params.captureMode,
@@ -157,7 +157,7 @@ export async function getCoachReportSummary(coachId: string): Promise<CoachRepor
         detail: p.detail,
         firstServeIn: p.firstServeIn,
       })),
-      { bestOf: Number(match.bestOf) as 1 | 3, noAd: match.noAd, initialServer: match.initialServer },
+      { format: match.format, noAd: match.noAd, initialServer: match.initialServer },
       adjustments.map((a) => ({
         timestamp: new Date(a.occurredAt).getTime(),
         gamesPlayer1: a.gamesPlayer1,

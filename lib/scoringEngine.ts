@@ -1,3 +1,4 @@
+import { MATCH_FORMAT_RULES, MATCH_TIEBREAK_TARGET, deciderSetIndex, type MatchFormatRules } from './matchFormats';
 import { MatchConfig, PlayerId, PointEvent, ScoreAdjustment, otherPlayer } from './types';
 
 export interface GameRecord {
@@ -39,17 +40,33 @@ export interface MatchState {
   pointHistory: PointSnapshot[];
 }
 
-const setsToWin = (bestOf: 1 | 3) => (bestOf === 1 ? 1 : 2);
+/** true si el set en el índice completedSetsCount (0-based, el que está por arrancar o en curso)
+ * es el set decisivo de este formato Y ese formato lo juega como un match tiebreak en vez de un
+ * set normal a games — el único set de 'super_tiebreak_only' (índice 0), o el 3er set de
+ * 'match_tiebreak'/'match_tiebreak_short' (índice 2, y solo se llega ahí si los sets van 1-1). */
+function isDeciderSetStart(rules: MatchFormatRules, completedSetsCount: number): boolean {
+  return rules.deciderIsMatchTiebreak && completedSetsCount === deciderSetIndex(rules);
+}
+
+/** A qué puntaje se gana el tie-break EN CURSO — MATCH_TIEBREAK_TARGET (10) si el set actual es
+ * el decisivo de un formato "match tiebreak", 7 para cualquier otro (el 6-6/4-4 normal dentro de
+ * un set). Se deriva de completedSets.length en vez de guardarse en el estado: un set no puede
+ * ser decisivo Y llegar a jugarse a games a la vez (ver processPoint), así que no hay ambigüedad. */
+function currentTiebreakTarget(state: MatchState, rules: MatchFormatRules): number {
+  return isDeciderSetStart(rules, state.completedSets.length) ? MATCH_TIEBREAK_TARGET : 7;
+}
 
 export function createInitialMatchState(config: MatchConfig): MatchState {
+  const rules = MATCH_FORMAT_RULES[config.format];
+  const startsAsDecider = isDeciderSetStart(rules, 0);
   return {
     completedSets: [],
     currentSetGames: [],
     currentGamePoints: { player1: 0, player2: 0 },
-    inTiebreak: false,
+    inTiebreak: startsAsDecider,
     tiebreakPoints: { player1: 0, player2: 0 },
     server: config.initialServer,
-    tiebreakInitialServer: null,
+    tiebreakInitialServer: startsAsDecider ? config.initialServer : null,
     setsWon: { player1: 0, player2: 0 },
     matchEnded: false,
     winner: null,
@@ -78,22 +95,23 @@ function gameWinner(points: { player1: number; player2: number }, noAd: boolean)
   return null;
 }
 
-function tiebreakWinner(points: { player1: number; player2: number }): PlayerId | null {
+function tiebreakWinner(points: { player1: number; player2: number }, target: number): PlayerId | null {
   const { player1: a, player2: b } = points;
-  if (a >= 7 && a - b >= 2) return 'player1';
-  if (b >= 7 && b - a >= 2) return 'player2';
+  if (a >= target && a - b >= 2) return 'player1';
+  if (b >= target && b - a >= 2) return 'player2';
   return null;
 }
 
-function setWinner(games: { player1: number; player2: number }): PlayerId | null {
+function setWinner(games: { player1: number; player2: number }, gamesPerSet: number): PlayerId | null {
   const { player1: a, player2: b } = games;
-  if (a >= 6 && a - b >= 2) return 'player1';
-  if (b >= 6 && b - a >= 2) return 'player2';
+  if (a >= gamesPerSet && a - b >= 2) return 'player1';
+  if (b >= gamesPerSet && b - a >= 2) return 'player2';
   return null;
 }
 
 function processPoint(state: MatchState, event: PointEvent, config: MatchConfig): MatchState {
   if (state.matchEnded) return state;
+  const rules = MATCH_FORMAT_RULES[config.format];
 
   const server: PlayerId = state.inTiebreak
     ? tiebreakServerForPoint(
@@ -107,7 +125,7 @@ function processPoint(state: MatchState, event: PointEvent, config: MatchConfig)
       ...state.tiebreakPoints,
       [event.wonBy]: state.tiebreakPoints[event.wonBy] + 1,
     };
-    const tbWinner = tiebreakWinner(tiebreakPoints);
+    const tbWinner = tiebreakWinner(tiebreakPoints, currentTiebreakTarget(state, rules));
 
     if (!tbWinner) {
       return {
@@ -130,16 +148,17 @@ function processPoint(state: MatchState, event: PointEvent, config: MatchConfig)
     const completedSets = [...state.completedSets, setRecord];
     const setsWon = { ...state.setsWon, [tbWinner]: state.setsWon[tbWinner] + 1 };
     const nextGameServer = otherPlayer(state.tiebreakInitialServer as PlayerId);
-    const matchEnded = setsWon[tbWinner] >= setsToWin(config.bestOf);
+    const matchEnded = setsWon[tbWinner] >= rules.setsToWin;
+    const nextSetIsDecider = !matchEnded && isDeciderSetStart(rules, completedSets.length);
 
     return {
       ...state,
       completedSets,
       currentSetGames: [],
       currentGamePoints: { player1: 0, player2: 0 },
-      inTiebreak: false,
+      inTiebreak: nextSetIsDecider,
       tiebreakPoints: { player1: 0, player2: 0 },
-      tiebreakInitialServer: null,
+      tiebreakInitialServer: nextSetIsDecider ? nextGameServer : null,
       server: nextGameServer,
       setsWon,
       matchEnded,
@@ -170,7 +189,7 @@ function processPoint(state: MatchState, event: PointEvent, config: MatchConfig)
   const gamesCount = countGames(currentSetGames);
   const nextGameServer = otherPlayer(state.server);
 
-  if (gamesCount.player1 === 6 && gamesCount.player2 === 6) {
+  if (gamesCount.player1 === rules.gamesPerSet && gamesCount.player2 === rules.gamesPerSet) {
     return {
       ...state,
       currentSetGames,
@@ -181,7 +200,7 @@ function processPoint(state: MatchState, event: PointEvent, config: MatchConfig)
     };
   }
 
-  const stWinner = setWinner(gamesCount);
+  const stWinner = setWinner(gamesCount, rules.gamesPerSet);
 
   if (!stWinner) {
     return {
@@ -201,13 +220,16 @@ function processPoint(state: MatchState, event: PointEvent, config: MatchConfig)
   };
   const completedSets = [...state.completedSets, setRecord];
   const setsWon = { ...state.setsWon, [stWinner]: state.setsWon[stWinner] + 1 };
-  const matchEnded = setsWon[stWinner] >= setsToWin(config.bestOf);
+  const matchEnded = setsWon[stWinner] >= rules.setsToWin;
+  const nextSetIsDecider = !matchEnded && isDeciderSetStart(rules, completedSets.length);
 
   return {
     ...state,
     completedSets,
     currentSetGames: [],
     currentGamePoints: { player1: 0, player2: 0 },
+    inTiebreak: nextSetIsDecider,
+    tiebreakInitialServer: nextSetIsDecider ? nextGameServer : null,
     server: nextGameServer,
     setsWon,
     matchEnded,
@@ -258,12 +280,13 @@ function resizeGamesFor(games: GameRecord[], player: PlayerId, target: number, f
  */
 function processAdjustment(state: MatchState, adj: ScoreAdjustment, config: MatchConfig): MatchState {
   if (state.matchEnded) return state;
+  const rules = MATCH_FORMAT_RULES[config.format];
 
   let currentSetGames = resizeGamesFor(state.currentSetGames, 'player1', adj.gamesPlayer1, adj.server);
   currentSetGames = resizeGamesFor(currentSetGames, 'player2', adj.gamesPlayer2, adj.server);
   const gamesCount = countGames(currentSetGames);
 
-  if (gamesCount.player1 === 6 && gamesCount.player2 === 6) {
+  if (gamesCount.player1 === rules.gamesPerSet && gamesCount.player2 === rules.gamesPerSet) {
     return {
       ...state,
       currentSetGames,
@@ -274,7 +297,7 @@ function processAdjustment(state: MatchState, adj: ScoreAdjustment, config: Matc
     };
   }
 
-  const stWinner = setWinner(gamesCount);
+  const stWinner = setWinner(gamesCount, rules.gamesPerSet);
   if (stWinner) {
     const setRecord: SetRecord = {
       games: currentSetGames,
@@ -284,13 +307,15 @@ function processAdjustment(state: MatchState, adj: ScoreAdjustment, config: Matc
     };
     const completedSets = [...state.completedSets, setRecord];
     const setsWon = { ...state.setsWon, [stWinner]: state.setsWon[stWinner] + 1 };
-    const matchEnded = setsWon[stWinner] >= setsToWin(config.bestOf);
+    const matchEnded = setsWon[stWinner] >= rules.setsToWin;
+    const nextSetIsDecider = !matchEnded && isDeciderSetStart(rules, completedSets.length);
     return {
       ...state,
       completedSets,
       currentSetGames: [],
       currentGamePoints: { player1: 0, player2: 0 },
-      inTiebreak: false,
+      inTiebreak: nextSetIsDecider,
+      tiebreakInitialServer: nextSetIsDecider ? adj.server : null,
       server: adj.server,
       setsWon,
       matchEnded,

@@ -667,7 +667,7 @@ console.log('\n=== Escenario 12: captura en vivo de un partido (matches / match_
   const matchPayload = {
     bookingId: booking12.id,
     player2Label: 'Rival de práctica',
-    bestOf: '3',
+    format: 'best_of_3',
     noAd: false,
     initialServer: 'player1',
     captureMode: 'rapida',
@@ -1780,7 +1780,7 @@ console.log('\n=== Escenario 25: estadísticas agregadas de partidos de un coach
     payload: {
       bookingId: statsBooking.id,
       player2Label: 'Rival de práctica',
-      bestOf: '1',
+      format: 'single_set',
       noAd: true,
       initialServer: 'player1',
       captureMode: 'rapida',
