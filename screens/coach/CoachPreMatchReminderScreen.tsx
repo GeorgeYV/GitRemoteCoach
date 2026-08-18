@@ -5,7 +5,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import IconTextInput from '../../components/shared/IconTextInput';
 import InitialAvatar from '../../components/shared/InitialAvatar';
 import { useAuth } from '../../context/AuthContext';
-import { ApiError, BookingWithParticipants, setMeetingDetails } from '../../lib/api';
+import { ApiError, Booking, BookingWithParticipants, rescheduleBooking, setMeetingDetails } from '../../lib/api';
+import { isValidDateString, isValidTimeString, isoToLocalDateAndTime, localDateAndTimeToIso } from '../../lib/dateSlots';
 import { colors, radius, withOpacity } from '../../lib/theme';
 
 const URGENT_MINUTES_THRESHOLD = 15;
@@ -32,11 +33,13 @@ export default function CoachPreMatchReminderScreen({
   onStartCapture,
   onOpenChat,
   onMeetingSaved,
+  onRescheduled,
 }: {
   booking: BookingWithParticipants;
   onStartCapture?: () => void;
   onOpenChat?: () => void;
   onMeetingSaved?: (details: { courtLabel: string; meetingPointDetail: string }) => void;
+  onRescheduled?: (updated: Booking) => void;
 }) {
   const { token } = useAuth();
   const matchDate = new Date(booking.matchDatetime);
@@ -54,6 +57,42 @@ export default function CoachPreMatchReminderScreen({
   const [editingMeeting, setEditingMeeting] = useState(false);
   const [savingMeeting, setSavingMeeting] = useState(false);
   const [meetingError, setMeetingError] = useState<string | null>(null);
+
+  const initialSchedule = isoToLocalDateAndTime(booking.matchDatetime);
+  const [scheduleDate, setScheduleDate] = useState(initialSchedule.date);
+  const [scheduleTime, setScheduleTime] = useState(initialSchedule.time);
+  const [editingSchedule, setEditingSchedule] = useState(false);
+  const [savingSchedule, setSavingSchedule] = useState(false);
+  const [scheduleError, setScheduleError] = useState<string | null>(null);
+
+  async function handleSaveSchedule() {
+    if (!token) {
+      setScheduleError('No hay una sesión activa.');
+      return;
+    }
+    const trimmedDate = scheduleDate.trim();
+    const trimmedTime = scheduleTime.trim();
+    if (!isValidDateString(trimmedDate) || !isValidTimeString(trimmedTime)) {
+      setScheduleError('Fecha u hora inválida. Usa AAAA-MM-DD y HH:MM.');
+      return;
+    }
+    const matchDatetime = localDateAndTimeToIso(trimmedDate, trimmedTime);
+    if (new Date(matchDatetime).getTime() <= Date.now()) {
+      setScheduleError('El nuevo horario debe ser en el futuro.');
+      return;
+    }
+    setSavingSchedule(true);
+    setScheduleError(null);
+    try {
+      const updated = await rescheduleBooking(token, booking.id, matchDatetime);
+      setEditingSchedule(false);
+      onRescheduled?.(updated);
+    } catch (err) {
+      setScheduleError(err instanceof ApiError ? err.message : 'No se pudo reprogramar. Intenta de nuevo.');
+    } finally {
+      setSavingSchedule(false);
+    }
+  }
 
   async function handleSaveMeeting() {
     if (!token) {
@@ -109,6 +148,53 @@ export default function CoachPreMatchReminderScreen({
             {dateLabel} · {timeLabel}
           </Text>
         </View>
+
+        <Section
+          label="Horario"
+          action={
+            !editingSchedule ? (
+              <Pressable style={styles.editButton} onPress={() => setEditingSchedule(true)}>
+                <Ionicons name="create-outline" size={14} color={colors.courtBlue} />
+                <Text style={styles.editButtonLabel}>Reprogramar</Text>
+              </Pressable>
+            ) : undefined
+          }
+        >
+          {editingSchedule && (
+            <View style={styles.editCard}>
+              <IconTextInput icon="calendar-outline" placeholder="Fecha (AAAA-MM-DD)" value={scheduleDate} onChangeText={setScheduleDate} />
+              <IconTextInput icon="time-outline" placeholder="Hora (HH:MM)" value={scheduleTime} onChangeText={setScheduleTime} />
+              {scheduleError && <Text style={styles.editErrorText}>{scheduleError}</Text>}
+              <View style={styles.editActionsRow}>
+                <Pressable
+                  style={styles.editCancelButton}
+                  onPress={() => {
+                    setScheduleDate(initialSchedule.date);
+                    setScheduleTime(initialSchedule.time);
+                    setScheduleError(null);
+                    setEditingSchedule(false);
+                  }}
+                  disabled={savingSchedule}
+                >
+                  <View style={styles.buttonContent}>
+                    <Ionicons name="close-circle-outline" size={15} color={colors.textSoft} />
+                    <Text style={styles.editCancelLabel}>Cancelar</Text>
+                  </View>
+                </Pressable>
+                <Pressable style={styles.editSaveButton} onPress={handleSaveSchedule} disabled={savingSchedule}>
+                  {savingSchedule ? (
+                    <ActivityIndicator color={colors.courtBlueDeep} />
+                  ) : (
+                    <View style={styles.buttonContent}>
+                      <Ionicons name="checkmark-circle-outline" size={15} color={colors.courtBlueDeep} />
+                      <Text style={styles.editSaveLabel}>Guardar</Text>
+                    </View>
+                  )}
+                </Pressable>
+              </View>
+            </View>
+          )}
+        </Section>
 
         <Section
           label="Lugar exacto"

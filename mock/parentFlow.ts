@@ -93,6 +93,9 @@ export interface BookingHistoryEntry {
   playerName: string;
   ageCategory: string;
   tournamentName: string;
+  /** ISO — para reprogramar (BookingRescheduleScreen); date/time de abajo son el mismo valor ya
+   * formateado para mostrar. */
+  matchDatetime: string;
   date: string;
   time: string;
   venue: string;

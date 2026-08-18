@@ -164,6 +164,7 @@ const PREVIEW_PARENT_CHAT_BOOKING: BookingHistoryEntry = {
   playerName: 'Vista previa',
   ageCategory: '—',
   tournamentName: '—',
+  matchDatetime: new Date().toISOString(),
   date: '—',
   time: '—',
   venue: '—',

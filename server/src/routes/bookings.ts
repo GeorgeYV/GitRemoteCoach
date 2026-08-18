@@ -34,6 +34,10 @@ const cancelBookingSchema = z.object({
   reason: z.string().max(500).optional(),
 });
 
+const rescheduleBookingSchema = z.object({
+  matchDatetime: z.string().datetime(),
+});
+
 export async function bookingRoutes(app: FastifyInstance): Promise<void> {
   // El playerId sale del body (un padre puede tener más de un hijo/a) pero se verifica contra
   // la sesión: sin esto, cualquiera podría reservar en nombre del hijo/a de otro padre.
@@ -123,6 +127,26 @@ export async function bookingRoutes(app: FastifyInstance): Promise<void> {
     else throw new ForbiddenError('No eres parte de esta reserva');
 
     return cancellationService.cancelBooking({ bookingId: id, actor, actorUserId: sub, reason: parsed.data.reason });
+  });
+
+  // Cualquiera de las dos partes puede reprogramar el horario directamente (sin aprobación de
+  // la otra) — CoachPreMatchReminderScreen / pantalla equivalente del padre.
+  app.patch('/bookings/:id/reschedule', { preHandler: app.authenticate }, async (req) => {
+    const { id } = req.params as { id: string };
+    const parsed = rescheduleBookingSchema.safeParse(req.body);
+    if (!parsed.success) throw new ValidationError(parsed.error.message);
+    const { sub } = req.user as { sub: string };
+    const { coachId, guardianUserId } = await bookingRepository.getBookingParticipants(id);
+    if (sub !== coachId && sub !== guardianUserId) {
+      throw new ForbiddenError('No eres parte de esta reserva');
+    }
+    return bookingService.rescheduleBooking({
+      bookingId: id,
+      matchDatetime: parsed.data.matchDatetime,
+      actorUserId: sub,
+      coachId,
+      guardianUserId,
+    });
   });
 
   // Logística de encuentro mostrada en CoachPreMatchReminderScreen (cancha, punto de encuentro).

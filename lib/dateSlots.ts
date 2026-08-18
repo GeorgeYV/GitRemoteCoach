@@ -68,3 +68,28 @@ export function isValidDateString(value: string): boolean {
   const parsed = new Date(Date.UTC(year, month - 1, day));
   return parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day;
 }
+
+const TIME_STRING_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
+
+/** Formulario "Reprogramar horario" (CoachPreMatchReminderScreen y su equivalente del padre) —
+ * HH:MM 24 horas. */
+export function isValidTimeString(value: string): boolean {
+  return TIME_STRING_PATTERN.test(value);
+}
+
+/** Descompone un matchDatetime ISO en fecha/hora LOCAL editables (AAAA-MM-DD, HH:MM) — el
+ * dispositivo del coach/padre está donde se juega el partido, así que su hora local es la hora
+ * real del partido. Inverso de localDateAndTimeToIso. */
+export function isoToLocalDateAndTime(iso: string): { date: string; time: string } {
+  const d = new Date(iso);
+  const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const time = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  return { date, time };
+}
+
+/** Combina fecha/hora LOCAL (ya validadas con isValidDateString/isValidTimeString) en un
+ * matchDatetime ISO — new Date(...) interpreta el string sin "Z" en la zona horaria local del
+ * dispositivo, que es exactamente lo que queremos acá. */
+export function localDateAndTimeToIso(date: string, time: string): string {
+  return new Date(`${date}T${time}:00`).toISOString();
+}

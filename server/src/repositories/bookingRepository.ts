@@ -155,6 +155,31 @@ export async function setMeetingDetails(
   return mapRow(rows[0]);
 }
 
+/** Reprogramar horario — WHERE excluye estados terminales (el llamador ya verificó que el
+ * booking existe vía getBookingParticipants, así que 0 filas acá solo puede significar "estado
+ * terminal", no "no existe"). Mismo UNIQUE_VIOLATION que createBookingRequest: si el nuevo
+ * horario choca con otra reserva activa del mismo jugador+coach, idx_bookings_no_duplicate_active
+ * lo rechaza. */
+export async function reschedule(id: string, matchDatetime: string, db: Queryable = pool): Promise<Booking | null> {
+  try {
+    const { rows } = await db.query(
+      `UPDATE bookings SET match_datetime = $2
+       WHERE id = $1 AND status NOT IN ('rejected', 'expired', 'cancelled', 'completed')
+       RETURNING *`,
+      [id, matchDatetime],
+    );
+    return rows.length > 0 ? mapRow(rows[0]) : null;
+  } catch (err: any) {
+    if (err.code === UNIQUE_VIOLATION) {
+      throw new ConflictError(
+        'Ya existe una solicitud activa para este jugador con este entrenador en ese horario',
+        'duplicate_booking',
+      );
+    }
+    throw err;
+  }
+}
+
 export async function updateStatus(
   id: string,
   fromStatuses: BookingStatus[],

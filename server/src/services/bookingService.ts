@@ -105,6 +105,36 @@ export async function markBookingMessagesRead(bookingId: string, role: 'coach' |
   await bookingRepository.markMessagesRead(bookingId, role);
 }
 
+/** Reprogramar horario — cualquiera de las dos partes puede hacerlo directamente (sin
+ * aprobación de la otra), a pedido de producto. Notifica a la otra parte del cambio. */
+export async function rescheduleBooking(params: {
+  bookingId: string;
+  matchDatetime: string;
+  actorUserId: string;
+  coachId: string;
+  guardianUserId: string;
+}): Promise<Booking> {
+  if (new Date(params.matchDatetime).getTime() <= Date.now()) {
+    throw new ValidationError('match_datetime debe ser en el futuro');
+  }
+  const updated = await bookingRepository.reschedule(params.bookingId, params.matchDatetime);
+  if (!updated) {
+    throw new ConflictError(
+      'Esta reserva ya no se puede reprogramar (está cancelada, rechazada, vencida o completada)',
+      'invalid_transition',
+    );
+  }
+
+  const notifyUserId = params.actorUserId === params.coachId ? params.guardianUserId : params.coachId;
+  await notificationService.notifyUser(notifyUserId, {
+    title: 'Horario del partido actualizado',
+    body: 'Se cambió la hora de tu partido — revisa los nuevos detalles.',
+    data: { bookingId: params.bookingId },
+  });
+
+  return updated;
+}
+
 export async function rejectBooking(bookingId: string): Promise<Booking> {
   const updated = await bookingRepository.updateStatus(
     bookingId,

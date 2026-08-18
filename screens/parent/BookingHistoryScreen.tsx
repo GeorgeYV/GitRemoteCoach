@@ -5,12 +5,13 @@ import ParentTabBar from '../../components/parent/ParentTabBar';
 import BookingStatusPill from '../../components/parent/BookingStatusPill';
 import InitialAvatar from '../../components/shared/InitialAvatar';
 import { useAuth } from '../../context/AuthContext';
-import { ApiError, listParentBookings, markParentBookingDecisionsSeen } from '../../lib/api';
+import { ApiError, Booking, listParentBookings, markParentBookingDecisionsSeen } from '../../lib/api';
 import { toBookingHistoryEntry } from '../../lib/parentBookingDisplay';
 import { colors, radius } from '../../lib/theme';
 import { BookingHistoryEntry } from '../../mock/parentFlow';
 import BookingCancelScreen from './BookingCancelScreen';
 import BookingPaymentScreen from './BookingPaymentScreen';
+import BookingRescheduleScreen from './BookingRescheduleScreen';
 import BookingReviewScreen from './BookingReviewScreen';
 import ParentChatScreen from './ParentChatScreen';
 
@@ -26,6 +27,7 @@ export default function BookingHistoryScreen() {
   const [reviewTarget, setReviewTarget] = useState<BookingHistoryEntry | null>(null);
   const [chatTarget, setChatTarget] = useState<BookingHistoryEntry | null>(null);
   const [payTarget, setPayTarget] = useState<BookingHistoryEntry | null>(null);
+  const [rescheduleTarget, setRescheduleTarget] = useState<BookingHistoryEntry | null>(null);
 
   useEffect(() => {
     if (!user || !token) {
@@ -73,9 +75,37 @@ export default function BookingHistoryScreen() {
     setPayTarget(null);
   }
 
+  function confirmReschedule(updated: Booking) {
+    const matchDate = new Date(updated.matchDatetime);
+    setBookings(
+      (prev) =>
+        prev?.map((b) =>
+          b.id === updated.id
+            ? {
+                ...b,
+                matchDatetime: updated.matchDatetime,
+                date: matchDate.toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric', month: 'short' }),
+                time: matchDate.toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit' }),
+              }
+            : b,
+        ) ?? null,
+    );
+    setRescheduleTarget(null);
+  }
+
   if (cancelTarget) {
     return (
       <BookingCancelScreen booking={cancelTarget} onBack={() => setCancelTarget(null)} onConfirm={confirmCancel} />
+    );
+  }
+
+  if (rescheduleTarget) {
+    return (
+      <BookingRescheduleScreen
+        booking={rescheduleTarget}
+        onBack={() => setRescheduleTarget(null)}
+        onRescheduled={confirmReschedule}
+      />
     );
   }
 
@@ -143,6 +173,7 @@ export default function BookingHistoryScreen() {
                 onCancel={() => setCancelTarget(booking)}
                 onChat={() => setChatTarget(booking)}
                 onPay={booking.status === 'accepted' ? () => setPayTarget(booking) : undefined}
+                onReschedule={() => setRescheduleTarget(booking)}
               />
             ))}
           </View>
@@ -190,12 +221,14 @@ function BookingRow({
   onReview,
   onChat,
   onPay,
+  onReschedule,
 }: {
   booking: BookingHistoryEntry;
   onCancel?: () => void;
   onReview?: () => void;
   onChat?: () => void;
   onPay?: () => void;
+  onReschedule?: () => void;
 }) {
   return (
     <View style={styles.row}>
@@ -225,6 +258,11 @@ function BookingRow({
               <Pressable style={styles.chatLink} onPress={onChat}>
                 {booking.hasUnreadMessages && <View style={styles.unreadDot} />}
                 <Text style={styles.chatLinkLabel}>Chat</Text>
+              </Pressable>
+            )}
+            {onReschedule && (
+              <Pressable style={styles.rescheduleLink} onPress={onReschedule}>
+                <Text style={styles.rescheduleLinkLabel}>Reprogramar</Text>
               </Pressable>
             )}
             {onCancel && (
@@ -360,6 +398,15 @@ const styles = StyleSheet.create({
     height: 7,
     borderRadius: 4,
     backgroundColor: colors.amber,
+  },
+  rescheduleLink: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  rescheduleLinkLabel: {
+    color: colors.courtBlue,
+    fontSize: 12,
+    fontWeight: '700',
   },
   cancelLink: {
     paddingVertical: 4,

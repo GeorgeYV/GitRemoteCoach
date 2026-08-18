@@ -340,6 +340,16 @@ export function setMeetingDetails(
   });
 }
 
+/** PATCH /bookings/:id/reschedule — cualquiera de las dos partes puede cambiar el horario
+ * directamente, sin que la otra tenga que aprobarlo. matchDatetime en ISO-8601. */
+export function rescheduleBooking(authToken: string, bookingId: string, matchDatetime: string): Promise<Booking> {
+  return request(`/bookings/${bookingId}/reschedule`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${authToken}` },
+    body: JSON.stringify({ matchDatetime }),
+  });
+}
+
 /** POST /bookings — BookingConfirmScreen. Crea la reserva en estado 'requested'. */
 export function requestBooking(
   authToken: string,
