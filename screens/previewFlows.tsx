@@ -776,6 +776,7 @@ export function ClubTournamentFlow({
  * clubService.getClubForAdmin) antes de montar cualquier pantalla.
  */
 export function ClubFlow({ adminUserId }: { adminUserId: string }) {
+  const { logout } = useAuth();
   const [club, setClub] = useState<Club | null>(null);
   const [error, setError] = useState<string | null>(null);
   // 404 en GET /club-admins/:userId/club no es un error real: significa que este club_admin
@@ -853,6 +854,7 @@ export function ClubFlow({ adminUserId }: { adminUserId: string }) {
       onOpenTournaments={() => setScreen('tournaments')}
       onOpenSettlements={() => setScreen('settlements')}
       onOpenProfile={() => setScreen('editProfile')}
+      onLogout={logout}
     />
   );
 }

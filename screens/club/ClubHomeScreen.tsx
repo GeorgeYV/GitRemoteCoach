@@ -23,11 +23,13 @@ export default function ClubHomeScreen({
   onOpenTournaments,
   onOpenSettlements,
   onOpenProfile,
+  onLogout,
 }: {
   clubId: string;
   onOpenTournaments: () => void;
   onOpenSettlements: () => void;
   onOpenProfile?: () => void;
+  onLogout?: () => void;
 }) {
   const [club, setClub] = useState<Club | null>(null);
   const [tournaments, setTournaments] = useState<TournamentSummary[] | null>(null);
@@ -115,6 +117,15 @@ export default function ClubHomeScreen({
             <Text style={[styles.actionButtonLabel, styles.actionButtonLabelSecondary]}>Ver liquidaciones</Text>
           </View>
         </Pressable>
+
+        {onLogout && (
+          <Pressable style={[styles.actionButton, styles.logoutButton]} onPress={onLogout}>
+            <View style={styles.buttonContent}>
+              <Ionicons name="log-out-outline" size={16} color={colors.errorCoral} />
+              <Text style={[styles.actionButtonLabel, styles.logoutButtonLabel]}>Salir</Text>
+            </View>
+          </Pressable>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -197,5 +208,12 @@ const styles = StyleSheet.create({
   },
   actionButtonLabelSecondary: {
     color: colors.lineWhite,
+  },
+  logoutButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+  },
+  logoutButtonLabel: {
+    color: colors.errorCoral,
   },
 });
