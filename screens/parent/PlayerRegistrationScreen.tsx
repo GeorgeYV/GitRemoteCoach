@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import IconTextInput from '../../components/shared/IconTextInput';
 import { useAuth } from '../../context/AuthContext';
 import { AgeCategory, ApiError, CountryCode, Player, registerPlayer, updatePlayer } from '../../lib/api';
+import { isValidDateString } from '../../lib/dateSlots';
 import { colors, radius, withOpacity } from '../../lib/theme';
 import { AGE_CATEGORY_OPTIONS, COUNTRY_LABELS, COUNTRY_OPTIONS } from '../../mock/coachFlow';
 
@@ -32,6 +33,10 @@ export default function PlayerRegistrationScreen({
       return;
     }
     if (!ageCategory || !country) return;
+    if (!isValidDateString(birthDate.trim())) {
+      setError('Fecha de nacimiento inválida. Usa el formato AAAA-MM-DD (ej. 2015-03-15).');
+      return;
+    }
     setSubmitting(true);
     setError(null);
     const params = {

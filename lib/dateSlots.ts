@@ -54,3 +54,17 @@ export function dateRangeLabel(startIso: string, endIso: string): string {
   const end = new Date(endIso).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' });
   return `${start} – ${end}`;
 }
+
+const DATE_STRING_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Formularios con fecha en texto libre (AAAA-MM-DD, ej. PlayerRegistrationScreen,
+ * ClubCreateTournamentScreen, PlatformAdminTournamentScreen) validan con esto antes de mandar
+ * al backend — si no, el error crudo de Zod (z.string().date()) se le mostraba tal cual al
+ * usuario. Chequea también que sea una fecha real: new Date("2026-02-30") no lanza, "corrige"
+ * silenciosamente al 2 de marzo, así que hay que comparar los componentes de vuelta. */
+export function isValidDateString(value: string): boolean {
+  if (!DATE_STRING_PATTERN.test(value)) return false;
+  const [year, month, day] = value.split('-').map(Number);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  return parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day;
+}

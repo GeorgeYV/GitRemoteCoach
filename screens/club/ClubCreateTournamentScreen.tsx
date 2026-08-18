@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import IconTextInput from '../../components/shared/IconTextInput';
 import { useAuth } from '../../context/AuthContext';
 import { ApiError, createTournament, TournamentSummary } from '../../lib/api';
+import { isValidDateString } from '../../lib/dateSlots';
 import { colors, radius, withOpacity } from '../../lib/theme';
 
 export default function ClubCreateTournamentScreen({
@@ -31,6 +32,16 @@ export default function ClubCreateTournamentScreen({
     if (!canSubmit) return;
     if (!token) {
       setError('No hay una sesión activa.');
+      return;
+    }
+    const trimmedStart = startDate.trim();
+    const trimmedEnd = endDate.trim();
+    if (!isValidDateString(trimmedStart) || !isValidDateString(trimmedEnd)) {
+      setError('Fecha inválida. Usa el formato AAAA-MM-DD (ej. 2026-03-15).');
+      return;
+    }
+    if (trimmedEnd < trimmedStart) {
+      setError('La fecha de fin no puede ser anterior a la de inicio.');
       return;
     }
     setSubmitting(true);
