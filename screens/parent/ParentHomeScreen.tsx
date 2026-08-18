@@ -31,6 +31,7 @@ export default function ParentHomeScreen() {
   const [childName, setChildName] = useState<string | null>(null);
   const [tournaments, setTournaments] = useState<TournamentSearchResult[] | null>(null);
   const [query, setQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<TournamentSearchResult[] | null>(null);
 
   useEffect(() => {
     if (!token) return;
@@ -41,11 +42,39 @@ export default function ParentHomeScreen() {
       .catch(() => setChildName(null));
   }, [token]);
 
+  // Carga fija (sin término de búsqueda) — solo alimenta "Continuar con", que siempre debe
+  // mostrar el mismo torneo destacado sin importar qué esté escribiendo el padre en el buscador.
   useEffect(() => {
     searchTournaments()
       .then(setTournaments)
       .catch(() => setTournaments([]));
   }, []);
+
+  // "Torneos activos" sí busca de verdad contra el backend (igual que CoachTournamentSearchScreen)
+  // en vez de filtrar en el cliente los primeros 25 que trajo la carga fija de arriba — si no, un
+  // torneo que no esté entre esos 25 (o que exista pero el padre busque por otro nombre/sede/ciudad
+  // fuera de ese lote) nunca iba a aparecer aunque sí exista.
+  useEffect(() => {
+    const trimmed = query.trim();
+    if (!trimmed) {
+      setSearchResults(null);
+      return;
+    }
+    let cancelled = false;
+    const handle = setTimeout(() => {
+      searchTournaments(trimmed)
+        .then((result) => {
+          if (!cancelled) setSearchResults(result);
+        })
+        .catch(() => {
+          if (!cancelled) setSearchResults([]);
+        });
+    }, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(handle);
+    };
+  }, [query]);
 
   function goToTrainers(tournamentId?: string) {
     if (tournamentId) {
@@ -57,16 +86,12 @@ export default function ParentHomeScreen() {
 
   const firstName = user?.fullName.split(' ')[0] ?? '';
   const featured = tournaments?.[0] ?? null;
-  const rest = tournaments?.slice(1) ?? [];
-  const normalizedQuery = query.trim().toLowerCase();
-  const visibleRest = normalizedQuery
-    ? rest.filter(
-        (t) =>
-          t.name.toLowerCase().includes(normalizedQuery) ||
-          t.venue.toLowerCase().includes(normalizedQuery) ||
-          t.city.toLowerCase().includes(normalizedQuery)
-      )
-    : rest;
+  const isSearching = query.trim().length > 0;
+  // Sin búsqueda activa: el resto de la carga fija, sin repetir el destacado. Buscando: la lista
+  // completa de resultados del servidor — puede incluir al destacado, y eso está bien (ya no hay
+  // que ocultarlo para evitar el mensaje contradictorio de "no encontramos" cuando en realidad sí
+  // hay un resultado, solo que estaba arriba).
+  const visibleList = isSearching ? searchResults : (tournaments?.slice(1) ?? null);
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -116,15 +141,15 @@ export default function ParentHomeScreen() {
         />
 
         <Text style={styles.sectionLabel}>Torneos activos</Text>
-        {tournaments === null ? (
-          <Text style={styles.tournamentMeta}>Cargando torneos…</Text>
-        ) : visibleRest.length === 0 && !featured ? (
-          <Text style={styles.tournamentMeta}>No hay torneos activos por ahora.</Text>
-        ) : visibleRest.length === 0 && normalizedQuery ? (
+        {visibleList === null ? (
+          <Text style={styles.tournamentMeta}>{isSearching ? 'Buscando…' : 'Cargando torneos…'}</Text>
+        ) : visibleList.length === 0 && isSearching ? (
           <Text style={styles.tournamentMeta}>No encontramos torneos con ese nombre, sede o ciudad.</Text>
+        ) : visibleList.length === 0 && !featured ? (
+          <Text style={styles.tournamentMeta}>No hay torneos activos por ahora.</Text>
         ) : (
           <View style={styles.tournamentList}>
-            {visibleRest.map((tournament) => (
+            {visibleList.map((tournament) => (
               <TournamentRow
                 key={tournament.id}
                 tournament={tournament}
