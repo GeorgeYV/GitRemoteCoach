@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import IconTextInput from '../../components/shared/IconTextInput';
 import { ApiError, requestPasswordReset, resetPassword } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
+import { isValidEmail } from '../../lib/validation';
 
 /** Login → "¿Olvidaste tu contraseña?". Dos pasos en una sola pantalla (sin ruta extra):
  * pedir el código por correo, luego canjearlo junto con la nueva contraseña. Un código
@@ -25,6 +26,10 @@ export default function ForgotPasswordScreen({
   const [error, setError] = useState<string | null>(null);
 
   async function handleRequestCode() {
+    if (!isValidEmail(email.trim())) {
+      setError('Correo electrónico inválido.');
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {

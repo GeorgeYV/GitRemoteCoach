@@ -6,6 +6,7 @@ import IconTextInput from '../../components/shared/IconTextInput';
 import { useAuth } from '../../context/AuthContext';
 import { ApiError, Club, CountryCode, registerClub, updateClub } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
+import { isValidEmail } from '../../lib/validation';
 import { COUNTRY_LABELS, COUNTRY_OPTIONS } from '../../mock/coachFlow';
 
 const TYPE_OPTIONS: { value: 'club' | 'federation'; label: string }[] = [
@@ -39,6 +40,10 @@ export default function ClubRegistrationScreen({
   async function handleSubmit() {
     if (!token || !type || !country) {
       setError('No hay una sesión activa.');
+      return;
+    }
+    if (contactEmail.trim() && !isValidEmail(contactEmail.trim())) {
+      setError('Correo de contacto inválido.');
       return;
     }
     setSubmitting(true);

@@ -8,6 +8,7 @@ import { useAuth } from '../../context/AuthContext';
 import { UserRole } from '../../lib/api';
 import { useGoogleAuthRequest } from '../../lib/googleAuthSession';
 import { colors, radius, withOpacity } from '../../lib/theme';
+import { isValidEmail } from '../../lib/validation';
 
 /** Mismas opciones que RegisterScreen.tsx — solo se preguntan acá si "Continuar con Google"
  * resulta ser una identidad nueva (ver AuthContext.googleSignIn). */
@@ -77,6 +78,10 @@ export default function LoginScreen({
   }
 
   async function handleSubmit() {
+    if (!isValidEmail(email.trim())) {
+      setError('Correo electrónico inválido.');
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {

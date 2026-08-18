@@ -8,6 +8,7 @@ import { useAuth } from '../../context/AuthContext';
 import { UserRole } from '../../lib/api';
 import { useGoogleAuthRequest } from '../../lib/googleAuthSession';
 import { colors, radius, withOpacity } from '../../lib/theme';
+import { isValidEmail } from '../../lib/validation';
 
 const ROLE_OPTIONS: { value: Exclude<UserRole, 'platform_admin'>; label: string }[] = [
   { value: 'parent', label: 'Soy padre/madre' },
@@ -35,6 +36,10 @@ export default function RegisterScreen({
 
   async function handleSubmit() {
     if (!primaryRole) return;
+    if (!isValidEmail(email.trim())) {
+      setError('Correo electrónico inválido.');
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
