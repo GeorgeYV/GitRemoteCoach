@@ -6,9 +6,16 @@ import DocumentRow from '../../components/coach/DocumentRow';
 import IconTextInput from '../../components/shared/IconTextInput';
 import TrainerAvatarPlaceholder from '../../components/shared/TrainerAvatarPlaceholder';
 import { useAuth } from '../../context/AuthContext';
-import { AgeCategory, ApiError, PlayingLevel, registerCoachProfile } from '../../lib/api';
+import { AgeCategory, ApiError, CountryCode, PlayingLevel, registerCoachProfile } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
-import { AGE_CATEGORY_OPTIONS, DocumentItem, LEVEL_OPTIONS, VERIFICATION_DOC_CHECKLIST } from '../../mock/coachFlow';
+import {
+  AGE_CATEGORY_OPTIONS,
+  COUNTRY_LABELS,
+  COUNTRY_OPTIONS,
+  DocumentItem,
+  LEVEL_OPTIONS,
+  VERIFICATION_DOC_CHECKLIST,
+} from '../../mock/coachFlow';
 
 /** No hay almacenamiento real de archivos todavía: el checklist sigue siendo interactivo, pero el
  * backend recibe un placeholder en vez de un archivo real por cada documento marcado como subido. */
@@ -25,6 +32,7 @@ export default function CoachRegistrationScreen({ onSubmit }: { onSubmit?: () =>
   const [name, setName] = useState('');
   const [city, setCity] = useState('');
   const [region, setRegion] = useState('');
+  const [country, setCountry] = useState<CountryCode | null>(null);
   const [experience, setExperience] = useState('');
   const [hourlyRate, setHourlyRate] = useState('');
   const [categories, setCategories] = useState<string[]>([]);
@@ -46,12 +54,14 @@ export default function CoachRegistrationScreen({ onSubmit }: { onSubmit?: () =>
       setError('No hay una sesión activa.');
       return;
     }
+    if (!country) return;
     setSubmitting(true);
     setError(null);
     try {
       await registerCoachProfile(token, {
         city,
         region: region.trim() || undefined,
+        country,
         yearsExperience: Number(experience) || 0,
         hourlyRate: Number(hourlyRate) || 0,
         ageCategories: categories as AgeCategory[],
@@ -69,6 +79,7 @@ export default function CoachRegistrationScreen({ onSubmit }: { onSubmit?: () =>
   }
 
   const requiredDocsReady = documents.filter((d) => !d.optional).every((d) => d.status === 'uploaded');
+  const canSubmit = requiredDocsReady && !!country && !submitting;
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -127,6 +138,23 @@ export default function CoachRegistrationScreen({ onSubmit }: { onSubmit?: () =>
           />
         </Section>
 
+        <Section label="País donde entrenas">
+          <View style={styles.chipRow}>
+            {COUNTRY_OPTIONS.map((option) => {
+              const active = country === option;
+              return (
+                <Pressable
+                  key={option}
+                  onPress={() => setCountry(option)}
+                  style={[styles.chip, active && styles.chipActive]}
+                >
+                  <Text style={[styles.chipLabel, active && styles.chipLabelActive]}>{COUNTRY_LABELS[option]}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </Section>
+
         <Section label="Categorías de edad">
           <ChipGroup options={AGE_CATEGORY_OPTIONS} selected={categories} onToggle={(v) => toggle(categories, v, setCategories)} />
         </Section>
@@ -152,9 +180,12 @@ export default function CoachRegistrationScreen({ onSubmit }: { onSubmit?: () =>
         {!requiredDocsReady && (
           <Text style={styles.footerHint}>Sube los documentos obligatorios para continuar</Text>
         )}
+        {requiredDocsReady && !country && (
+          <Text style={styles.footerHint}>Elige tu país para continuar</Text>
+        )}
         <Pressable
-          style={[styles.submitButton, (!requiredDocsReady || submitting) && styles.submitButtonDisabled]}
-          disabled={!requiredDocsReady || submitting}
+          style={[styles.submitButton, !canSubmit && styles.submitButtonDisabled]}
+          disabled={!canSubmit}
           onPress={handleSubmit}
         >
           {submitting ? (

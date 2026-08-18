@@ -11,6 +11,26 @@ export interface DocumentItem {
 export const AGE_CATEGORY_OPTIONS = ['U10', 'U12', 'U14', 'U16', 'U18'];
 export const LEVEL_OPTIONS = ['Recreativo', 'Competitivo', 'Alto rendimiento'];
 
+/** Espeja el DOMAIN country_code (db/schema.sql#35) — Ecuador primero, luego vecinos
+ * sudamericanos empezando por Perú. Compartido entre PlayerRegistrationScreen,
+ * CoachRegistrationScreen, ClubRegistrationScreen y el toggle "mi país"/"todos". */
+export type CountryCode = 'EC' | 'PE' | 'CO' | 'CL' | 'BO' | 'AR' | 'VE' | 'BR' | 'PY' | 'UY';
+
+export const COUNTRY_OPTIONS: CountryCode[] = ['EC', 'PE', 'CO', 'CL', 'BO', 'AR', 'VE', 'BR', 'PY', 'UY'];
+
+export const COUNTRY_LABELS: Record<CountryCode, string> = {
+  EC: 'Ecuador',
+  PE: 'Perú',
+  CO: 'Colombia',
+  CL: 'Chile',
+  BO: 'Bolivia',
+  AR: 'Argentina',
+  VE: 'Venezuela',
+  BR: 'Brasil',
+  PY: 'Paraguay',
+  UY: 'Uruguay',
+};
+
 /** Checklist de registro del entrenador — id coincide 1:1 con VerificationDocType para poder
  * enviarse directo al backend real en CoachRegistrationScreen (ver server/db/schema.sql#verification_doc_type). */
 export const VERIFICATION_DOC_CHECKLIST: DocumentItem[] = [

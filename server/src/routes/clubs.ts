@@ -16,10 +16,13 @@ const createTournamentSchema = z
     path: ['endDate'],
   });
 
+const COUNTRY_CODES = ['EC', 'PE', 'CO', 'CL', 'BO', 'AR', 'VE', 'BR', 'PY', 'UY'] as const;
+
 const registerClubSchema = z.object({
   name: z.string().min(1),
   type: z.enum(['club', 'federation']),
   city: z.string().min(1),
+  country: z.enum(COUNTRY_CODES),
   contactEmail: z.string().email().optional(),
   contactPhone: z.string().min(1).optional(),
 });

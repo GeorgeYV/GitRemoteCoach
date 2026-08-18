@@ -4,8 +4,17 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ClubTagBadge from '../../components/coach/ClubTagBadge';
 import { useAuth } from '../../context/AuthContext';
-import { ApiError, CoachClubTag, listCoachClubTags, searchTournaments, TournamentSearchResult } from '../../lib/api';
-import { colors, radius } from '../../lib/theme';
+import {
+  ApiError,
+  CoachClubTag,
+  CountryCode,
+  getCoachProfile,
+  listCoachClubTags,
+  searchTournaments,
+  TournamentSearchResult,
+} from '../../lib/api';
+import { colors, radius, withOpacity } from '../../lib/theme';
+import { COUNTRY_LABELS } from '../../mock/coachFlow';
 
 function dateRangeLabel(startIso: string, endIso: string): string {
   const start = new Date(startIso).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' });
@@ -25,6 +34,8 @@ export default function CoachTournamentSearchScreen({
   const [results, setResults] = useState<TournamentSearchResult[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [clubTags, setClubTags] = useState<CoachClubTag[]>([]);
+  const [defaultCountry, setDefaultCountry] = useState<CountryCode | null>(null);
+  const [countryFilterOn, setCountryFilterOn] = useState(true);
 
   useEffect(() => {
     if (!user) return;
@@ -37,12 +48,30 @@ export default function CoachTournamentSearchScreen({
     };
   }, [user]);
 
+  // País donde entrena — default del toggle "mi país"/"todos" de abajo.
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    getCoachProfile(user.id)
+      .then((result) => {
+        if (!cancelled) setDefaultCountry(result.profile.country);
+      })
+      .catch(() => {
+        if (!cancelled) setDefaultCountry(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  const activeCountry = countryFilterOn ? (defaultCountry ?? undefined) : undefined;
+
   useEffect(() => {
     let cancelled = false;
     setLoadError(null);
     // Debounce: espera a que el usuario deje de escribir antes de pegarle al backend en cada tecla.
     const handle = setTimeout(() => {
-      searchTournaments(query.trim() || undefined)
+      searchTournaments(query.trim() || undefined, activeCountry)
         .then((result) => {
           if (!cancelled) setResults(result);
         })
@@ -55,7 +84,7 @@ export default function CoachTournamentSearchScreen({
       cancelled = true;
       clearTimeout(handle);
     };
-  }, [query]);
+  }, [query, activeCountry]);
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -81,6 +110,25 @@ export default function CoachTournamentSearchScreen({
           onChangeText={setQuery}
         />
       </View>
+
+      {defaultCountry && (
+        <View style={styles.countryToggleRow}>
+          <Pressable
+            style={[styles.countryToggleChip, countryFilterOn && styles.countryToggleChipActive]}
+            onPress={() => setCountryFilterOn(true)}
+          >
+            <Text style={[styles.countryToggleLabel, countryFilterOn && styles.countryToggleLabelActive]}>
+              {COUNTRY_LABELS[defaultCountry]}
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[styles.countryToggleChip, !countryFilterOn && styles.countryToggleChipActive]}
+            onPress={() => setCountryFilterOn(false)}
+          >
+            <Text style={[styles.countryToggleLabel, !countryFilterOn && styles.countryToggleLabelActive]}>Todos</Text>
+          </Pressable>
+        </View>
+      )}
 
       {loadError ? (
         <View style={styles.emptyState}>
@@ -189,6 +237,32 @@ const styles = StyleSheet.create({
     color: colors.lineWhite,
     fontSize: 13,
     padding: 0,
+  },
+  countryToggleRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginHorizontal: 20,
+    marginBottom: 18,
+  },
+  countryToggleChip: {
+    backgroundColor: colors.panel,
+    borderRadius: 14,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  countryToggleChipActive: {
+    backgroundColor: withOpacity(colors.ballLime, 0.16),
+    borderColor: colors.ballLime,
+  },
+  countryToggleLabel: {
+    color: colors.textSoft,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  countryToggleLabelActive: {
+    color: colors.courtBlue,
   },
   list: {
     paddingHorizontal: 20,

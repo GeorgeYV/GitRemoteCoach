@@ -4,6 +4,7 @@ import * as tournamentRepository from '../repositories/tournamentRepository.js';
 import type {
   ClubCoachInvitationWithCoachName,
   CoachClubTag,
+  CountryCode,
   TournamentCoachTagWithProfile,
   TournamentSearchResult,
 } from '../types.js';
@@ -25,9 +26,10 @@ export async function getTournamentRoster(tournamentId: string): Promise<Tournam
   return { officialCoaches, pendingInvitations, pendingCommissionAmount };
 }
 
-/** CoachTournamentSearchScreen: torneos activos en los que un entrenador podría ofrecerse. */
-export async function searchTournaments(query?: string): Promise<TournamentSearchResult[]> {
-  return tournamentRepository.search({ query });
+/** CoachTournamentSearchScreen/ParentHomeScreen: torneos activos, opcionalmente filtrados por
+ * texto y/o país del club organizador. */
+export async function searchTournaments(query?: string, country?: CountryCode): Promise<TournamentSearchResult[]> {
+  return tournamentRepository.search({ query, country });
 }
 
 /** CoachAvailabilityScreen, CoachTournamentSearchScreen, CoachReputationScreen: insignias de

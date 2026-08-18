@@ -422,6 +422,7 @@ export interface CoachProfile {
   fullName: string;
   city: string;
   region: string | null;
+  country: CountryCode | null;
   photoUrl: string | null;
   yearsExperience: number;
   specialty: string | null;
@@ -510,6 +511,7 @@ export function registerCoachProfile(
   params: {
     city: string;
     region?: string;
+    country: CountryCode;
     yearsExperience: number;
     specialty?: string;
     hourlyRate: number;
@@ -573,6 +575,9 @@ export function updateCoachTraining(
   });
 }
 
+/** Espeja el DOMAIN country_code (db/schema.sql#35). */
+export type CountryCode = 'EC' | 'PE' | 'CO' | 'CL' | 'BO' | 'AR' | 'VE' | 'BR' | 'PY' | 'UY';
+
 /** Espeja server/src/types.ts#Player. */
 export interface Player {
   id: string;
@@ -580,6 +585,7 @@ export interface Player {
   fullName: string;
   birthDate: string;
   ageCategory: AgeCategory;
+  country: CountryCode | null;
   createdAt: string;
 }
 
@@ -592,7 +598,7 @@ export function listPlayers(authToken: string): Promise<Player[]> {
  * guardián del token, no de un id que mande el cliente). */
 export function registerPlayer(
   authToken: string,
-  params: { fullName: string; birthDate: string; ageCategory: AgeCategory },
+  params: { fullName: string; birthDate: string; ageCategory: AgeCategory; country: CountryCode },
 ): Promise<Player> {
   return request('/players', {
     method: 'POST',
@@ -764,6 +770,7 @@ export interface Club {
   name: string;
   type: 'club' | 'federation';
   city: string;
+  country: CountryCode | null;
   contactEmail: string | null;
   contactPhone: string | null;
   defaultCommissionRate: string;
@@ -779,7 +786,14 @@ export function getClub(clubId: string): Promise<Club> {
  * crea el club y lo vincula al usuario de la sesión. */
 export function registerClub(
   authToken: string,
-  params: { name: string; type: 'club' | 'federation'; city: string; contactEmail?: string; contactPhone?: string },
+  params: {
+    name: string;
+    type: 'club' | 'federation';
+    city: string;
+    country: CountryCode;
+    contactEmail?: string;
+    contactPhone?: string;
+  },
 ): Promise<Club> {
   return request('/clubs', {
     method: 'POST',
@@ -838,14 +852,16 @@ export interface TournamentSearchResult {
   name: string;
   venue: string;
   city: string;
+  country: CountryCode | null;
   startDate: string;
   endDate: string;
 }
 
-/** GET /tournaments?search= — CoachTournamentSearchScreen. */
-export function searchTournaments(query?: string): Promise<TournamentSearchResult[]> {
+/** GET /tournaments?search=&country= — CoachTournamentSearchScreen/ParentHomeScreen. */
+export function searchTournaments(query?: string, country?: CountryCode): Promise<TournamentSearchResult[]> {
   const qs = new URLSearchParams();
   if (query) qs.set('search', query);
+  if (country) qs.set('country', country);
   const suffix = qs.toString();
   return request(`/tournaments${suffix ? `?${suffix}` : ''}`);
 }

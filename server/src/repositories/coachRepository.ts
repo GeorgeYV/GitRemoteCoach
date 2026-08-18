@@ -1,7 +1,7 @@
 import type { Pool, PoolClient } from 'pg';
 import { pool } from '../lib/db.js';
 import { ConflictError, NotFoundError, ValidationError } from '../lib/errors.js';
-import type { AgeCategory, CoachProfile, CoachSearchResult, PlayingLevel } from '../types.js';
+import type { AgeCategory, CoachProfile, CoachSearchResult, CountryCode, PlayingLevel } from '../types.js';
 
 type Queryable = Pool | PoolClient;
 
@@ -79,6 +79,7 @@ function mapCoachProfileRow(row: any): CoachProfile {
     fullName: row.full_name,
     city: row.city,
     region: row.region,
+    country: row.country,
     photoUrl: row.photo_url,
     yearsExperience: row.years_experience,
     specialty: row.specialty,
@@ -96,14 +97,21 @@ function mapCoachProfileRow(row: any): CoachProfile {
 /** CoachRegistrationScreen: crea la fila coach_profiles del usuario recién registrado. */
 export async function create(
   userId: string,
-  params: { city: string; region: string | null; yearsExperience: number; specialty: string | null; hourlyRate: number },
+  params: {
+    city: string;
+    region: string | null;
+    country: CountryCode;
+    yearsExperience: number;
+    specialty: string | null;
+    hourlyRate: number;
+  },
   db: Queryable = pool,
 ): Promise<CoachProfile> {
   try {
     await db.query(
-      `INSERT INTO coach_profiles (user_id, city, region, years_experience, specialty, hourly_rate)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      [userId, params.city, params.region, params.yearsExperience, params.specialty, params.hourlyRate],
+      `INSERT INTO coach_profiles (user_id, city, region, country, years_experience, specialty, hourly_rate)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [userId, params.city, params.region, params.country, params.yearsExperience, params.specialty, params.hourlyRate],
     );
   } catch (err: any) {
     // user_id es la PK de coach_profiles — un segundo POST /coaches para el mismo usuario cae acá.

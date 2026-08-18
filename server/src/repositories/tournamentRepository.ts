@@ -1,7 +1,7 @@
 import type { Pool, PoolClient } from 'pg';
 import { pool } from '../lib/db.js';
 import { NotFoundError } from '../lib/errors.js';
-import type { TournamentSearchResult, TournamentSummary } from '../types.js';
+import type { CountryCode, TournamentSearchResult, TournamentSummary } from '../types.js';
 
 type Queryable = Pool | PoolClient;
 
@@ -11,6 +11,7 @@ function mapSearchRow(row: any): TournamentSearchResult {
     name: row.name,
     venue: row.venue,
     city: row.city,
+    country: row.country,
     startDate: row.start_date,
     endDate: row.end_date,
   };
@@ -21,8 +22,12 @@ function mapSearchRow(row: any): TournamentSearchResult {
  * 'in_progress') (idx_tournaments_active) es la intención original, pero nada en la app todavía
  * transiciona el status de un torneo (sin job ni endpoint que lo mueva a 'completed'/'cancelled'),
  * así que por sí solo nunca excluye nada — nos apoyamos también en end_date para no listar
- * torneos cuyas fechas ya pasaron. */
-export async function search(params: { query?: string }, db: Queryable = pool): Promise<TournamentSearchResult[]> {
+ * torneos cuyas fechas ya pasaron. country filtra por el país del club (toggle "mi país"/"todos"
+ * de ambas pantallas) — opcional, sin él devuelve todos los países. */
+export async function search(
+  params: { query?: string; country?: CountryCode },
+  db: Queryable = pool,
+): Promise<TournamentSearchResult[]> {
   const conditions: string[] = [`t.status IN ('scheduled', 'in_progress')`, `t.end_date >= CURRENT_DATE`];
   const values: unknown[] = [];
 
@@ -31,8 +36,13 @@ export async function search(params: { query?: string }, db: Queryable = pool): 
     conditions.push(`(t.name ILIKE $${values.length} OR t.venue ILIKE $${values.length} OR c.city ILIKE $${values.length})`);
   }
 
+  if (params.country) {
+    values.push(params.country);
+    conditions.push(`c.country = $${values.length}`);
+  }
+
   const { rows } = await db.query(
-    `SELECT t.id, t.name, t.venue, c.city, t.start_date, t.end_date
+    `SELECT t.id, t.name, t.venue, c.city, c.country, t.start_date, t.end_date
      FROM tournaments t
      JOIN clubs c ON c.id = t.club_id
      WHERE ${conditions.join(' AND ')}

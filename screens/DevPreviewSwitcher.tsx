@@ -152,6 +152,7 @@ const PREVIEW_TOURNAMENT: TournamentSearchResult = {
   name: 'Vista previa',
   venue: '—',
   city: '—',
+  country: null,
   startDate: new Date().toISOString(),
   endDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
 };

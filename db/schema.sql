@@ -139,6 +139,8 @@ CREATE TABLE coach_profiles (
   user_id             UUID PRIMARY KEY REFERENCES users (id) ON DELETE CASCADE,
   city                TEXT NOT NULL,
   region              TEXT,
+  -- País donde entrena — default del filtro "mi país" en CoachTournamentSearchScreen.
+  country             TEXT,
   photo_url           TEXT,
   years_experience    SMALLINT NOT NULL CHECK (years_experience >= 0),
   specialty           TEXT,
@@ -152,7 +154,8 @@ CREATE TABLE coach_profiles (
   stripe_connected_account_id TEXT,
   created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
-  CONSTRAINT chk_coach_profiles_is_coach CHECK (TRUE) -- rol validado a nivel de aplicación al insertar
+  CONSTRAINT chk_coach_profiles_is_coach CHECK (TRUE), -- rol validado a nivel de aplicación al insertar
+  CONSTRAINT chk_coach_profiles_country CHECK (country IS NULL OR country IN ('EC', 'PE', 'CO', 'CL', 'BO', 'AR', 'VE', 'BR', 'PY', 'UY'))
 );
 
 CREATE INDEX idx_coach_profiles_city ON coach_profiles (city);
@@ -309,10 +312,14 @@ CREATE TABLE clubs (
   name                   TEXT NOT NULL,
   type                   club_type NOT NULL DEFAULT 'club',
   city                   TEXT NOT NULL,
+  -- País del club — de acá lo hereda cada torneo que organiza (ver tournamentRepository.search).
+  -- Nullable: clubes ya existentes antes de este campo se quedan sin país hasta que lo editen.
+  country                TEXT,
   contact_email          CITEXT,
   contact_phone          TEXT,
   default_commission_rate NUMERIC(5, 4) NOT NULL CHECK (default_commission_rate BETWEEN 0 AND 1),
-  created_at             TIMESTAMPTZ NOT NULL DEFAULT now()
+  created_at             TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT chk_clubs_country CHECK (country IS NULL OR country IN ('EC', 'PE', 'CO', 'CL', 'BO', 'AR', 'VE', 'BR', 'PY', 'UY'))
 );
 
 CREATE TABLE club_admins (
@@ -698,7 +705,11 @@ CREATE TABLE players (
   full_name        TEXT NOT NULL,
   birth_date       DATE NOT NULL,
   age_category     age_category NOT NULL,
-  created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+  -- País donde juega — default del filtro "mi país" en ParentHomeScreen (por hijo, no por padre:
+  -- un mismo padre podría tener hijos jugando en países distintos).
+  country          TEXT,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT chk_players_country CHECK (country IS NULL OR country IN ('EC', 'PE', 'CO', 'CL', 'BO', 'AR', 'VE', 'BR', 'PY', 'UY'))
 );
 
 CREATE INDEX idx_players_guardian_user_id ON players (guardian_user_id);
@@ -1602,4 +1613,19 @@ CREATE INDEX idx_push_tokens_user_id ON push_tokens (user_id);
 --     'per_match' existentes a 'per_day' → DROP TYPE viejo → rename),
 --     no un simple ALTER TYPE ADD VALUE como en #32. coach_tournament_rates
 --     también cambió su DEFAULT de 'per_match' a 'per_day'.
+--
+-- 35. country (clubs/coach_profiles/players) es TEXT + CHECK inline en
+--     cada tabla, no un ENUM ni (el intento inicial) un DOMAIN — pg-mem
+--     (server/test/setupDb.ts) no soporta CREATE DOMAIN y rompía el
+--     parseo de todo este archivo en los smoke tests, así que se
+--     descartó a pesar de ser más DRY. Sigue siendo mucho más barato de
+--     ampliar que un ENUM (#34): cada CHECK se redefine con un
+--     ALTER TABLE ... DROP CONSTRAINT / ADD CONSTRAINT independiente por
+--     tabla, sin recrear ningún tipo. Las tres columnas son NULL-able y
+--     sin backfill — filas existentes quedan sin país hasta que se edite
+--     el registro; players.country va por jugador (no en users) porque
+--     un mismo padre puede tener hijos jugando en países distintos, y
+--     clubs.country (no tournaments.country) porque el club es la entidad
+--     físicamente fija — el torneo hereda el país de su club vía el mismo
+--     JOIN que ya usa city (ver tournamentRepository.search).
 -- =====================================================================

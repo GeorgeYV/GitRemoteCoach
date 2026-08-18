@@ -4,8 +4,9 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { SafeAreaView } from 'react-native-safe-area-context';
 import IconTextInput from '../../components/shared/IconTextInput';
 import { useAuth } from '../../context/AuthContext';
-import { ApiError, Club, registerClub } from '../../lib/api';
+import { ApiError, Club, CountryCode, registerClub } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
+import { COUNTRY_LABELS, COUNTRY_OPTIONS } from '../../mock/coachFlow';
 
 const TYPE_OPTIONS: { value: 'club' | 'federation'; label: string }[] = [
   { value: 'club', label: 'Club' },
@@ -17,15 +18,17 @@ export default function ClubRegistrationScreen({ onSuccess }: { onSuccess?: (clu
   const [name, setName] = useState('');
   const [type, setType] = useState<'club' | 'federation' | null>(null);
   const [city, setCity] = useState('');
+  const [country, setCountry] = useState<CountryCode | null>(null);
   const [contactEmail, setContactEmail] = useState('');
   const [contactPhone, setContactPhone] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const canSubmit = name.trim().length > 0 && type !== null && city.trim().length > 0 && !submitting;
+  const canSubmit =
+    name.trim().length > 0 && type !== null && city.trim().length > 0 && !!country && !submitting;
 
   async function handleSubmit() {
-    if (!token || !type) {
+    if (!token || !type || !country) {
       setError('No hay una sesión activa.');
       return;
     }
@@ -36,6 +39,7 @@ export default function ClubRegistrationScreen({ onSuccess }: { onSuccess?: (clu
         name: name.trim(),
         type,
         city: city.trim(),
+        country,
         contactEmail: contactEmail.trim() || undefined,
         contactPhone: contactPhone.trim() || undefined,
       });
@@ -75,6 +79,25 @@ export default function ClubRegistrationScreen({ onSuccess }: { onSuccess?: (clu
 
         <IconTextInput icon="business-outline" placeholder="Nombre del club o federación" value={name} onChangeText={setName} />
         <IconTextInput icon="location-outline" placeholder="Ciudad" value={city} onChangeText={setCity} />
+
+        <Text style={styles.sectionLabel}>País</Text>
+        <View style={styles.typeRow}>
+          {COUNTRY_OPTIONS.map((option) => {
+            const active = country === option;
+            return (
+              <Pressable
+                key={option}
+                onPress={() => setCountry(option)}
+                style={[styles.typeChip, active && styles.typeChipActive]}
+              >
+                <Text style={[styles.typeChipLabel, active && styles.typeChipLabelActive]}>
+                  {COUNTRY_LABELS[option]}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
         <IconTextInput
           icon="mail-outline"
           placeholder="Correo de contacto (opcional)"
@@ -149,6 +172,7 @@ const styles = StyleSheet.create({
   },
   typeRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
     marginBottom: 18,
   },

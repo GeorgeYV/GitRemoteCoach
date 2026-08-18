@@ -3,7 +3,7 @@ import { ConflictError, NotFoundError } from '../lib/errors.js';
 import * as clubRepository from '../repositories/clubRepository.js';
 import * as settlementRepository from '../repositories/settlementRepository.js';
 import * as tournamentRepository from '../repositories/tournamentRepository.js';
-import type { Club, ClubSettlementWithTournamentName, TournamentSummary } from '../types.js';
+import type { Club, ClubSettlementWithTournamentName, CountryCode, TournamentSummary } from '../types.js';
 
 export async function getClub(clubId: string): Promise<Club> {
   return clubRepository.getById(clubId);
@@ -20,7 +20,14 @@ export async function getClubForAdmin(userId: string): Promise<Club> {
  * en "No se pudo cargar tu club". Crea el club y lo vincula al usuario en una transacción. */
 export async function registerClub(
   adminUserId: string,
-  input: { name: string; type: 'club' | 'federation'; city: string; contactEmail?: string; contactPhone?: string },
+  input: {
+    name: string;
+    type: 'club' | 'federation';
+    city: string;
+    country: CountryCode;
+    contactEmail?: string;
+    contactPhone?: string;
+  },
 ): Promise<Club> {
   try {
     await clubRepository.getClubIdForAdminUser(adminUserId);
@@ -34,6 +41,7 @@ export async function registerClub(
         name: input.name,
         type: input.type,
         city: input.city,
+        country: input.country,
         contactEmail: input.contactEmail ?? null,
         contactPhone: input.contactPhone ?? null,
       },

@@ -214,7 +214,7 @@ console.log('\n=== Escenario 4: reserva duplicada (mismo jugador/entrenador/hora
     method: 'POST',
     url: '/players',
     headers: { authorization: `Bearer ${otherParentToken}` },
-    payload: { fullName: 'Otro Alumno Multi', birthDate: '2013-01-01', ageCategory: 'U14' },
+    payload: { fullName: 'Otro Alumno Multi', birthDate: '2013-01-01', ageCategory: 'U14', country: 'EC' },
   });
   const otherPlayerId = otherPlayerRes.json().id;
 
@@ -1023,6 +1023,7 @@ console.log('\n=== Escenario 16: onboarding de coach (POST /coaches) ===');
     payload: {
       city: 'CDMX',
       region: 'CDMX',
+      country: 'EC',
       yearsExperience: 5,
       specialty: 'Saque y volea',
       hourlyRate: 30,
@@ -1040,7 +1041,7 @@ console.log('\n=== Escenario 16: onboarding de coach (POST /coaches) ===');
     method: 'POST',
     url: '/coaches',
     headers: { authorization: `Bearer ${newCoachToken}` },
-    payload: { city: 'CDMX', yearsExperience: 5, hourlyRate: 30, ageCategories: [], levels: [] },
+    payload: { city: 'CDMX', country: 'EC', yearsExperience: 5, hourlyRate: 30, ageCategories: [], levels: [] },
   });
   assertEqual(duplicateRes.statusCode, 409, 'un segundo POST /coaches para el mismo usuario devuelve 409');
 
@@ -1109,7 +1110,7 @@ console.log('\n=== Escenario 17: hijos/as del padre (GET/POST /players) ===');
     method: 'POST',
     url: '/players',
     headers: { authorization: `Bearer ${newParentToken}` },
-    payload: { fullName: 'Camila Nuevo', birthDate: '2014-05-01', ageCategory: 'U12' },
+    payload: { fullName: 'Camila Nuevo', birthDate: '2014-05-01', ageCategory: 'U12', country: 'EC' },
   });
   assertEqual(createRes.statusCode, 201, 'POST /players con datos válidos devuelve 201');
   const created = createRes.json();
@@ -1555,6 +1556,7 @@ console.log('\n=== Escenario 23: documentos de verificación de coach (CoachRegi
     headers: { authorization: `Bearer ${docCoachToken}` },
     payload: {
       city: 'CDMX',
+      country: 'EC',
       yearsExperience: 3,
       hourlyRate: 25,
       ageCategories: ['U12'],
@@ -1718,7 +1720,13 @@ console.log('\n=== Escenario 24: onboarding de club_admin (POST /clubs) ===');
     method: 'POST',
     url: '/clubs',
     headers: { authorization: `Bearer ${newAdminToken}` },
-    payload: { name: 'Academia Nueva', type: 'club', city: 'Monterrey', contactEmail: 'contacto@academianueva.com' },
+    payload: {
+      name: 'Academia Nueva',
+      type: 'club',
+      city: 'Monterrey',
+      country: 'EC',
+      contactEmail: 'contacto@academianueva.com',
+    },
   });
   assertEqual(createRes.statusCode, 201, 'POST /clubs con datos válidos devuelve 201');
   const createdClub = createRes.json();
@@ -1732,7 +1740,7 @@ console.log('\n=== Escenario 24: onboarding de club_admin (POST /clubs) ===');
     method: 'POST',
     url: '/clubs',
     headers: { authorization: `Bearer ${newAdminToken}` },
-    payload: { name: 'Otra Academia', type: 'federation', city: 'CDMX' },
+    payload: { name: 'Otra Academia', type: 'federation', city: 'CDMX', country: 'EC' },
   });
   assertEqual(duplicateRes.statusCode, 409, 'un segundo POST /clubs para el mismo usuario devuelve 409');
 }
@@ -1755,7 +1763,7 @@ console.log('\n=== Escenario 25: estadísticas agregadas de partidos de un coach
     method: 'POST',
     url: '/coaches',
     headers: { authorization: `Bearer ${statsCoachToken}` },
-    payload: { city: 'CDMX', yearsExperience: 4, hourlyRate: 30, ageCategories: ['U14'], levels: ['competitivo'] },
+    payload: { city: 'CDMX', country: 'EC', yearsExperience: 4, hourlyRate: 30, ageCategories: ['U14'], levels: ['competitivo'] },
   });
 
   const noMatchesRes = await app.inject({ method: 'GET', url: `/coaches/${statsCoach.id}/report-summary` });

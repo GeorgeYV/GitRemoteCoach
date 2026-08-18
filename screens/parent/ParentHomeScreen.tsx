@@ -7,9 +7,10 @@ import ParentTabBar from '../../components/parent/ParentTabBar';
 import IconTextInput from '../../components/shared/IconTextInput';
 import InitialAvatar from '../../components/shared/InitialAvatar';
 import { useAuth } from '../../context/AuthContext';
-import { listPlayers, searchTournaments, TournamentSearchResult } from '../../lib/api';
+import { CountryCode, listPlayers, searchTournaments, TournamentSearchResult } from '../../lib/api';
 import { dateRangeLabel } from '../../lib/dateSlots';
-import { colors, radius } from '../../lib/theme';
+import { colors, radius, withOpacity } from '../../lib/theme';
+import { COUNTRY_LABELS } from '../../mock/coachFlow';
 
 /** "Empieza en N días" si el torneo todavía no arranca, "En curso" si hoy cae dentro del rango,
  * o nada si por alguna razón el rango ya pasó (no debería, GET /tournaments ya filtra por status). */
@@ -29,6 +30,10 @@ export default function ParentHomeScreen() {
   const router = useRouter();
   const { user, token } = useAuth();
   const [childName, setChildName] = useState<string | null>(null);
+  // País de los hijos registrados, solo si todos comparten el mismo — si el padre no tiene
+  // hijos, o tiene hijos en países distintos, no hay un "mi país" claro y arranca sin filtro.
+  const [defaultCountry, setDefaultCountry] = useState<CountryCode | null>(null);
+  const [countryFilterOn, setCountryFilterOn] = useState(true);
   const [tournaments, setTournaments] = useState<TournamentSearchResult[] | null>(null);
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState<TournamentSearchResult[] | null>(null);
@@ -36,19 +41,29 @@ export default function ParentHomeScreen() {
   useEffect(() => {
     if (!token) return;
     listPlayers(token)
-      // Nombrar a un hijo/a específico solo tiene sentido si es el único — con 2+ registrados
-      // no hay forma de saber para cuál está buscando el padre en este momento.
-      .then((players) => setChildName(players.length === 1 ? players[0].fullName : null))
-      .catch(() => setChildName(null));
+      .then((players) => {
+        // Nombrar a un hijo/a específico solo tiene sentido si es el único — con 2+ registrados
+        // no hay forma de saber para cuál está buscando el padre en este momento.
+        setChildName(players.length === 1 ? players[0].fullName : null);
+        const countries = new Set(players.map((p) => p.country).filter((c): c is CountryCode => c !== null));
+        setDefaultCountry(countries.size === 1 ? [...countries][0] : null);
+      })
+      .catch(() => {
+        setChildName(null);
+        setDefaultCountry(null);
+      });
   }, [token]);
+
+  const activeCountry = countryFilterOn ? (defaultCountry ?? undefined) : undefined;
 
   // Carga fija (sin término de búsqueda) — solo alimenta "Continuar con", que siempre debe
   // mostrar el mismo torneo destacado sin importar qué esté escribiendo el padre en el buscador.
+  // Sí depende del país activo: cambiar el toggle "mi país"/"todos" debe actualizar el destacado.
   useEffect(() => {
-    searchTournaments()
+    searchTournaments(undefined, activeCountry)
       .then(setTournaments)
       .catch(() => setTournaments([]));
-  }, []);
+  }, [activeCountry]);
 
   // "Torneos activos" sí busca de verdad contra el backend (igual que CoachTournamentSearchScreen)
   // en vez de filtrar en el cliente los primeros 25 que trajo la carga fija de arriba — si no, un
@@ -62,7 +77,7 @@ export default function ParentHomeScreen() {
     }
     let cancelled = false;
     const handle = setTimeout(() => {
-      searchTournaments(trimmed)
+      searchTournaments(trimmed, activeCountry)
         .then((result) => {
           if (!cancelled) setSearchResults(result);
         })
@@ -74,7 +89,7 @@ export default function ParentHomeScreen() {
       cancelled = true;
       clearTimeout(handle);
     };
-  }, [query]);
+  }, [query, activeCountry]);
 
   function goToTrainers(tournamentId?: string) {
     if (tournamentId) {
@@ -139,6 +154,27 @@ export default function ParentHomeScreen() {
           placeholder="Buscar por nombre o sede del torneo"
           containerStyle={styles.searchBar}
         />
+
+        {defaultCountry && (
+          <View style={styles.countryToggleRow}>
+            <Pressable
+              style={[styles.countryToggleChip, countryFilterOn && styles.countryToggleChipActive]}
+              onPress={() => setCountryFilterOn(true)}
+            >
+              <Text style={[styles.countryToggleLabel, countryFilterOn && styles.countryToggleLabelActive]}>
+                {COUNTRY_LABELS[defaultCountry]}
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[styles.countryToggleChip, !countryFilterOn && styles.countryToggleChipActive]}
+              onPress={() => setCountryFilterOn(false)}
+            >
+              <Text style={[styles.countryToggleLabel, !countryFilterOn && styles.countryToggleLabelActive]}>
+                Todos
+              </Text>
+            </Pressable>
+          </View>
+        )}
 
         <Text style={styles.sectionLabel}>Torneos activos</Text>
         {visibleList === null ? (
@@ -284,6 +320,31 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     marginBottom: 24,
     gap: 8,
+  },
+  countryToggleRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 20,
+  },
+  countryToggleChip: {
+    backgroundColor: colors.panel,
+    borderRadius: 14,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  countryToggleChipActive: {
+    backgroundColor: withOpacity(colors.ballLime, 0.16),
+    borderColor: colors.ballLime,
+  },
+  countryToggleLabel: {
+    color: colors.textSoft,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  countryToggleLabelActive: {
+    color: colors.courtBlue,
   },
   tournamentList: {
     gap: 10,

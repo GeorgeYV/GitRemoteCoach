@@ -1,7 +1,7 @@
 import type { Pool, PoolClient } from 'pg';
 import { pool } from '../lib/db.js';
 import { NotFoundError } from '../lib/errors.js';
-import type { AgeCategory, Player } from '../types.js';
+import type { AgeCategory, CountryCode, Player } from '../types.js';
 
 type Queryable = Pool | PoolClient;
 
@@ -17,6 +17,7 @@ function mapPlayerRow(row: any): Player {
     fullName: row.full_name,
     birthDate: row.birth_date.toISOString().slice(0, 10),
     ageCategory: row.age_category,
+    country: row.country,
     createdAt: row.created_at,
   };
 }
@@ -40,14 +41,14 @@ export async function getById(playerId: string, db: Queryable = pool): Promise<P
 /** PlayerRegistrationScreen: crea al hijo/a del padre logueado. */
 export async function create(
   guardianUserId: string,
-  params: { fullName: string; birthDate: string; ageCategory: AgeCategory },
+  params: { fullName: string; birthDate: string; ageCategory: AgeCategory; country: CountryCode },
   db: Queryable = pool,
 ): Promise<Player> {
   const { rows } = await db.query(
-    `INSERT INTO players (guardian_user_id, full_name, birth_date, age_category)
-     VALUES ($1, $2, $3, $4)
+    `INSERT INTO players (guardian_user_id, full_name, birth_date, age_category, country)
+     VALUES ($1, $2, $3, $4, $5)
      RETURNING *`,
-    [guardianUserId, params.fullName, params.birthDate, params.ageCategory],
+    [guardianUserId, params.fullName, params.birthDate, params.ageCategory, params.country],
   );
   return mapPlayerRow(rows[0]);
 }

@@ -1,7 +1,7 @@
 import type { Pool, PoolClient } from 'pg';
 import { pool } from '../lib/db.js';
 import { NotFoundError } from '../lib/errors.js';
-import type { Club } from '../types.js';
+import type { Club, CountryCode } from '../types.js';
 
 type Queryable = Pool | PoolClient;
 
@@ -16,6 +16,7 @@ function mapRow(row: any): Club {
     name: row.name,
     type: row.type,
     city: row.city,
+    country: row.country,
     contactEmail: row.contact_email,
     contactPhone: row.contact_phone,
     defaultCommissionRate: row.default_commission_rate,
@@ -43,13 +44,20 @@ export async function getClubIdForAdminUser(userId: string, db: Queryable = pool
  * responsabilidad del caller — clubService.registerClub llama a esto y a addAdmin dentro
  * de una misma transacción (withTransaction). */
 export async function create(
-  input: { name: string; type: 'club' | 'federation'; city: string; contactEmail: string | null; contactPhone: string | null },
+  input: {
+    name: string;
+    type: 'club' | 'federation';
+    city: string;
+    country: CountryCode;
+    contactEmail: string | null;
+    contactPhone: string | null;
+  },
   db: Queryable = pool,
 ): Promise<Club> {
   const { rows } = await db.query(
-    `INSERT INTO clubs (name, type, city, contact_email, contact_phone, default_commission_rate)
-     VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-    [input.name, input.type, input.city, input.contactEmail, input.contactPhone, DEFAULT_COMMISSION_RATE],
+    `INSERT INTO clubs (name, type, city, country, contact_email, contact_phone, default_commission_rate)
+     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+    [input.name, input.type, input.city, input.country, input.contactEmail, input.contactPhone, DEFAULT_COMMISSION_RATE],
   );
   return mapRow(rows[0]);
 }

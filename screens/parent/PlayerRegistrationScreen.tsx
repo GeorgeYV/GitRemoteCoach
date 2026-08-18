@@ -4,9 +4,9 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { SafeAreaView } from 'react-native-safe-area-context';
 import IconTextInput from '../../components/shared/IconTextInput';
 import { useAuth } from '../../context/AuthContext';
-import { AgeCategory, ApiError, Player, registerPlayer } from '../../lib/api';
+import { AgeCategory, ApiError, CountryCode, Player, registerPlayer } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
-import { AGE_CATEGORY_OPTIONS } from '../../mock/coachFlow';
+import { AGE_CATEGORY_OPTIONS, COUNTRY_LABELS, COUNTRY_OPTIONS } from '../../mock/coachFlow';
 
 export default function PlayerRegistrationScreen({
   onSubmit,
@@ -19,6 +19,7 @@ export default function PlayerRegistrationScreen({
   const [fullName, setFullName] = useState('');
   const [birthDate, setBirthDate] = useState('');
   const [ageCategory, setAgeCategory] = useState<string | null>(null);
+  const [country, setCountry] = useState<CountryCode | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -27,7 +28,7 @@ export default function PlayerRegistrationScreen({
       setError('No hay una sesión activa.');
       return;
     }
-    if (!ageCategory) return;
+    if (!ageCategory || !country) return;
     setSubmitting(true);
     setError(null);
     try {
@@ -35,6 +36,7 @@ export default function PlayerRegistrationScreen({
         fullName: fullName.trim(),
         birthDate: birthDate.trim(),
         ageCategory: ageCategory as AgeCategory,
+        country,
       });
       onSubmit(player);
     } catch (err) {
@@ -44,7 +46,8 @@ export default function PlayerRegistrationScreen({
     }
   }
 
-  const canSubmit = fullName.trim().length > 0 && birthDate.trim().length > 0 && !!ageCategory && !submitting;
+  const canSubmit =
+    fullName.trim().length > 0 && birthDate.trim().length > 0 && !!ageCategory && !!country && !submitting;
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -84,6 +87,23 @@ export default function PlayerRegistrationScreen({
                   style={[styles.chip, active && styles.chipActive]}
                 >
                   <Text style={[styles.chipLabel, active && styles.chipLabelActive]}>{option}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </Section>
+
+        <Section label="País donde juega">
+          <View style={styles.chipRow}>
+            {COUNTRY_OPTIONS.map((option) => {
+              const active = country === option;
+              return (
+                <Pressable
+                  key={option}
+                  onPress={() => setCountry(option)}
+                  style={[styles.chip, active && styles.chipActive]}
+                >
+                  <Text style={[styles.chipLabel, active && styles.chipLabelActive]}>{COUNTRY_LABELS[option]}</Text>
                 </Pressable>
               );
             })}

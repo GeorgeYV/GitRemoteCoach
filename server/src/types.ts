@@ -18,6 +18,8 @@ export type TournamentStatus = 'scheduled' | 'in_progress' | 'completed' | 'canc
 export type AgeCategory = 'U10' | 'U12' | 'U14' | 'U16' | 'U18';
 export type PlayingLevel = 'recreativo' | 'competitivo' | 'alto_rendimiento';
 export type RateMode = 'per_day' | 'per_tournament';
+/** Espeja el DOMAIN country_code (db/schema.sql#35). */
+export type CountryCode = 'EC' | 'PE' | 'CO' | 'CL' | 'BO' | 'AR' | 'VE' | 'BR' | 'PY' | 'UY';
 export type ClubInvitationStatus = 'pending' | 'accepted' | 'declined';
 export type MessageSenderType = 'coach' | 'parent' | 'system';
 export type VerificationStatus = 'pending' | 'approved' | 'rejected';
@@ -131,6 +133,7 @@ export interface Club {
   name: string;
   type: 'club' | 'federation';
   city: string;
+  country: CountryCode | null;
   contactEmail: string | null;
   contactPhone: string | null;
   defaultCommissionRate: string;
@@ -146,6 +149,8 @@ export interface Player {
   /** DATE column normalizado a YYYY-MM-DD en el repositorio — ver playerRepository.mapPlayerRow. */
   birthDate: string;
   ageCategory: AgeCategory;
+  /** País donde juega — default del filtro "mi país" en ParentHomeScreen. */
+  country: CountryCode | null;
   createdAt: string;
 }
 
@@ -154,6 +159,8 @@ export interface CoachProfile {
   fullName: string;
   city: string;
   region: string | null;
+  /** País donde entrena — default del filtro "mi país" en CoachTournamentSearchScreen. */
+  country: CountryCode | null;
   photoUrl: string | null;
   yearsExperience: number;
   specialty: string | null;
@@ -229,6 +236,7 @@ export interface TournamentSearchResult {
   name: string;
   venue: string;
   city: string;
+  country: CountryCode | null;
   startDate: string;
   endDate: string;
 }

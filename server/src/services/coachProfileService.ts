@@ -7,6 +7,7 @@ import type {
   CoachSearchResult,
   CoachVerificationDocument,
   CoachVerificationDocumentWithCoachName,
+  CountryCode,
   PlayingLevel,
   VerificationDocType,
 } from '../types.js';
@@ -43,6 +44,7 @@ export async function registerCoachProfile(
   params: {
     city: string;
     region: string | null;
+    country: CountryCode;
     yearsExperience: number;
     specialty: string | null;
     hourlyRate: number;
@@ -57,6 +59,7 @@ export async function registerCoachProfile(
       {
         city: params.city,
         region: params.region,
+        country: params.country,
         yearsExperience: params.yearsExperience,
         specialty: params.specialty,
         hourlyRate: params.hourlyRate,

@@ -9,6 +9,7 @@ import { ForbiddenError, ValidationError } from '../lib/errors.js';
 const AGE_CATEGORIES = ['U10', 'U12', 'U14', 'U16', 'U18'] as const;
 const PLAYING_LEVELS = ['recreativo', 'competitivo', 'alto_rendimiento'] as const;
 const VERIFICATION_DOC_TYPES = ['identity', 'background_check', 'certification', 'club_reference'] as const;
+const COUNTRY_CODES = ['EC', 'PE', 'CO', 'CL', 'BO', 'AR', 'VE', 'BR', 'PY', 'UY'] as const;
 
 const updateTrainingSchema = z.object({
   ageCategories: z.array(z.enum(AGE_CATEGORIES)),
@@ -18,6 +19,7 @@ const updateTrainingSchema = z.object({
 const registerCoachSchema = z.object({
   city: z.string().min(1),
   region: z.string().min(1).optional(),
+  country: z.enum(COUNTRY_CODES),
   yearsExperience: z.number().int().min(0),
   specialty: z.string().min(1).optional(),
   hourlyRate: z.number().min(0),
@@ -45,6 +47,7 @@ export async function coachRoutes(app: FastifyInstance): Promise<void> {
     const profile = await coachProfileService.registerCoachProfile(sub, {
       city: parsed.data.city,
       region: parsed.data.region ?? null,
+      country: parsed.data.country,
       yearsExperience: parsed.data.yearsExperience,
       specialty: parsed.data.specialty ?? null,
       hourlyRate: parsed.data.hourlyRate,

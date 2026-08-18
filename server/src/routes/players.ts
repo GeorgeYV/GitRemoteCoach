@@ -4,11 +4,13 @@ import * as playerService from '../services/playerService.js';
 import { ValidationError } from '../lib/errors.js';
 
 const AGE_CATEGORIES = ['U10', 'U12', 'U14', 'U16', 'U18'] as const;
+const COUNTRY_CODES = ['EC', 'PE', 'CO', 'CL', 'BO', 'AR', 'VE', 'BR', 'PY', 'UY'] as const;
 
 const registerPlayerSchema = z.object({
   fullName: z.string().min(1),
   birthDate: z.string().date(),
   ageCategory: z.enum(AGE_CATEGORIES),
+  country: z.enum(COUNTRY_CODES),
 });
 
 export async function playerRoutes(app: FastifyInstance): Promise<void> {
