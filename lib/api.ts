@@ -607,6 +607,19 @@ export function registerPlayer(
   });
 }
 
+/** PUT /players/:id — ParentProfileScreen "Editar jugador". */
+export function updatePlayer(
+  authToken: string,
+  playerId: string,
+  params: { fullName: string; birthDate: string; ageCategory: AgeCategory; country: CountryCode },
+): Promise<Player> {
+  return request(`/players/${playerId}`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${authToken}` },
+    body: JSON.stringify(params),
+  });
+}
+
 export type RateMode = 'per_day' | 'per_tournament';
 
 export interface CoachTournamentAvailability {

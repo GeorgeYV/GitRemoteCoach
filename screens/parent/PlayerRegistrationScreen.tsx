@@ -4,22 +4,25 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { SafeAreaView } from 'react-native-safe-area-context';
 import IconTextInput from '../../components/shared/IconTextInput';
 import { useAuth } from '../../context/AuthContext';
-import { AgeCategory, ApiError, CountryCode, Player, registerPlayer } from '../../lib/api';
+import { AgeCategory, ApiError, CountryCode, Player, registerPlayer, updatePlayer } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
 import { AGE_CATEGORY_OPTIONS, COUNTRY_LABELS, COUNTRY_OPTIONS } from '../../mock/coachFlow';
 
 export default function PlayerRegistrationScreen({
+  player,
   onSubmit,
   onBack,
 }: {
+  /** Si viene seteado, la pantalla edita este jugador (PUT) en vez de crear uno nuevo (POST). */
+  player?: Player;
   onSubmit: (player: Player) => void;
   onBack?: () => void;
 }) {
   const { token } = useAuth();
-  const [fullName, setFullName] = useState('');
-  const [birthDate, setBirthDate] = useState('');
-  const [ageCategory, setAgeCategory] = useState<string | null>(null);
-  const [country, setCountry] = useState<CountryCode | null>(null);
+  const [fullName, setFullName] = useState(player?.fullName ?? '');
+  const [birthDate, setBirthDate] = useState(player?.birthDate ?? '');
+  const [ageCategory, setAgeCategory] = useState<string | null>(player?.ageCategory ?? null);
+  const [country, setCountry] = useState<CountryCode | null>(player?.country ?? null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -31,16 +34,21 @@ export default function PlayerRegistrationScreen({
     if (!ageCategory || !country) return;
     setSubmitting(true);
     setError(null);
+    const params = {
+      fullName: fullName.trim(),
+      birthDate: birthDate.trim(),
+      ageCategory: ageCategory as AgeCategory,
+      country,
+    };
     try {
-      const player = await registerPlayer(token, {
-        fullName: fullName.trim(),
-        birthDate: birthDate.trim(),
-        ageCategory: ageCategory as AgeCategory,
-        country,
-      });
-      onSubmit(player);
+      const result = player ? await updatePlayer(token, player.id, params) : await registerPlayer(token, params);
+      onSubmit(result);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'No se pudo registrar a tu hijo/a. Intenta de nuevo.');
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : `No se pudo ${player ? 'guardar los cambios' : 'registrar a tu hijo/a'}. Intenta de nuevo.`,
+      );
     } finally {
       setSubmitting(false);
     }
@@ -58,9 +66,11 @@ export default function PlayerRegistrationScreen({
           </Pressable>
         )}
         <View style={styles.headerText}>
-          <Text style={styles.headerTitle}>Registra a tu hijo/a</Text>
+          <Text style={styles.headerTitle}>{player ? 'Editar jugador' : 'Registra a tu hijo/a'}</Text>
           <Text style={styles.headerSubtitle}>
-            Lo necesitamos para poder reservar sesiones a su nombre con los entrenadores.
+            {player
+              ? 'Actualiza los datos de tu hijo/a.'
+              : 'Lo necesitamos para poder reservar sesiones a su nombre con los entrenadores.'}
           </Text>
         </View>
       </View>
@@ -122,8 +132,8 @@ export default function PlayerRegistrationScreen({
             <ActivityIndicator color={colors.courtBlueDeep} />
           ) : (
             <View style={styles.submitContent}>
-              <Text style={styles.submitLabel}>Continuar</Text>
-              <Ionicons name="arrow-forward-outline" size={18} color={colors.courtBlueDeep} />
+              <Text style={styles.submitLabel}>{player ? 'Guardar cambios' : 'Continuar'}</Text>
+              <Ionicons name={player ? 'checkmark-outline' : 'arrow-forward-outline'} size={18} color={colors.courtBlueDeep} />
             </View>
           )}
         </Pressable>

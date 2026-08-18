@@ -11,3 +11,10 @@ export async function registerPlayer(
 ): Promise<Player> {
   return playerRepository.create(guardianUserId, params);
 }
+
+export async function updatePlayer(
+  playerId: string,
+  params: { fullName: string; birthDate: string; ageCategory: AgeCategory; country: CountryCode },
+): Promise<Player> {
+  return playerRepository.update(playerId, params);
+}

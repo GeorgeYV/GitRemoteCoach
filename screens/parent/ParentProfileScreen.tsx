@@ -7,6 +7,7 @@ import InitialAvatar from '../../components/shared/InitialAvatar';
 import { useAuth } from '../../context/AuthContext';
 import { ApiError, listPlayers, Player } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
+import { COUNTRY_LABELS } from '../../mock/coachFlow';
 import PlayerRegistrationScreen from './PlayerRegistrationScreen';
 
 const AGE_CATEGORY_LABELS: Record<string, string> = {
@@ -22,6 +23,7 @@ export default function ParentProfileScreen() {
   const [players, setPlayers] = useState<Player[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showRegistration, setShowRegistration] = useState(false);
+  const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
 
   useEffect(() => {
     if (!token) {
@@ -45,13 +47,20 @@ export default function ParentProfileScreen() {
 
   const firstInitial = user?.fullName[0] ?? '?';
 
-  if (showRegistration) {
+  if (showRegistration || editingPlayer) {
     return (
       <PlayerRegistrationScreen
-        onBack={() => setShowRegistration(false)}
-        onSubmit={(player) => {
-          setPlayers((prev) => [...(prev ?? []), player]);
+        player={editingPlayer ?? undefined}
+        onBack={() => {
           setShowRegistration(false);
+          setEditingPlayer(null);
+        }}
+        onSubmit={(player) => {
+          setPlayers((prev) =>
+            editingPlayer ? (prev?.map((p) => (p.id === player.id ? player : p)) ?? null) : [...(prev ?? []), player],
+          );
+          setShowRegistration(false);
+          setEditingPlayer(null);
         }}
       />
     );
@@ -93,8 +102,12 @@ export default function ParentProfileScreen() {
                     <Text style={styles.playerName}>{player.fullName}</Text>
                     <Text style={styles.playerMeta}>
                       {AGE_CATEGORY_LABELS[player.ageCategory] ?? player.ageCategory} · {player.birthDate}
+                      {player.country ? ` · ${COUNTRY_LABELS[player.country]}` : ''}
                     </Text>
                   </View>
+                  <Pressable style={styles.editButton} onPress={() => setEditingPlayer(player)}>
+                    <Ionicons name="pencil-outline" size={16} color={colors.textDim} />
+                  </Pressable>
                 </View>
               ))}
             </View>
@@ -235,6 +248,9 @@ const styles = StyleSheet.create({
   playerMeta: {
     color: colors.textDim,
     fontSize: 12,
+  },
+  editButton: {
+    padding: 6,
   },
   logoutButton: {
     flexDirection: 'row',
