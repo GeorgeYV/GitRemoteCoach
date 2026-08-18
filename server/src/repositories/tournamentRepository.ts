@@ -16,11 +16,14 @@ function mapSearchRow(row: any): TournamentSearchResult {
   };
 }
 
-/** CoachTournamentSearchScreen: descubrimiento público de torneos activos — mismo patrón de
- * condiciones ILIKE que coachRepository.search. Solo 'scheduled'/'in_progress' (idx_tournaments_active),
- * así un torneo ya completado no aparece como opción para ofrecerse. */
+/** CoachTournamentSearchScreen/ParentHomeScreen: descubrimiento público de torneos activos —
+ * mismo patrón de condiciones ILIKE que coachRepository.search. status IN ('scheduled',
+ * 'in_progress') (idx_tournaments_active) es la intención original, pero nada en la app todavía
+ * transiciona el status de un torneo (sin job ni endpoint que lo mueva a 'completed'/'cancelled'),
+ * así que por sí solo nunca excluye nada — nos apoyamos también en end_date para no listar
+ * torneos cuyas fechas ya pasaron. */
 export async function search(params: { query?: string }, db: Queryable = pool): Promise<TournamentSearchResult[]> {
-  const conditions: string[] = [`t.status IN ('scheduled', 'in_progress')`];
+  const conditions: string[] = [`t.status IN ('scheduled', 'in_progress')`, `t.end_date >= CURRENT_DATE`];
   const values: unknown[] = [];
 
   if (params.query) {
