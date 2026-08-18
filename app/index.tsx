@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -105,7 +106,8 @@ export default function AuthenticatedHome() {
     <View style={styles.container}>
       <RoleHome user={user} />
       {showLogoutChip && (
-        <Pressable style={[styles.logoutChip, { top: insets.top + 8 }]} onPress={logout}>
+        <Pressable style={[styles.logoutChip, { bottom: insets.bottom + 12 }]} onPress={logout}>
+          <Ionicons name="log-out-outline" size={16} color={colors.textSoft} />
           <Text style={styles.logoutChipLabel}>Salir</Text>
         </Pressable>
       )}
@@ -131,11 +133,15 @@ const styles = StyleSheet.create({
   },
   logoutChip: {
     position: 'absolute',
+    left: 16,
     right: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
     backgroundColor: colors.panel,
     borderRadius: radius,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
+    paddingVertical: 12,
     borderWidth: 1,
     borderColor: colors.border,
   },

@@ -90,7 +90,8 @@ export default function ClubHomeScreen({
           </View>
           {onOpenProfile && (
             <Pressable style={styles.editButton} onPress={onOpenProfile}>
-              <Ionicons name="pencil-outline" size={16} color={colors.textDim} />
+              <Ionicons name="pencil-outline" size={14} color={colors.textDim} />
+              <Text style={styles.editButtonLabel}>Editar</Text>
             </Pressable>
           )}
         </View>
@@ -142,7 +143,19 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   editButton: {
-    padding: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  editButtonLabel: {
+    color: colors.textDim,
+    fontSize: 12,
+    fontWeight: '700',
   },
   headerTitle: {
     color: colors.lineWhite,
