@@ -229,12 +229,16 @@ const styles = StyleSheet.create({
   },
   daysGrid: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 6,
+    flexWrap: 'wrap',
+    justifyContent: 'flex-start',
+    rowGap: 14,
+    columnGap: 6,
     marginBottom: 12,
   },
   dayColumn: {
-    flex: 1,
+    // Máximo 5 columnas por fila (mismo criterio que TrainerProfileScreen#availabilityColumn) —
+    // 18% en vez de 100/5=20% para dejarle margen a columnGap y que el 6to día efectivamente baje.
+    width: '18%',
   },
   dayLabel: {
     color: colors.textDim,

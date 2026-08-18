@@ -466,11 +466,15 @@ const styles = StyleSheet.create({
   },
   availabilityGrid: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 6,
+    flexWrap: 'wrap',
+    justifyContent: 'flex-start',
+    rowGap: 14,
+    columnGap: 6,
   },
   availabilityColumn: {
-    flex: 1,
+    // Máximo 5 columnas por fila (torneos largos ya no se aprietan en una sola línea) — 18%
+    // en vez de 100/5=20% para dejarle margen a columnGap y que el 6to día efectivamente baje.
+    width: '18%',
   },
   availabilityDay: {
     color: colors.textDim,
