@@ -6,40 +6,51 @@ import TrainerAvatarPlaceholder from '../../components/shared/TrainerAvatarPlace
 import { useAuth } from '../../context/AuthContext';
 import { AlternativeCoach, ApiError, Booking, getBooking, getBookingAlternatives, TournamentSearchResult } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
-import { BookingSlotSelection } from '../../mock/parentFlow';
 
-const ALTERNATIVES_STATUSES: Booking['status'][] = ['rejected', 'expired'];
+export interface StatusDayBooking {
+  bookingId: string;
+  dayLabel: string;
+  price: number;
+}
 
 /** El coach normalmente responde en minutos, pero la ventana real es de horas — pollear cada 4s alcanza para la demo. */
 const POLL_INTERVAL_MS = 4000;
 const WAITING_STATUSES: Booking['status'][] = ['requested'];
-const TERMINAL_NEGATIVE_STATUSES: Booking['status'][] = ['rejected', 'expired', 'cancelled', 'payment_failed'];
+const DAY_STATUS_LABELS: Record<Booking['status'], string> = {
+  requested: 'Por confirmar',
+  accepted: 'Aceptado',
+  paid: 'Aceptado',
+  completed: 'Aceptado',
+  rejected: 'Rechazado',
+  expired: 'Expiró',
+  cancelled: 'Cancelado',
+  payment_failed: 'Aceptado',
+};
 
 export default function BookingStatusScreen({
-  bookingId,
-  selection,
+  bookings,
   trainerName,
   tournament,
-  price,
   onAccepted,
   onDone,
   onSelectAlternative,
 }: {
-  bookingId: string;
-  selection: BookingSlotSelection;
+  bookings: StatusDayBooking[];
   trainerName: string;
   tournament: TournamentSearchResult;
-  price: number;
-  /** Se llama una sola vez, la primera vez que el estado real pasa a 'accepted', para continuar a pago. */
-  onAccepted: () => void;
+  /** Se llama una sola vez, cuando todos los días ya fueron decididos y al menos uno fue
+   * aceptado — solo los días aceptados se cobran (ver decisión de negocio). */
+  onAccepted: (accepted: StatusDayBooking[]) => void;
   onDone: () => void;
-  /** Reserva 'rejected' o 'expired': el padre eligió una alternativa sugerida para empezar de nuevo con ese coach. */
+  /** Ningún día fue aceptado: el padre eligió una alternativa sugerida para empezar de nuevo con ese coach. */
   onSelectAlternative?: (coachId: string) => void;
 }) {
   const { token } = useAuth();
-  const [booking, setBooking] = useState<Booking | null>(null);
+  const [statusById, setStatusById] = useState<Record<string, Booking>>({});
   const [error, setError] = useState<string | null>(null);
   const [alternatives, setAlternatives] = useState<AlternativeCoach[] | null>(null);
+
+  const bookingIdsKey = bookings.map((b) => b.bookingId).join(',');
 
   useEffect(() => {
     if (!token) {
@@ -51,11 +62,15 @@ export default function BookingStatusScreen({
 
     async function poll() {
       try {
-        const result = await getBooking(token!, bookingId);
+        const results = await Promise.all(bookings.map((b) => getBooking(token!, b.bookingId)));
         if (cancelled) return;
-        setBooking(result);
+        const next: Record<string, Booking> = {};
+        results.forEach((result, i) => {
+          next[bookings[i].bookingId] = result;
+        });
+        setStatusById(next);
         setError(null);
-        if (WAITING_STATUSES.includes(result.status)) {
+        if (results.some((result) => WAITING_STATUSES.includes(result.status))) {
           timer = setTimeout(poll, POLL_INTERVAL_MS);
         }
       } catch (err) {
@@ -71,37 +86,43 @@ export default function BookingStatusScreen({
       clearTimeout(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bookingId]);
+  }, [bookingIdsKey]);
+
+  const allLoaded = bookings.every((b) => statusById[b.bookingId]);
+  const anyWaiting = bookings.some((b) => WAITING_STATUSES.includes(statusById[b.bookingId]?.status));
+  const allDecided = allLoaded && !anyWaiting;
+  const acceptedBookings = bookings.filter((b) => statusById[b.bookingId]?.status === 'accepted');
+  const noneAccepted = allDecided && acceptedBookings.length === 0;
 
   useEffect(() => {
-    if (!token || !booking || !ALTERNATIVES_STATUSES.includes(booking.status)) return;
+    if (!token || !noneAccepted) return;
     let cancelled = false;
-    getBookingAlternatives(token, bookingId).then((result) => {
+    getBookingAlternatives(token, bookings[0].bookingId).then((result) => {
       if (!cancelled) setAlternatives(result);
     });
     return () => {
       cancelled = true;
     };
-  }, [token, bookingId, booking?.status]);
-
-  const negative = booking && TERMINAL_NEGATIVE_STATUSES.includes(booking.status);
-  const confirmed = booking?.status === 'paid' || booking?.status === 'completed';
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, noneAccepted]);
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <ScrollView contentContainerStyle={styles.content}>
-        <View style={[styles.statusCard, confirmed && styles.statusCardConfirmed, negative && styles.statusCardNegative]}>
-          {!booking && !error && <ActivityIndicator color={colors.courtBlue} style={styles.statusSpinner} />}
+        <View style={[styles.statusCard, allDecided && acceptedBookings.length > 0 && styles.statusCardConfirmed, noneAccepted && styles.statusCardNegative]}>
+          {!allLoaded && !error && <ActivityIndicator color={colors.courtBlue} style={styles.statusSpinner} />}
           <Text
             style={[
               styles.statusEyebrow,
-              confirmed && styles.statusEyebrowConfirmed,
-              negative && styles.statusEyebrowNegative,
+              allDecided && acceptedBookings.length > 0 && styles.statusEyebrowConfirmed,
+              noneAccepted && styles.statusEyebrowNegative,
             ]}
           >
-            {statusTitle(booking, error)}
+            {statusTitle(allLoaded, error, allDecided, acceptedBookings.length, bookings.length)}
           </Text>
-          <Text style={styles.statusBody}>{statusBody(booking, error, trainerName.split(' ')[0])}</Text>
+          <Text style={styles.statusBody}>
+            {statusBody(allLoaded, error, allDecided, acceptedBookings.length, bookings.length, trainerName.split(' ')[0])}
+          </Text>
         </View>
 
         <Section label="Detalle de la reserva">
@@ -114,16 +135,18 @@ export default function BookingStatusScreen({
               </View>
             </View>
             <View style={styles.detailDivider} />
-            <DetailLine label="Día" value={selection.dayLabel} />
             <DetailLine label="Sede" value={tournament.venue} />
-            <DetailLine
-              label={booking?.totalAmountPaid ? 'Total pagado' : 'Tarifa acordada'}
-              value={`$${booking?.totalAmountPaid ?? price}`}
-            />
+            {bookings.map((b) => (
+              <DetailLine
+                key={b.bookingId}
+                label={b.dayLabel}
+                value={statusById[b.bookingId] ? DAY_STATUS_LABELS[statusById[b.bookingId].status] : 'Consultando…'}
+              />
+            ))}
           </View>
         </Section>
 
-        {booking && ALTERNATIVES_STATUSES.includes(booking.status) && (alternatives === null || alternatives.length > 0) && (
+        {noneAccepted && (alternatives === null || alternatives.length > 0) && (
           <Section label="Otros entrenadores en este torneo">
             {alternatives === null ? (
               <ActivityIndicator color={colors.courtBlue} />
@@ -150,8 +173,8 @@ export default function BookingStatusScreen({
       </ScrollView>
 
       <View style={styles.footer}>
-        {booking?.status === 'accepted' ? (
-          <Pressable style={styles.doneButton} onPress={onAccepted}>
+        {allDecided && acceptedBookings.length > 0 ? (
+          <Pressable style={styles.doneButton} onPress={() => onAccepted(acceptedBookings)}>
             <View style={styles.doneContent}>
               <Ionicons name="arrow-forward-outline" size={17} color={colors.courtBlueDeep} />
               <Text style={styles.doneLabel}>Continuar a pago</Text>
@@ -170,52 +193,43 @@ export default function BookingStatusScreen({
   );
 }
 
-function statusTitle(booking: Booking | null, error: string | null): string {
-  if (error && !booking) return 'No se pudo cargar';
-  if (!booking) return 'Consultando tu solicitud…';
-  switch (booking.status) {
-    case 'requested':
-      return 'Solicitud enviada';
-    case 'accepted':
-      return '¡Buenas noticias!';
-    case 'paid':
-    case 'completed':
-      return '¡Reserva confirmada!';
-    case 'rejected':
-      return 'Solicitud rechazada';
-    case 'expired':
-      return 'La solicitud expiró';
-    case 'cancelled':
-      return 'Reserva cancelada';
-    case 'payment_failed':
-      return 'El pago no se completó';
-    default:
-      return 'Estado de la reserva';
-  }
+function statusTitle(
+  allLoaded: boolean,
+  error: string | null,
+  allDecided: boolean,
+  acceptedCount: number,
+  totalCount: number,
+): string {
+  if (error && !allLoaded) return 'No se pudo cargar';
+  if (!allLoaded) return 'Consultando tu solicitud…';
+  if (!allDecided) return 'Solicitud enviada';
+  if (acceptedCount === 0) return totalCount > 1 ? 'Solicitudes rechazadas' : 'Solicitud rechazada';
+  if (acceptedCount === totalCount) return '¡Buenas noticias!';
+  return '¡Buenas noticias parciales!';
 }
 
-function statusBody(booking: Booking | null, error: string | null, coachFirstName: string): string {
-  if (error && !booking) return error;
-  if (!booking) return 'Un momento…';
-  switch (booking.status) {
-    case 'requested':
-      return `Esperando que ${coachFirstName} acepte tu solicitud. Normalmente responde en menos de 30 minutos.`;
-    case 'accepted':
-      return `${coachFirstName} aceptó tu solicitud. Continúa para completar el pago.`;
-    case 'paid':
-    case 'completed':
-      return `${coachFirstName} confirmó tu solicitud. Te avisaremos cuando comparta el punto de encuentro exacto.`;
-    case 'rejected':
-      return `${coachFirstName} no pudo aceptar esta solicitud. Busca otro entrenador disponible.`;
-    case 'expired':
-      return `${coachFirstName} no respondió a tiempo. Intenta reservar con otro entrenador.`;
-    case 'cancelled':
-      return 'Esta reserva fue cancelada.';
-    case 'payment_failed':
-      return 'La pasarela de pago rechazó el cargo. Intenta con otro método de pago.';
-    default:
-      return '';
+function statusBody(
+  allLoaded: boolean,
+  error: string | null,
+  allDecided: boolean,
+  acceptedCount: number,
+  totalCount: number,
+  coachFirstName: string,
+): string {
+  if (error && !allLoaded) return error;
+  if (!allLoaded) return 'Un momento…';
+  if (!allDecided) {
+    return totalCount > 1
+      ? `Esperando que ${coachFirstName} responda cada día. Normalmente responde en menos de 30 minutos.`
+      : `Esperando que ${coachFirstName} acepte tu solicitud. Normalmente responde en menos de 30 minutos.`;
   }
+  if (acceptedCount === 0) {
+    return `${coachFirstName} no pudo aceptar esta solicitud. Busca otro entrenador disponible.`;
+  }
+  if (acceptedCount === totalCount) {
+    return `${coachFirstName} aceptó tu solicitud. Continúa para completar el pago.`;
+  }
+  return `${coachFirstName} aceptó ${acceptedCount} de ${totalCount} días. Solo se te cobrará por los días aceptados.`;
 }
 
 function Section({ label, children }: { label: string; children: React.ReactNode }) {

@@ -27,10 +27,10 @@ import {
   TournamentSummary,
 } from '../lib/api';
 import { isUpcoming, toCoachBooking } from '../lib/coachBookingDisplay';
+import { RateMode } from '../lib/api';
 import { mockMatchConfig, mockRoundLabel } from '../mock/players';
 import {
   AvailabilityDay,
-  BookingSlotSelection,
   mockCarlosMedinaProfile,
   REAL_COMPLETED_BOOKING_ID,
 } from '../mock/parentFlow';
@@ -54,9 +54,9 @@ import CoachSessionHistoryScreen from './coach/CoachSessionHistoryScreen';
 import CoachTournamentSearchScreen from './coach/CoachTournamentSearchScreen';
 import TrainerListScreen from './parent/TrainerListScreen';
 import TrainerProfileScreen from './parent/TrainerProfileScreen';
-import BookingConfirmScreen from './parent/BookingConfirmScreen';
+import BookingConfirmScreen, { CreatedDayBooking } from './parent/BookingConfirmScreen';
 import BookingPaymentScreen from './parent/BookingPaymentScreen';
-import BookingStatusScreen from './parent/BookingStatusScreen';
+import BookingStatusScreen, { StatusDayBooking } from './parent/BookingStatusScreen';
 import ClubHomeScreen from './club/ClubHomeScreen';
 import ClubSettlementsScreen from './club/ClubSettlementsScreen';
 import ClubTournamentListScreen from './club/ClubTournamentListScreen';
@@ -104,6 +104,7 @@ interface SelectedTrainer {
   coachId: string;
   name: string;
   price: number;
+  rateMode: RateMode;
   availability: AvailabilityDay[];
 }
 
@@ -115,9 +116,11 @@ export function ParentBookingFlow({ initialTournamentId }: { initialTournamentId
   const [tournamentError, setTournamentError] = useState(false);
   const [coachId, setCoachId] = useState<string | null>(null);
   const [selectedTrainer, setSelectedTrainer] = useState<SelectedTrainer | null>(null);
-  const [selection, setSelection] = useState<BookingSlotSelection | null>(null);
+  // Reservas creadas al confirmar (una por día elegido); solo el subconjunto aceptado por el
+  // coach (payableBookings) es lo que efectivamente se cobra en BookingPaymentScreen.
+  const [createdBookings, setCreatedBookings] = useState<CreatedDayBooking[]>([]);
+  const [payableBookings, setPayableBookings] = useState<StatusDayBooking[]>([]);
   const [note, setNote] = useState('');
-  const [bookingId, setBookingId] = useState<string | null>(null);
   // undefined = todavía resolviendo; luego queda la lista real (puede estar vacía).
   const [players, setPlayers] = useState<Player[] | undefined>(undefined);
   // A quién se le reserva. Se autocompleta cuando solo hay un hijo/a; con 2+ hay que elegir
@@ -256,12 +259,12 @@ export function ParentBookingFlow({ initialTournamentId }: { initialTournamentId
         tournament={tournament}
         trainerName={selectedTrainer.name}
         price={selectedTrainer.price}
+        rateMode={selectedTrainer.rateMode}
         availability={selectedTrainer.availability}
         onBack={() => setStep('profile')}
-        onContinue={(nextSelection, nextNote, nextBookingId) => {
-          setSelection(nextSelection);
+        onContinue={(created, nextNote) => {
+          setCreatedBookings(created);
           setNote(nextNote);
-          setBookingId(nextBookingId);
           setStep('status');
         }}
       />
@@ -269,36 +272,36 @@ export function ParentBookingFlow({ initialTournamentId }: { initialTournamentId
   }
 
   if (step === 'status') {
-    if (!selection || !bookingId || !selectedTrainer) return null;
+    if (createdBookings.length === 0 || !selectedTrainer) return null;
     return (
       <BookingStatusScreen
-        bookingId={bookingId}
-        selection={selection}
+        bookings={createdBookings}
         trainerName={selectedTrainer.name}
         tournament={tournament}
-        price={selectedTrainer.price}
-        onAccepted={() => setStep('payment')}
+        onAccepted={(accepted) => {
+          setPayableBookings(accepted);
+          setStep('payment');
+        }}
         onDone={() => setStep('profile')}
         onSelectAlternative={(nextCoachId) => {
           setCoachId(nextCoachId);
           setSelectedTrainer(null);
+          setCreatedBookings([]);
           setStep('profile');
         }}
       />
     );
   }
 
-  if (!selection || !bookingId || !selectedTrainer) return null;
+  if (payableBookings.length === 0 || !selectedTrainer) return null;
 
   return (
     <BookingPaymentScreen
-      bookingId={bookingId}
-      dateTimeLabel={selection.dayLabel}
+      bookings={payableBookings}
       venue={tournament.venue}
       note={note}
       trainerName={selectedTrainer.name}
       tournamentName={tournament.name}
-      price={selectedTrainer.price}
       onBack={() => setStep('status')}
       onConfirm={() => setStep('status')}
     />

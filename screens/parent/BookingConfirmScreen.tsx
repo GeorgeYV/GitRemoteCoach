@@ -5,9 +5,16 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import IconTextInput from '../../components/shared/IconTextInput';
 import TrainerAvatarPlaceholder from '../../components/shared/TrainerAvatarPlaceholder';
 import { useAuth } from '../../context/AuthContext';
-import { ApiError, requestBooking, TournamentSearchResult } from '../../lib/api';
+import { ApiError, RateMode, requestBooking, TournamentSearchResult } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
-import { AvailabilityDay, BookingSlotSelection, buildMatchDatetime } from '../../mock/parentFlow';
+import { AvailabilityDay, buildMatchDatetime } from '../../mock/parentFlow';
+
+export interface CreatedDayBooking {
+  bookingId: string;
+  dayLabel: string;
+  isoDate: string;
+  price: number;
+}
 
 export default function BookingConfirmScreen({
   playerId,
@@ -16,6 +23,7 @@ export default function BookingConfirmScreen({
   tournament,
   trainerName,
   price,
+  rateMode,
   availability,
   onBack,
   onContinue,
@@ -26,46 +34,85 @@ export default function BookingConfirmScreen({
   tournament: TournamentSearchResult;
   trainerName: string;
   price: number;
+  rateMode: RateMode;
   availability: AvailabilityDay[];
   onBack: () => void;
-  onContinue: (selection: BookingSlotSelection, note: string, bookingId: string) => void;
+  onContinue: (created: CreatedDayBooking[], note: string) => void;
 }) {
   const { token } = useAuth();
-  const [selection, setSelection] = useState<BookingSlotSelection | null>(null);
+  const [selectedIsoDates, setSelectedIsoDates] = useState<Set<string>>(new Set());
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Reservas ya creadas en el servidor en un intento previo — se preservan entre reintentos
+  // (ver handleContinue) para no perder de vista una solicitud real si otro día falla.
+  const [created, setCreated] = useState<CreatedDayBooking[]>([]);
 
-  function selectDay(day: AvailabilityDay) {
-    setSelection({ dayLabel: day.dayLabel, isoDate: day.isoDate });
+  function toggleDay(day: AvailabilityDay) {
+    if (created.length > 0) return; // días ya bloqueados una vez que hay reservas reales creadas
+    setSelectedIsoDates((prev) => {
+      const next = new Set(prev);
+      if (next.has(day.isoDate)) next.delete(day.isoDate);
+      else next.add(day.isoDate);
+      return next;
+    });
   }
 
+  const selectedDays = availability
+    .filter((day) => selectedIsoDates.has(day.isoDate))
+    .sort((a, b) => a.isoDate.localeCompare(b.isoDate));
+
+  // 'per_tournament' se cobra una sola vez sin importar cuántos días se reserven; 'per_day'
+  // multiplica por la cantidad de días elegidos.
+  const total = rateMode === 'per_tournament' ? price : price * selectedDays.length;
+
   async function handleContinue() {
-    if (!selection) return;
+    if (selectedDays.length === 0) return;
     if (!token) {
       setError('No hay una sesión activa.');
       return;
     }
     setSubmitting(true);
     setError(null);
-    try {
-      const booking = await requestBooking(token, {
-        playerId,
-        coachId,
-        tournamentId: tournament.id,
-        matchDatetime: buildMatchDatetime(selection),
-        agreedRate: price,
-        note: note.trim() || undefined,
-      });
-      onContinue(selection, note.trim(), booking.id);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'No se pudo enviar la solicitud. Intenta de nuevo.');
-    } finally {
-      setSubmitting(false);
+
+    const alreadyCreated = new Set(created.map((c) => c.isoDate));
+    const pendingDays = selectedDays.filter((day) => !alreadyCreated.has(day.isoDate));
+    const newlyCreated: CreatedDayBooking[] = [];
+    const failedDayLabels: string[] = [];
+
+    for (const day of pendingDays) {
+      // Con 'per_tournament', solo el primer día (cronológicamente) de la selección carga el
+      // monto total; el resto queda en $0 para que la suma real cobrada siga siendo el total.
+      const isFirstDay = selectedDays[0].isoDate === day.isoDate;
+      const dayPrice = rateMode === 'per_tournament' ? (isFirstDay ? price : 0) : price;
+      try {
+        const booking = await requestBooking(token, {
+          playerId,
+          coachId,
+          tournamentId: tournament.id,
+          matchDatetime: buildMatchDatetime(day),
+          agreedRate: dayPrice,
+          note: note.trim() || undefined,
+        });
+        newlyCreated.push({ bookingId: booking.id, dayLabel: day.dayLabel, isoDate: day.isoDate, price: dayPrice });
+      } catch (err) {
+        failedDayLabels.push(day.dayLabel);
+      }
     }
+
+    const allCreated = [...created, ...newlyCreated];
+    setCreated(allCreated);
+    setSubmitting(false);
+
+    if (failedDayLabels.length > 0) {
+      setError(`No se pudo solicitar: ${failedDayLabels.join(', ')}. Vuelve a intentar.`);
+      return;
+    }
+    onContinue(allCreated, note.trim());
   }
 
-  const canContinue = selection !== null && !submitting;
+  const canContinue = selectedDays.length > 0 && !submitting;
+  const daysLocked = created.length > 0;
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -90,10 +137,10 @@ export default function BookingConfirmScreen({
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        <Section label="Elige el día">
+        <Section label="Elige uno o más días">
           <View style={styles.daysGrid}>
             {availability.map((day) => {
-              const active = selection?.dayLabel === day.dayLabel;
+              const active = selectedIsoDates.has(day.isoDate);
               const exception = day.available && day.unavailableFrom && day.unavailableTo
                 ? `No disp. ${day.unavailableFrom}–${day.unavailableTo}`
                 : null;
@@ -102,8 +149,8 @@ export default function BookingConfirmScreen({
                   <Text style={styles.dayLabel}>{day.dayLabel}</Text>
                   {day.isPreTournament && <Text style={styles.dayPreTag}>Previo</Text>}
                   <Pressable
-                    disabled={!day.available}
-                    onPress={() => selectDay(day)}
+                    disabled={!day.available || daysLocked}
+                    onPress={() => toggleDay(day)}
                     style={[
                       styles.slotPill,
                       !day.available && styles.slotPillDisabled,
@@ -126,7 +173,9 @@ export default function BookingConfirmScreen({
             })}
           </View>
           <Text style={styles.hint}>
-            {selection ? selection.dayLabel : 'Elige un día disponible para continuar'}
+            {selectedDays.length > 0
+              ? selectedDays.map((d) => d.dayLabel).join(', ')
+              : 'Elige uno o más días disponibles para continuar'}
           </Text>
         </Section>
 
@@ -144,7 +193,11 @@ export default function BookingConfirmScreen({
 
       <View style={styles.footer}>
         {error && <Text style={styles.errorText}>{error}</Text>}
-        <Text style={styles.footerNote}>${price} · sin costo de viáticos</Text>
+        <Text style={styles.footerNote}>
+          {rateMode === 'per_tournament'
+            ? `$${total} · una sola vez por todo el torneo · sin costo de viáticos`
+            : `$${price}/día × ${selectedDays.length || 0} = $${total} · sin costo de viáticos`}
+        </Text>
         <Pressable
           style={[styles.continueButton, !canContinue && styles.continueButtonDisabled]}
           disabled={!canContinue}
@@ -154,7 +207,7 @@ export default function BookingConfirmScreen({
             <ActivityIndicator color={colors.courtBlueDeep} />
           ) : (
             <View style={styles.continueContent}>
-              <Text style={styles.continueLabel}>Continuar a pago</Text>
+              <Text style={styles.continueLabel}>{error ? 'Reintentar' : 'Continuar a pago'}</Text>
               <Ionicons name="arrow-forward-outline" size={18} color={colors.courtBlueDeep} />
             </View>
           )}

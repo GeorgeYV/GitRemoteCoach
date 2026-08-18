@@ -382,6 +382,20 @@ export function payBooking(
   });
 }
 
+/** POST /bookings/pay-batch — BookingPaymentScreen cuando el padre reservó más de un día con el
+ * mismo entrenador: un solo cargo por el total en vez de un pago por reserva. */
+export function payBookingsBatch(
+  authToken: string,
+  bookingIds: string[],
+  paymentMethodId: string,
+): Promise<{ bookings: Booking[]; requiresAction?: { clientSecret: string } }> {
+  return request('/bookings/pay-batch', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${authToken}` },
+    body: JSON.stringify({ bookingIds, paymentMethodId }),
+  });
+}
+
 export type MessageSenderType = 'coach' | 'parent' | 'system';
 
 /** Espeja server/src/types.ts#BookingMessage. */

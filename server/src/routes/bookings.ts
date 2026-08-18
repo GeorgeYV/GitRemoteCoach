@@ -13,7 +13,10 @@ const requestBookingSchema = z.object({
   coachId: z.string().uuid(),
   tournamentId: z.string().uuid(),
   matchDatetime: z.string().datetime(),
-  agreedRate: z.number().positive(),
+  // nonnegative (no positive): con tarifa 'per_tournament' y varios días reservados a la vez,
+  // solo el primer día de la selección carga el monto total y el resto queda en $0 (ver
+  // BookingConfirmScreen) — se cobra una sola vez aunque haya N reservas asociadas al torneo.
+  agreedRate: z.number().nonnegative(),
   note: z.string().max(500).optional(),
 });
 
@@ -27,6 +30,11 @@ const setMeetingDetailsSchema = z
   });
 
 const payBookingSchema = z.object({
+  paymentMethodId: z.string().min(1),
+});
+
+const payBookingsBatchSchema = z.object({
+  bookingIds: z.array(z.string().uuid()).min(1),
   paymentMethodId: z.string().min(1),
 });
 
@@ -99,6 +107,20 @@ export async function bookingRoutes(app: FastifyInstance): Promise<void> {
     const { guardianUserId } = await bookingRepository.getBookingParticipants(id);
     if (sub !== guardianUserId) throw new ForbiddenError('Solo el padre/madre de la reserva puede pagarla');
     return paymentService.initiatePayment(id, parsed.data.paymentMethodId);
+  });
+
+  // Un solo pago para varias reservas a la vez (padre reservó más de un día con el mismo
+  // entrenador) — todas deben pertenecer al padre autenticado, cada una se valida por separado
+  // igual que en /bookings/:id/pay.
+  app.post('/bookings/pay-batch', { preHandler: app.authenticate }, async (req) => {
+    const parsed = payBookingsBatchSchema.safeParse(req.body);
+    if (!parsed.success) throw new ValidationError(parsed.error.message);
+    const { sub } = req.user as { sub: string };
+    for (const id of parsed.data.bookingIds) {
+      const { guardianUserId } = await bookingRepository.getBookingParticipants(id);
+      if (sub !== guardianUserId) throw new ForbiddenError('Solo el padre/madre de la reserva puede pagarla');
+    }
+    return paymentService.initiatePaymentBatch(parsed.data.bookingIds, parsed.data.paymentMethodId);
   });
 
   // Libera los fondos retenidos al entrenador — solo el propio entrenador de la reserva puede

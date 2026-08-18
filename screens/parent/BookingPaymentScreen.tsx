@@ -5,28 +5,24 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import PaymentMethodRow from '../../components/parent/PaymentMethodRow';
 import TrainerAvatarPlaceholder from '../../components/shared/TrainerAvatarPlaceholder';
 import { useAuth } from '../../context/AuthContext';
-import { ApiError, payBooking } from '../../lib/api';
+import { ApiError, payBookingsBatch } from '../../lib/api';
 import { colors, radius } from '../../lib/theme';
 import { mockPaymentMethods } from '../../mock/parentFlow';
 
 export default function BookingPaymentScreen({
-  bookingId,
-  dateTimeLabel,
+  bookings,
   venue,
   note,
   trainerName,
   tournamentName,
-  price,
   onBack,
   onConfirm,
 }: {
-  bookingId: string;
-  dateTimeLabel: string;
+  bookings: { bookingId: string; dayLabel: string; price: number }[];
   venue: string;
   note: string;
   trainerName: string;
   tournamentName: string;
-  price: number;
   onBack: () => void;
   onConfirm: () => void;
 }) {
@@ -34,6 +30,8 @@ export default function BookingPaymentScreen({
   const [methodId, setMethodId] = useState(mockPaymentMethods[0].id);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const total = bookings.reduce((sum, b) => sum + b.price, 0);
 
   async function handleConfirm() {
     if (!token) {
@@ -43,7 +41,11 @@ export default function BookingPaymentScreen({
     setSubmitting(true);
     setError(null);
     try {
-      const result = await payBooking(token, bookingId, methodId);
+      const result = await payBookingsBatch(
+        token,
+        bookings.map((b) => b.bookingId),
+        methodId,
+      );
       if (result.requiresAction) {
         setError('El pago requiere verificación adicional (3DS), no soportada en este demo.');
         return;
@@ -76,11 +78,13 @@ export default function BookingPaymentScreen({
               </View>
             </View>
             <View style={styles.summaryDivider} />
-            <SummaryLine label="Día y horario" value={dateTimeLabel} />
             <SummaryLine label="Sede" value={venue} />
+            {bookings.map((b) => (
+              <SummaryLine key={b.bookingId} label={b.dayLabel} value={`$${b.price}`} />
+            ))}
             {note ? <SummaryLine label="Nota" value={note} /> : null}
             <View style={styles.summaryDivider} />
-            <SummaryLine label="Total a pagar" value={`$${price}`} emphasize />
+            <SummaryLine label="Total a pagar" value={`$${total}`} emphasize />
           </View>
         </Section>
 
@@ -109,7 +113,7 @@ export default function BookingPaymentScreen({
           ) : (
             <View style={styles.confirmContent}>
               <Ionicons name="card-outline" size={17} color={colors.courtBlueDeep} />
-              <Text style={styles.confirmLabel}>Confirmar y pagar ${price}</Text>
+              <Text style={styles.confirmLabel}>Confirmar y pagar ${total}</Text>
             </View>
           )}
         </Pressable>

@@ -120,6 +120,24 @@ export async function getBookingByIdForUpdate(id: string, client: PoolClient): P
   return mapRow(rows[0]);
 }
 
+/** Igual que getBookingByIdForUpdate pero para el pago combinado de varios días a la vez
+ * (paymentService.initiatePaymentBatch) — ORDER BY id antes del FOR UPDATE asegura que dos pagos
+ * en lote concurrentes que comparten alguna reserva siempre la bloqueen en el mismo orden, evitando deadlocks. */
+export async function getBookingsByIdsForUpdate(ids: string[], client: PoolClient): Promise<Booking[]> {
+  if (ids.length === 0) return [];
+  const placeholders = ids.map((_, i) => `$${i + 1}`).join(', ');
+  const { rows } = await client.query(
+    `SELECT * FROM bookings WHERE id IN (${placeholders}) ORDER BY id FOR UPDATE`,
+    ids,
+  );
+  if (rows.length !== ids.length) {
+    const foundIds = new Set(rows.map((row) => row.id));
+    const missingId = ids.find((id) => !foundIds.has(id));
+    throw new NotFoundError('Booking', missingId!);
+  }
+  return rows.map(mapRow);
+}
+
 /** Autorización a nivel de ruta: quién puede actuar sobre esta reserva (el entrenador o el
  * padre/guardián del jugador) — un único JOIN reutilizado por todas las rutas de bookings. */
 export async function getBookingParticipants(

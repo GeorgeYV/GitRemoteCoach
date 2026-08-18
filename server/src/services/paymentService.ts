@@ -124,29 +124,176 @@ export async function initiatePayment(
  * Confirma un pago que requirió acción adicional (3DS) vía webhook
  * `payment_intent.succeeded` / `payment_intent.payment_failed`. Idempotente:
  * si ya existe una transacción 'succeeded' para este payment intent, no hace nada.
+ *
+ * Cubre tanto un pago individual (metadata.bookingId, ver initiatePayment) como un pago
+ * combinado de varios días (metadata.bookingIds separado por comas, ver initiatePaymentBatch) —
+ * el primero se trata como un lote de tamaño 1 en vez de duplicar esta lógica.
  */
 export async function handlePaymentIntentWebhook(event: Stripe.Event): Promise<void> {
   const intent = event.data.object as Stripe.PaymentIntent;
-  const bookingId = intent.metadata.bookingId;
-  if (!bookingId) return;
+  const bookingIds = intent.metadata.bookingIds
+    ? intent.metadata.bookingIds.split(',')
+    : intent.metadata.bookingId
+      ? [intent.metadata.bookingId]
+      : [];
+  if (bookingIds.length === 0) return;
 
   await withTransaction(async (client) => {
     const existing = await paymentRepository.findByStripeObjectId(intent.id, client);
     if (existing?.status === 'succeeded' || existing?.status === 'failed') return;
 
-    const booking = await bookingRepository.getBookingByIdForUpdate(bookingId, client);
-    if (booking.status !== 'accepted' && booking.status !== 'payment_failed') return;
+    const bookings = await bookingRepository.getBookingsByIdsForUpdate(bookingIds, client);
+    const payable = bookings.filter((b) => b.status === 'accepted' || b.status === 'payment_failed');
+    if (payable.length === 0) return;
 
     if (event.type === 'payment_intent.succeeded') {
-      const { clubCommissionRate } = await tournamentRepository.getTournamentCommissionInfo(booking.tournamentId, client);
-      const split = computeSplit(Number(booking.agreedRate), clubCommissionRate);
+      const commissionRateByTournament = new Map<string, number>();
+      for (const booking of payable) {
+        let clubCommissionRate = commissionRateByTournament.get(booking.tournamentId);
+        if (clubCommissionRate === undefined) {
+          clubCommissionRate = (
+            await tournamentRepository.getTournamentCommissionInfo(booking.tournamentId, client)
+          ).clubCommissionRate;
+          commissionRateByTournament.set(booking.tournamentId, clubCommissionRate);
+        }
+        const split = computeSplit(Number(booking.agreedRate), clubCommissionRate);
 
+        await paymentRepository.recordTransaction(
+          { bookingId: booking.id, type: 'charge', status: 'succeeded', amount: split.totalAmountPaid, stripeObjectId: intent.id, rawResponse: intent },
+          client,
+        );
+        await bookingRepository.updateStatus(
+          booking.id,
+          ['accepted', 'payment_failed'],
+          'paid',
+          {
+            total_amount_paid: split.totalAmountPaid,
+            platform_commission_amount: split.platformCommissionAmount,
+            club_commission_amount: split.clubCommissionAmount,
+            coach_net_amount: split.coachNetAmount,
+            payment_reference: intent.id,
+          },
+          client,
+        );
+      }
+    } else if (event.type === 'payment_intent.payment_failed') {
+      // El monto total del intent se reparte por igual entre las reservas pagables solo para
+      // fines de registro (payment_transactions.amount) — no vuelve a tocar agreed_rate/los
+      // montos de split, que ya quedaron congelados en cada booking al crearla.
+      const perBookingAmount = round2(intent.amount / 100 / payable.length);
+      for (const booking of payable) {
+        await paymentRepository.recordTransaction(
+          { bookingId: booking.id, type: 'charge_failed', status: 'failed', amount: perBookingAmount, stripeObjectId: intent.id, rawResponse: intent },
+          client,
+        );
+        await bookingRepository.updateStatus(booking.id, ['accepted', 'payment_failed'], 'payment_failed', {}, client);
+      }
+    }
+  });
+}
+
+/**
+ * Igual que initiatePayment pero para varias reservas a la vez, cobradas en un solo Stripe
+ * PaymentIntent (ver decisión de negocio: "reservar más de 1 día" — el padre paga una sola vez
+ * por el total en vez de N pagos separados). payment_transactions sigue teniendo una fila por
+ * reserva (columna booking_id singular, ver paymentRepository), todas comparten el mismo
+ * stripeObjectId — no hizo falta cambiar el schema.
+ */
+export async function initiatePaymentBatch(
+  bookingIds: string[],
+  paymentMethodId: string,
+): Promise<{ bookings: Booking[]; requiresAction?: { clientSecret: string } }> {
+  return withTransaction(async (client) => {
+    const bookings = await bookingRepository.getBookingsByIdsForUpdate(bookingIds, client);
+
+    for (const booking of bookings) {
+      if (booking.status !== 'accepted' && booking.status !== 'payment_failed') {
+        throw new ConflictError(`No se puede pagar una reserva en estado "${booking.status}"`, 'invalid_transition');
+      }
+      if (booking.paymentDeadline && new Date(booking.paymentDeadline).getTime() < Date.now()) {
+        throw new ConflictError('La ventana de pago para esta reserva ya venció', 'payment_window_expired');
+      }
+    }
+
+    const commissionRateByTournament = new Map<string, number>();
+    const splitByBookingId = new Map<string, SplitAmounts>();
+    let totalAmount = 0;
+    for (const booking of bookings) {
+      let clubCommissionRate = commissionRateByTournament.get(booking.tournamentId);
+      if (clubCommissionRate === undefined) {
+        clubCommissionRate = (
+          await tournamentRepository.getTournamentCommissionInfo(booking.tournamentId, client)
+        ).clubCommissionRate;
+        commissionRateByTournament.set(booking.tournamentId, clubCommissionRate);
+      }
+      const split = computeSplit(Number(booking.agreedRate), clubCommissionRate);
+      splitByBookingId.set(booking.id, split);
+      totalAmount += split.totalAmountPaid;
+    }
+    totalAmount = round2(totalAmount);
+
+    let intent: Stripe.PaymentIntent;
+    try {
+      intent = await stripe.paymentIntents.create({
+        amount: Math.round(totalAmount * 100),
+        currency: CURRENCY,
+        payment_method: paymentMethodId,
+        confirm: true,
+        automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
+        metadata: { bookingIds: bookingIds.join(',') },
+      });
+    } catch (err) {
+      if (err instanceof Stripe.errors.StripeCardError) {
+        for (const booking of bookings) {
+          await paymentRepository.recordTransaction(
+            {
+              bookingId: booking.id,
+              type: 'charge_failed',
+              status: 'failed',
+              amount: splitByBookingId.get(booking.id)!.totalAmountPaid,
+              rawResponse: { message: (err as Error).message },
+            },
+            client,
+          );
+          await bookingRepository.updateStatus(booking.id, ['accepted', 'payment_failed'], 'payment_failed', {}, client);
+        }
+        throw new ConflictError('El pago fue rechazado por la pasarela', 'payment_declined');
+      }
+      throw err;
+    }
+
+    if (intent.status === 'requires_action') {
+      for (const booking of bookings) {
+        await paymentRepository.recordTransaction(
+          {
+            bookingId: booking.id,
+            type: 'charge',
+            status: 'pending',
+            amount: splitByBookingId.get(booking.id)!.totalAmountPaid,
+            stripeObjectId: intent.id,
+          },
+          client,
+        );
+      }
+      return { bookings, requiresAction: { clientSecret: intent.client_secret! } };
+    }
+
+    if (intent.status !== 'succeeded') {
+      for (const booking of bookings) {
+        await bookingRepository.updateStatus(booking.id, ['accepted', 'payment_failed'], 'payment_failed', {}, client);
+      }
+      throw new ConflictError(`Pago no completado, estado de Stripe: ${intent.status}`, 'payment_declined');
+    }
+
+    const updatedBookings: Booking[] = [];
+    for (const booking of bookings) {
+      const split = splitByBookingId.get(booking.id)!;
       await paymentRepository.recordTransaction(
-        { bookingId, type: 'charge', status: 'succeeded', amount: split.totalAmountPaid, stripeObjectId: intent.id, rawResponse: intent },
+        { bookingId: booking.id, type: 'charge', status: 'succeeded', amount: split.totalAmountPaid, stripeObjectId: intent.id, rawResponse: intent },
         client,
       );
-      await bookingRepository.updateStatus(
-        bookingId,
+      const updated = await bookingRepository.updateStatus(
+        booking.id,
         ['accepted', 'payment_failed'],
         'paid',
         {
@@ -158,13 +305,11 @@ export async function handlePaymentIntentWebhook(event: Stripe.Event): Promise<v
         },
         client,
       );
-    } else if (event.type === 'payment_intent.payment_failed') {
-      await paymentRepository.recordTransaction(
-        { bookingId, type: 'charge_failed', status: 'failed', amount: intent.amount / 100, stripeObjectId: intent.id, rawResponse: intent },
-        client,
-      );
-      await bookingRepository.updateStatus(bookingId, ['accepted', 'payment_failed'], 'payment_failed', {}, client);
+      if (!updated) throw new ConflictError('La reserva cambió de estado durante el pago', 'invalid_transition');
+      updatedBookings.push(updated);
     }
+
+    return { bookings: updatedBookings };
   });
 }
 

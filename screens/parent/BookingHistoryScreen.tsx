@@ -122,13 +122,11 @@ export default function BookingHistoryScreen() {
   if (payTarget) {
     return (
       <BookingPaymentScreen
-        bookingId={payTarget.id}
-        dateTimeLabel={`${payTarget.date} · ${payTarget.time}`}
+        bookings={[{ bookingId: payTarget.id, dayLabel: `${payTarget.date} · ${payTarget.time}`, price: payTarget.price }]}
         venue={payTarget.venue}
         note=""
         trainerName={payTarget.trainerName}
         tournamentName={payTarget.tournamentName}
-        price={payTarget.price}
         onBack={() => setPayTarget(null)}
         onConfirm={confirmPayment}
       />

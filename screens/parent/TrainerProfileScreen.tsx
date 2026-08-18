@@ -88,7 +88,7 @@ export default function TrainerProfileScreen({
   coachId: string;
   tournament: TournamentSearchResult;
   onBack?: () => void;
-  onReserve?: (info: { coachId: string; name: string; price: number; availability: AvailabilityDay[] }) => void;
+  onReserve?: (info: { coachId: string; name: string; price: number; rateMode: RateMode; availability: AvailabilityDay[] }) => void;
 }) {
   const [profile, setProfile] = useState<CoachProfileWithTraining | null>(null);
   const [availability, setAvailability] = useState<AvailabilityDay[] | null>(null);
@@ -300,7 +300,7 @@ export default function TrainerProfileScreen({
         <Text style={styles.footerNote}>${price} · sin costo de viáticos</Text>
         <Pressable
           style={styles.reserveButton}
-          onPress={() => onReserve?.({ coachId, name, price, availability })}
+          onPress={() => onReserve?.({ coachId, name, price, rateMode: rateMode ?? 'per_day', availability })}
         >
           <View style={styles.reserveContent}>
             <Ionicons name="calendar-outline" size={17} color={colors.courtBlueDeep} />
