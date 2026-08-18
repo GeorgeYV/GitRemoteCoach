@@ -61,6 +61,7 @@ import ClubHomeScreen from './club/ClubHomeScreen';
 import ClubSettlementsScreen from './club/ClubSettlementsScreen';
 import ClubTournamentListScreen from './club/ClubTournamentListScreen';
 import ClubTournamentDetailScreen from './club/ClubTournamentDetailScreen';
+import ClubTournamentShareScreen from './club/ClubTournamentShareScreen';
 import ClubInviteCoachScreen from './club/ClubInviteCoachScreen';
 import ClubCreateTournamentScreen from './club/ClubCreateTournamentScreen';
 import ClubRegistrationScreen from './club/ClubRegistrationScreen';
@@ -721,6 +722,7 @@ export function ClubTournamentFlow({
 }) {
   const [tournament, setTournament] = useState<TournamentSummary | null>(null);
   const [inviting, setInviting] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const [creating, setCreating] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -760,11 +762,16 @@ export function ClubTournamentFlow({
     );
   }
 
+  if (sharing) {
+    return <ClubTournamentShareScreen tournament={tournament} onBack={() => setSharing(false)} />;
+  }
+
   return (
     <ClubTournamentDetailScreen
       tournament={tournament}
       onBack={() => setTournament(null)}
       onInvite={() => setInviting(true)}
+      onShare={() => setSharing(true)}
     />
   );
 }

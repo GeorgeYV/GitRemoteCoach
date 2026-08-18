@@ -22,10 +22,12 @@ export default function ClubTournamentDetailScreen({
   tournament,
   onBack,
   onInvite,
+  onShare,
 }: {
   tournament: TournamentSummary;
   onBack: () => void;
   onInvite: () => void;
+  onShare?: () => void;
 }) {
   const { token } = useAuth();
   const [roster, setRoster] = useState<TournamentRoster | null>(null);
@@ -86,6 +88,14 @@ export default function ClubTournamentDetailScreen({
         </View>
         <Text style={styles.headerSubtitle}>{tournament.venue}</Text>
         <Text style={styles.headerSubtitle}>{dateRangeLabel(tournament.startDate, tournament.endDate)}</Text>
+        {onShare && (
+          <Pressable style={styles.shareButton} onPress={onShare}>
+            <View style={styles.buttonContent}>
+              <Ionicons name="share-social-outline" size={14} color={colors.textSoft} />
+              <Text style={styles.shareButtonLabel}>Compartir</Text>
+            </View>
+          </Pressable>
+        )}
       </View>
 
       {loadError ? (
@@ -193,6 +203,21 @@ const styles = StyleSheet.create({
   headerSubtitle: {
     color: colors.textDim,
     fontSize: 13,
+  },
+  shareButton: {
+    alignSelf: 'flex-start',
+    backgroundColor: colors.panelLight,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    marginTop: 10,
+  },
+  shareButtonLabel: {
+    color: colors.textSoft,
+    fontSize: 12,
+    fontWeight: '700',
   },
   content: {
     padding: 20,
