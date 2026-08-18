@@ -1,5 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
+import { getLocales } from 'expo-localization';
 import React, { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -10,7 +11,14 @@ import { useAuth } from '../../context/AuthContext';
 import { CountryCode, listPlayers, searchTournaments, TournamentSearchResult } from '../../lib/api';
 import { dateRangeLabel } from '../../lib/dateSlots';
 import { colors, radius, withOpacity } from '../../lib/theme';
-import { COUNTRY_LABELS } from '../../mock/coachFlow';
+import { COUNTRY_LABELS, COUNTRY_OPTIONS } from '../../mock/coachFlow';
+
+/** País del dispositivo (Region de iOS/Android) si está entre los soportados, si no Ecuador —
+ * usado como arranque del toggle "mi país" antes de saber el país de los hijos del padre. */
+function localeDefaultCountry(): CountryCode {
+  const regionCode = getLocales()[0]?.regionCode;
+  return (COUNTRY_OPTIONS as string[]).includes(regionCode ?? '') ? (regionCode as CountryCode) : 'EC';
+}
 
 /** "Empieza en N días" si el torneo todavía no arranca, "En curso" si hoy cae dentro del rango,
  * o nada si por alguna razón el rango ya pasó (no debería, GET /tournaments ya filtra por status). */
@@ -30,9 +38,9 @@ export default function ParentHomeScreen() {
   const router = useRouter();
   const { user, token } = useAuth();
   const [childName, setChildName] = useState<string | null>(null);
-  // País de los hijos registrados, solo si todos comparten el mismo — si el padre no tiene
-  // hijos, o tiene hijos en países distintos, no hay un "mi país" claro y arranca sin filtro.
-  const [defaultCountry, setDefaultCountry] = useState<CountryCode | null>(null);
+  // País de los hijos registrados si todos comparten el mismo; si el padre no tiene hijos
+  // registrados aún, o tiene hijos en países distintos, cae al país del dispositivo (o Ecuador).
+  const [defaultCountry, setDefaultCountry] = useState<CountryCode>(() => localeDefaultCountry());
   const [countryFilterOn, setCountryFilterOn] = useState(true);
   const [tournaments, setTournaments] = useState<TournamentSearchResult[] | null>(null);
   const [query, setQuery] = useState('');
@@ -46,15 +54,14 @@ export default function ParentHomeScreen() {
         // no hay forma de saber para cuál está buscando el padre en este momento.
         setChildName(players.length === 1 ? players[0].fullName : null);
         const countries = new Set(players.map((p) => p.country).filter((c): c is CountryCode => c !== null));
-        setDefaultCountry(countries.size === 1 ? [...countries][0] : null);
+        setDefaultCountry(countries.size === 1 ? [...countries][0] : localeDefaultCountry());
       })
       .catch(() => {
         setChildName(null);
-        setDefaultCountry(null);
       });
   }, [token]);
 
-  const activeCountry = countryFilterOn ? (defaultCountry ?? undefined) : undefined;
+  const activeCountry = countryFilterOn ? defaultCountry : undefined;
 
   // Carga fija (sin término de búsqueda) — solo alimenta "Continuar con", que siempre debe
   // mostrar el mismo torneo destacado sin importar qué esté escribiendo el padre en el buscador.
@@ -155,26 +162,24 @@ export default function ParentHomeScreen() {
           containerStyle={styles.searchBar}
         />
 
-        {defaultCountry && (
-          <View style={styles.countryToggleRow}>
-            <Pressable
-              style={[styles.countryToggleChip, countryFilterOn && styles.countryToggleChipActive]}
-              onPress={() => setCountryFilterOn(true)}
-            >
-              <Text style={[styles.countryToggleLabel, countryFilterOn && styles.countryToggleLabelActive]}>
-                {COUNTRY_LABELS[defaultCountry]}
-              </Text>
-            </Pressable>
-            <Pressable
-              style={[styles.countryToggleChip, !countryFilterOn && styles.countryToggleChipActive]}
-              onPress={() => setCountryFilterOn(false)}
-            >
-              <Text style={[styles.countryToggleLabel, !countryFilterOn && styles.countryToggleLabelActive]}>
-                Todos
-              </Text>
-            </Pressable>
-          </View>
-        )}
+        <View style={styles.countryToggleRow}>
+          <Pressable
+            style={[styles.countryToggleChip, countryFilterOn && styles.countryToggleChipActive]}
+            onPress={() => setCountryFilterOn(true)}
+          >
+            <Text style={[styles.countryToggleLabel, countryFilterOn && styles.countryToggleLabelActive]}>
+              {COUNTRY_LABELS[defaultCountry]}
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[styles.countryToggleChip, !countryFilterOn && styles.countryToggleChipActive]}
+            onPress={() => setCountryFilterOn(false)}
+          >
+            <Text style={[styles.countryToggleLabel, !countryFilterOn && styles.countryToggleLabelActive]}>
+              Todos
+            </Text>
+          </Pressable>
+        </View>
 
         <Text style={styles.sectionLabel}>Torneos activos</Text>
         {visibleList === null ? (

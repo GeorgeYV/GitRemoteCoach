@@ -33,7 +33,8 @@
           "microphonePermission": "Permití el acceso al micrófono para grabar notas de voz durante la captura en vivo.",
           "recordAudioAndroid": true
         }
-      ]
+      ],
+      "expo-localization"
     ]
   }
 }
