@@ -52,6 +52,29 @@ export async function registerClub(
   });
 }
 
+/** ClubHomeScreen "Editar perfil" — el chequeo de que quien llama de verdad administra este
+ * club vive en la ruta (mismo patrón que POST /clubs/:id/tournaments). */
+export async function updateClub(
+  clubId: string,
+  input: {
+    name: string;
+    type: 'club' | 'federation';
+    city: string;
+    country: CountryCode;
+    contactEmail?: string;
+    contactPhone?: string;
+  },
+): Promise<Club> {
+  return clubRepository.update(clubId, {
+    name: input.name,
+    type: input.type,
+    city: input.city,
+    country: input.country,
+    contactEmail: input.contactEmail ?? null,
+    contactPhone: input.contactPhone ?? null,
+  });
+}
+
 export async function listSettlementsForClub(clubId: string): Promise<ClubSettlementWithTournamentName[]> {
   return settlementRepository.listByClub(clubId);
 }

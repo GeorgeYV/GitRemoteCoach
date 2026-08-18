@@ -124,6 +124,29 @@ export async function create(
   return getCoachProfile(userId, db);
 }
 
+/** CoachRegistrationScreen "Editar perfil" — mismos campos que create, sin tocar
+ * verification_status/documentos: esos van por el flujo de verificación aparte. */
+export async function update(
+  userId: string,
+  params: {
+    city: string;
+    region: string | null;
+    country: CountryCode;
+    yearsExperience: number;
+    specialty: string | null;
+    hourlyRate: number;
+  },
+  db: Queryable = pool,
+): Promise<CoachProfile> {
+  await db.query(
+    `UPDATE coach_profiles
+     SET city = $2, region = $3, country = $4, years_experience = $5, specialty = $6, hourly_rate = $7, updated_at = now()
+     WHERE user_id = $1`,
+    [userId, params.city, params.region, params.country, params.yearsExperience, params.specialty, params.hourlyRate],
+  );
+  return getCoachProfile(userId, db);
+}
+
 export async function getCoachProfile(coachId: string, db: Queryable = pool): Promise<CoachProfile> {
   const { rows } = await db.query(
     `SELECT cp.*, u.full_name

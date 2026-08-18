@@ -65,3 +65,26 @@ export async function create(
 export async function addAdmin(clubId: string, userId: string, db: Queryable = pool): Promise<void> {
   await db.query(`INSERT INTO club_admins (club_id, user_id) VALUES ($1, $2)`, [clubId, userId]);
 }
+
+/** ClubRegistrationScreen "Editar perfil" — mismos campos que create, sin tocar
+ * default_commission_rate (todavía no hay pantalla para eso, ver comentario arriba). */
+export async function update(
+  clubId: string,
+  input: {
+    name: string;
+    type: 'club' | 'federation';
+    city: string;
+    country: CountryCode;
+    contactEmail: string | null;
+    contactPhone: string | null;
+  },
+  db: Queryable = pool,
+): Promise<Club> {
+  const { rows } = await db.query(
+    `UPDATE clubs SET name = $2, type = $3, city = $4, country = $5, contact_email = $6, contact_phone = $7
+     WHERE id = $1 RETURNING *`,
+    [clubId, input.name, input.type, input.city, input.country, input.contactEmail, input.contactPhone],
+  );
+  if (rows.length === 0) throw new NotFoundError('Club', clubId);
+  return mapRow(rows[0]);
+}

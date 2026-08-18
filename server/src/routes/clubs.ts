@@ -44,6 +44,27 @@ export async function clubRoutes(app: FastifyInstance): Promise<void> {
     return clubService.getClub(id);
   });
 
+  // ClubRegistrationScreen "Editar perfil" — mismo chequeo de pertenencia que
+  // POST /clubs/:id/tournaments: solo un admin de este club puede editarlo.
+  app.put('/clubs/:id', { preHandler: app.authenticate }, async (req) => {
+    const { id } = req.params as { id: string };
+    const { sub } = req.user as { sub: string };
+
+    let adminClubId: string;
+    try {
+      adminClubId = await clubRepository.getClubIdForAdminUser(sub);
+    } catch {
+      throw new ForbiddenError('Solo un administrador del club puede editarlo');
+    }
+    if (adminClubId !== id) {
+      throw new ForbiddenError('Solo un administrador del club puede editarlo');
+    }
+
+    const parsed = registerClubSchema.safeParse(req.body);
+    if (!parsed.success) throw new ValidationError(parsed.error.message);
+    return clubService.updateClub(id, parsed.data);
+  });
+
   // ClubSettlementsScreen
   app.get('/clubs/:id/settlements', async (req) => {
     const { id } = req.params as { id: string };

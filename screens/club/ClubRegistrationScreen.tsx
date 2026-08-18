@@ -4,7 +4,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { SafeAreaView } from 'react-native-safe-area-context';
 import IconTextInput from '../../components/shared/IconTextInput';
 import { useAuth } from '../../context/AuthContext';
-import { ApiError, Club, CountryCode, registerClub } from '../../lib/api';
+import { ApiError, Club, CountryCode, registerClub, updateClub } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
 import { COUNTRY_LABELS, COUNTRY_OPTIONS } from '../../mock/coachFlow';
 
@@ -13,14 +13,23 @@ const TYPE_OPTIONS: { value: 'club' | 'federation'; label: string }[] = [
   { value: 'federation', label: 'Federación' },
 ];
 
-export default function ClubRegistrationScreen({ onSuccess }: { onSuccess?: (club: Club) => void }) {
+export default function ClubRegistrationScreen({
+  club,
+  onSuccess,
+  onBack,
+}: {
+  /** Si viene seteado, la pantalla edita este club (PUT) en vez de crear uno nuevo (POST). */
+  club?: Club;
+  onSuccess?: (club: Club) => void;
+  onBack?: () => void;
+}) {
   const { token } = useAuth();
-  const [name, setName] = useState('');
-  const [type, setType] = useState<'club' | 'federation' | null>(null);
-  const [city, setCity] = useState('');
-  const [country, setCountry] = useState<CountryCode | null>(null);
-  const [contactEmail, setContactEmail] = useState('');
-  const [contactPhone, setContactPhone] = useState('');
+  const [name, setName] = useState(club?.name ?? '');
+  const [type, setType] = useState<'club' | 'federation' | null>(club?.type ?? null);
+  const [city, setCity] = useState(club?.city ?? '');
+  const [country, setCountry] = useState<CountryCode | null>(club?.country ?? null);
+  const [contactEmail, setContactEmail] = useState(club?.contactEmail ?? '');
+  const [contactPhone, setContactPhone] = useState(club?.contactPhone ?? '');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,18 +43,23 @@ export default function ClubRegistrationScreen({ onSuccess }: { onSuccess?: (clu
     }
     setSubmitting(true);
     setError(null);
+    const params = {
+      name: name.trim(),
+      type,
+      city: city.trim(),
+      country,
+      contactEmail: contactEmail.trim() || undefined,
+      contactPhone: contactPhone.trim() || undefined,
+    };
     try {
-      const club = await registerClub(token, {
-        name: name.trim(),
-        type,
-        city: city.trim(),
-        country,
-        contactEmail: contactEmail.trim() || undefined,
-        contactPhone: contactPhone.trim() || undefined,
-      });
-      onSuccess?.(club);
+      const result = club ? await updateClub(token, club.id, params) : await registerClub(token, params);
+      onSuccess?.(result);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'No se pudo registrar tu club. Intenta de nuevo.');
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : `No se pudo ${club ? 'guardar los cambios' : 'registrar tu club'}. Intenta de nuevo.`,
+      );
     } finally {
       setSubmitting(false);
     }
@@ -54,10 +68,19 @@ export default function ClubRegistrationScreen({ onSuccess }: { onSuccess?: (clu
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Registra tu club</Text>
-        <Text style={styles.headerSubtitle}>
-          Crea el perfil de tu club o federación para invitar entrenadores y organizar torneos.
-        </Text>
+        {club && onBack && (
+          <Pressable style={styles.backButton} onPress={onBack}>
+            <Text style={styles.backIcon}>←</Text>
+          </Pressable>
+        )}
+        <View style={styles.headerText}>
+          <Text style={styles.headerTitle}>{club ? 'Editar club' : 'Registra tu club'}</Text>
+          <Text style={styles.headerSubtitle}>
+            {club
+              ? 'Actualiza los datos de tu club o federación.'
+              : 'Crea el perfil de tu club o federación para invitar entrenadores y organizar torneos.'}
+          </Text>
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
@@ -125,8 +148,8 @@ export default function ClubRegistrationScreen({ onSuccess }: { onSuccess?: (clu
             <ActivityIndicator color={colors.courtBlueDeep} />
           ) : (
             <View style={styles.submitContent}>
-              <Ionicons name="business-outline" size={18} color={colors.courtBlueDeep} />
-              <Text style={styles.submitLabel}>Crear club</Text>
+              <Ionicons name={club ? 'checkmark-outline' : 'business-outline'} size={18} color={colors.courtBlueDeep} />
+              <Text style={styles.submitLabel}>{club ? 'Guardar cambios' : 'Crear club'}</Text>
             </View>
           )}
         </Pressable>
@@ -141,11 +164,24 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg,
   },
   header: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
     paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: 18,
     borderBottomWidth: 1,
     borderBottomColor: colors.borderSoft,
+  },
+  backButton: {
+    paddingRight: 12,
+    paddingTop: 2,
+  },
+  backIcon: {
+    color: colors.lineWhite,
+    fontSize: 20,
+  },
+  headerText: {
+    flex: 1,
   },
   headerTitle: {
     color: colors.lineWhite,

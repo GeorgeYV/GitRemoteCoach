@@ -96,6 +96,26 @@ export async function coachRoutes(app: FastifyInstance): Promise<void> {
     return tournamentService.listClubTagsForCoach(id);
   });
 
+  // CoachRegistrationScreen "Editar perfil" — datos personales/tarifa del propio entrenador
+  // logueado. No toca ageCategories/levels (ver /training) ni documentos/verificación.
+  app.put('/coaches/:id/profile', { preHandler: app.authenticate }, async (req) => {
+    const { id } = req.params as { id: string };
+    const { sub } = req.user as { sub: string };
+    if (sub !== id) throw new ForbiddenError('No puedes modificar el perfil de otro entrenador');
+    const parsed = registerCoachSchema
+      .omit({ ageCategories: true, levels: true, documents: true })
+      .safeParse(req.body);
+    if (!parsed.success) throw new ValidationError(parsed.error.message);
+    return coachProfileService.updateCoachProfileDetails(id, {
+      city: parsed.data.city,
+      region: parsed.data.region ?? null,
+      country: parsed.data.country,
+      yearsExperience: parsed.data.yearsExperience,
+      specialty: parsed.data.specialty ?? null,
+      hourlyRate: parsed.data.hourlyRate,
+    });
+  });
+
   // Guarda categorías de edad + niveles de juego del propio entrenador logueado.
   app.put('/coaches/:id/training', { preHandler: app.authenticate }, async (req) => {
     const { id } = req.params as { id: string };

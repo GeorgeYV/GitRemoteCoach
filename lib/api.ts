@@ -537,6 +537,27 @@ export function registerCoachProfile(
   });
 }
 
+/** PUT /coaches/:id/profile — CoachRegistrationScreen "Editar perfil". Datos personales/tarifa,
+ * sin ageCategories/levels (ver updateCoachTraining) ni documentos/verificación. */
+export function updateCoachProfileDetails(
+  authToken: string,
+  coachId: string,
+  params: {
+    city: string;
+    region?: string;
+    country: CountryCode;
+    yearsExperience: number;
+    specialty?: string;
+    hourlyRate: number;
+  },
+): Promise<CoachProfile> {
+  return request(`/coaches/${coachId}/profile`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${authToken}` },
+    body: JSON.stringify(params),
+  });
+}
+
 /** GET /coaches/:id/verification-documents — CoachVerificationPendingScreen: checklist real del
  * propio entrenador (no público, requiere ser el dueño de la sesión). */
 export function listCoachVerificationDocuments(authToken: string, coachId: string): Promise<CoachVerificationDocument[]> {
@@ -820,6 +841,26 @@ export function registerClub(
 ): Promise<Club> {
   return request('/clubs', {
     method: 'POST',
+    headers: { Authorization: `Bearer ${authToken}` },
+    body: JSON.stringify(params),
+  });
+}
+
+/** PUT /clubs/:id — ClubRegistrationScreen "Editar perfil". */
+export function updateClub(
+  authToken: string,
+  clubId: string,
+  params: {
+    name: string;
+    type: 'club' | 'federation';
+    city: string;
+    country: CountryCode;
+    contactEmail?: string;
+    contactPhone?: string;
+  },
+): Promise<Club> {
+  return request(`/clubs/${clubId}`, {
+    method: 'PUT',
     headers: { Authorization: `Bearer ${authToken}` },
     body: JSON.stringify(params),
   });

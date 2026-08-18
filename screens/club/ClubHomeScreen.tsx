@@ -22,10 +22,12 @@ export default function ClubHomeScreen({
   clubId,
   onOpenTournaments,
   onOpenSettlements,
+  onOpenProfile,
 }: {
   clubId: string;
   onOpenTournaments: () => void;
   onOpenSettlements: () => void;
+  onOpenProfile?: () => void;
 }) {
   const [club, setClub] = useState<Club | null>(null);
   const [tournaments, setTournaments] = useState<TournamentSummary[] | null>(null);
@@ -82,8 +84,15 @@ export default function ClubHomeScreen({
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>{club.name}</Text>
-          <Text style={styles.headerSubtitle}>{club.city}</Text>
+          <View style={styles.headerText}>
+            <Text style={styles.headerTitle}>{club.name}</Text>
+            <Text style={styles.headerSubtitle}>{club.city}</Text>
+          </View>
+          {onOpenProfile && (
+            <Pressable style={styles.editButton} onPress={onOpenProfile}>
+              <Ionicons name="pencil-outline" size={16} color={colors.textDim} />
+            </Pressable>
+          )}
         </View>
 
         <View style={styles.statGrid}>
@@ -124,7 +133,16 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
   },
   header: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
     marginBottom: 20,
+  },
+  headerText: {
+    flex: 1,
+  },
+  editButton: {
+    padding: 6,
   },
   headerTitle: {
     color: colors.lineWhite,

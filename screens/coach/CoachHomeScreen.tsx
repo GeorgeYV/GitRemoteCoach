@@ -8,6 +8,7 @@ import { colors, radius, withOpacity } from '../../lib/theme';
 import { CoachBooking } from '../../mock/coachFlow';
 
 const QUICK_LINKS = [
+  { key: 'profile', label: 'Mi perfil', hint: 'Edita tus datos, tarifa, categorías y niveles' },
   { key: 'availability', label: 'Disponibilidad', hint: 'Ajusta tus días y tarifa por torneo' },
   { key: 'sessions', label: 'Historial de sesiones', hint: 'Revisa partidos pasados y en curso' },
   { key: 'earnings', label: 'Ingresos', hint: 'Ve lo liberado y lo pendiente de pago' },
@@ -30,6 +31,7 @@ export default function CoachHomeScreen({
   onOpenSuspendedMatch,
   onOpenBooking,
   onOpenRequests,
+  onOpenProfile,
   onOpenAvailability,
   onOpenSessions,
   onOpenEarnings,
@@ -50,6 +52,7 @@ export default function CoachHomeScreen({
   onOpenSuspendedMatch?: () => void;
   onOpenBooking?: (bookingId: string) => void;
   onOpenRequests?: () => void;
+  onOpenProfile?: () => void;
   onOpenAvailability?: () => void;
   onOpenSessions?: () => void;
   onOpenEarnings?: () => void;
@@ -58,6 +61,7 @@ export default function CoachHomeScreen({
   onLogout?: () => void;
 }) {
   const quickLinkHandlers: Record<(typeof QUICK_LINKS)[number]['key'], (() => void) | undefined> = {
+    profile: onOpenProfile,
     availability: onOpenAvailability,
     sessions: onOpenSessions,
     earnings: onOpenEarnings,

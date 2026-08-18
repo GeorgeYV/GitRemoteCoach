@@ -10,6 +10,7 @@ import {
   BookingWithParticipants,
   Club,
   ClubCoachInvitationWithNames,
+  CoachProfileWithTraining,
   CoachSearchResult,
   createOrGetMatch,
   getClubForAdmin,
@@ -46,6 +47,7 @@ import CoachEarningsScreen from './coach/CoachEarningsScreen';
 import CoachHomeScreen from './coach/CoachHomeScreen';
 import CoachMatchSetupScreen from './coach/CoachMatchSetupScreen';
 import CoachPreMatchReminderScreen from './coach/CoachPreMatchReminderScreen';
+import CoachRegistrationScreen from './coach/CoachRegistrationScreen';
 import CoachRequestInboxScreen from './coach/CoachRequestInboxScreen';
 import CoachReputationScreen from './coach/CoachReputationScreen';
 import CoachSessionHistoryScreen from './coach/CoachSessionHistoryScreen';
@@ -307,6 +309,7 @@ export function CoachHomeFlow({ coachId, coachName }: { coachId: string; coachNa
   const { token, logout } = useAuth();
   const [bookings, setBookings] = useState<BookingWithParticipants[] | null>(null);
   const [rating, setRating] = useState('—');
+  const [coachProfile, setCoachProfile] = useState<CoachProfileWithTraining | null>(null);
   const [pendingInvitation, setPendingInvitation] = useState<ClubCoachInvitationWithNames | null>(null);
   const [invitationRefreshKey, setInvitationRefreshKey] = useState(0);
   const [suspendedMatch, setSuspendedMatch] = useState<SuspendedMatchSummary | null>(null);
@@ -318,6 +321,7 @@ export function CoachHomeFlow({ coachId, coachName }: { coachId: string; coachNa
     | 'cancel'
     | 'chat'
     | 'requests'
+    | 'profile'
     | 'availability'
     | 'sessions'
     | 'earnings'
@@ -339,6 +343,7 @@ export function CoachHomeFlow({ coachId, coachName }: { coachId: string; coachNa
         if (cancelled) return;
         setBookings(bookingList);
         setRating(profile.profile.ratingAvg);
+        setCoachProfile(profile);
       })
       .catch((err) => {
         if (cancelled) return;
@@ -461,6 +466,22 @@ export function CoachHomeFlow({ coachId, coachName }: { coachId: string; coachNa
     return <CoachRequestInboxScreen coachId={coachId} onBack={() => setStep('home')} />;
   }
 
+  if (step === 'profile' && coachProfile) {
+    return (
+      <CoachRegistrationScreen
+        profile={coachProfile}
+        onBack={() => setStep('home')}
+        onSubmit={() => {
+          getCoachProfile(coachId).then((updated) => {
+            setRating(updated.profile.ratingAvg);
+            setCoachProfile(updated);
+          });
+          setStep('home');
+        }}
+      />
+    );
+  }
+
   if (step === 'availability') {
     return <CoachAvailabilityFlow onBack={() => setStep('home')} />;
   }
@@ -521,6 +542,7 @@ export function CoachHomeFlow({ coachId, coachName }: { coachId: string; coachNa
         setStep('detail');
       }}
       onOpenRequests={() => setStep('requests')}
+      onOpenProfile={() => setStep('profile')}
       onOpenAvailability={() => setStep('availability')}
       onOpenSessions={() => setStep('sessions')}
       onOpenEarnings={() => setStep('earnings')}
@@ -773,10 +795,23 @@ export function ClubFlow({ adminUserId }: { adminUserId: string }) {
     };
   }, [adminUserId]);
 
-  const [screen, setScreen] = useState<'home' | 'tournaments' | 'settlements'>('home');
+  const [screen, setScreen] = useState<'home' | 'tournaments' | 'settlements' | 'editProfile'>('home');
 
   if (needsRegistration) {
     return <ClubRegistrationScreen onSuccess={(newClub) => { setClub(newClub); setNeedsRegistration(false); }} />;
+  }
+
+  if (screen === 'editProfile' && club) {
+    return (
+      <ClubRegistrationScreen
+        club={club}
+        onBack={() => setScreen('home')}
+        onSuccess={(updated) => {
+          setClub(updated);
+          setScreen('home');
+        }}
+      />
+    );
   }
 
   if (error) {
@@ -808,6 +843,7 @@ export function ClubFlow({ adminUserId }: { adminUserId: string }) {
       clubId={club.id}
       onOpenTournaments={() => setScreen('tournaments')}
       onOpenSettlements={() => setScreen('settlements')}
+      onOpenProfile={() => setScreen('editProfile')}
     />
   );
 }

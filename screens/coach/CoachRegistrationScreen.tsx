@@ -6,7 +6,16 @@ import DocumentRow from '../../components/coach/DocumentRow';
 import IconTextInput from '../../components/shared/IconTextInput';
 import TrainerAvatarPlaceholder from '../../components/shared/TrainerAvatarPlaceholder';
 import { useAuth } from '../../context/AuthContext';
-import { AgeCategory, ApiError, CountryCode, PlayingLevel, registerCoachProfile } from '../../lib/api';
+import {
+  AgeCategory,
+  ApiError,
+  CoachProfileWithTraining,
+  CountryCode,
+  PlayingLevel,
+  registerCoachProfile,
+  updateCoachProfileDetails,
+  updateCoachTraining,
+} from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
 import {
   AGE_CATEGORY_OPTIONS,
@@ -27,16 +36,32 @@ const LEVEL_LABEL_TO_VALUE: Record<string, PlayingLevel> = {
   'Alto rendimiento': 'alto_rendimiento',
 };
 
-export default function CoachRegistrationScreen({ onSubmit }: { onSubmit?: () => void }) {
-  const { token } = useAuth();
-  const [name, setName] = useState('');
-  const [city, setCity] = useState('');
-  const [region, setRegion] = useState('');
-  const [country, setCountry] = useState<CountryCode | null>(null);
-  const [experience, setExperience] = useState('');
-  const [hourlyRate, setHourlyRate] = useState('');
-  const [categories, setCategories] = useState<string[]>([]);
-  const [levels, setLevels] = useState<string[]>([]);
+const LEVEL_VALUE_TO_LABEL: Record<PlayingLevel, string> = {
+  recreativo: 'Recreativo',
+  competitivo: 'Competitivo',
+  alto_rendimiento: 'Alto rendimiento',
+};
+
+export default function CoachRegistrationScreen({
+  profile,
+  onSubmit,
+  onBack,
+}: {
+  /** Si viene seteado, la pantalla edita este perfil (PUT) en vez de crear uno nuevo (POST) —
+   * oculta la sección de documentos, que va por el flujo de verificación aparte. */
+  profile?: CoachProfileWithTraining;
+  onSubmit?: () => void;
+  onBack?: () => void;
+}) {
+  const { token, user, updateProfile } = useAuth();
+  const [name, setName] = useState(profile ? user?.fullName ?? '' : '');
+  const [city, setCity] = useState(profile?.profile.city ?? '');
+  const [region, setRegion] = useState(profile?.profile.region ?? '');
+  const [country, setCountry] = useState<CountryCode | null>(profile?.profile.country ?? null);
+  const [experience, setExperience] = useState(profile ? String(profile.profile.yearsExperience) : '');
+  const [hourlyRate, setHourlyRate] = useState(profile ? String(Number(profile.profile.hourlyRate)) : '');
+  const [categories, setCategories] = useState<string[]>(profile?.ageCategories ?? []);
+  const [levels, setLevels] = useState<string[]>(profile?.levels.map((l) => LEVEL_VALUE_TO_LABEL[l]) ?? []);
   const [documents, setDocuments] = useState<DocumentItem[]>(VERIFICATION_DOC_CHECKLIST);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -58,36 +83,70 @@ export default function CoachRegistrationScreen({ onSubmit }: { onSubmit?: () =>
     setSubmitting(true);
     setError(null);
     try {
-      await registerCoachProfile(token, {
-        city,
-        region: region.trim() || undefined,
-        country,
-        yearsExperience: Number(experience) || 0,
-        hourlyRate: Number(hourlyRate) || 0,
-        ageCategories: categories as AgeCategory[],
-        levels: levels.map((label) => LEVEL_LABEL_TO_VALUE[label]),
-        documents: documents
-          .filter((d) => d.status === 'uploaded')
-          .map((d) => ({ docType: d.id, fileUrl: `${PLACEHOLDER_FILE_URL_PREFIX}${d.id}` })),
-      });
+      if (profile) {
+        const coachId = profile.profile.userId;
+        await Promise.all([
+          updateProfile({ fullName: name.trim() }),
+          updateCoachProfileDetails(token, coachId, {
+            city,
+            region: region.trim() || undefined,
+            country,
+            yearsExperience: Number(experience) || 0,
+            hourlyRate: Number(hourlyRate) || 0,
+            // La pantalla nunca mostró un campo de especialidad para editar — se reenvía tal
+            // cual para no perderla si el coach ya la tenía seteada por otra vía.
+            specialty: profile.profile.specialty ?? undefined,
+          }),
+          updateCoachTraining(token, coachId, {
+            ageCategories: categories as AgeCategory[],
+            levels: levels.map((label) => LEVEL_LABEL_TO_VALUE[label]),
+          }),
+        ]);
+      } else {
+        await registerCoachProfile(token, {
+          city,
+          region: region.trim() || undefined,
+          country,
+          yearsExperience: Number(experience) || 0,
+          hourlyRate: Number(hourlyRate) || 0,
+          ageCategories: categories as AgeCategory[],
+          levels: levels.map((label) => LEVEL_LABEL_TO_VALUE[label]),
+          documents: documents
+            .filter((d) => d.status === 'uploaded')
+            .map((d) => ({ docType: d.id, fileUrl: `${PLACEHOLDER_FILE_URL_PREFIX}${d.id}` })),
+        });
+      }
       onSubmit?.();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'No se pudo enviar tu registro. Intenta de nuevo.');
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : `No se pudo ${profile ? 'guardar los cambios' : 'enviar tu registro'}. Intenta de nuevo.`,
+      );
     } finally {
       setSubmitting(false);
     }
   }
 
-  const requiredDocsReady = documents.filter((d) => !d.optional).every((d) => d.status === 'uploaded');
+  const requiredDocsReady = profile ? true : documents.filter((d) => !d.optional).every((d) => d.status === 'uploaded');
   const canSubmit = requiredDocsReady && !!country && !submitting;
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Únete como entrenador</Text>
-        <Text style={styles.headerSubtitle}>
-          Verificamos tu perfil una sola vez para proteger a los jugadores, a sus familias y a ti.
-        </Text>
+        {profile && onBack && (
+          <Pressable style={styles.backButton} onPress={onBack}>
+            <Text style={styles.backIcon}>←</Text>
+          </Pressable>
+        )}
+        <View style={styles.headerText}>
+          <Text style={styles.headerTitle}>{profile ? 'Editar perfil' : 'Únete como entrenador'}</Text>
+          <Text style={styles.headerSubtitle}>
+            {profile
+              ? 'Actualiza tus datos, tarifa y las categorías/niveles que atiendes.'
+              : 'Verificamos tu perfil una sola vez para proteger a los jugadores, a sus familias y a ti.'}
+          </Text>
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
@@ -163,16 +222,19 @@ export default function CoachRegistrationScreen({ onSubmit }: { onSubmit?: () =>
           <ChipGroup options={LEVEL_OPTIONS} selected={levels} onToggle={(v) => toggle(levels, v, setLevels)} />
         </Section>
 
-        <Section label="Documentos">
-          <Text style={styles.trustNote}>
-            Solo se usan para verificar tu identidad y experiencia. No se comparten con los padres ni con otros entrenadores.
-          </Text>
-          <View style={styles.documentsList}>
-            {documents.map((doc) => (
-              <DocumentRow key={doc.id} doc={doc} onPressUpload={() => markUploaded(doc.id)} />
-            ))}
-          </View>
-        </Section>
+        {!profile && (
+          <Section label="Documentos">
+            <Text style={styles.trustNote}>
+              Solo se usan para verificar tu identidad y experiencia. No se comparten con los padres ni con otros
+              entrenadores.
+            </Text>
+            <View style={styles.documentsList}>
+              {documents.map((doc) => (
+                <DocumentRow key={doc.id} doc={doc} onPressUpload={() => markUploaded(doc.id)} />
+              ))}
+            </View>
+          </Section>
+        )}
       </ScrollView>
 
       <View style={styles.footer}>
@@ -192,8 +254,8 @@ export default function CoachRegistrationScreen({ onSubmit }: { onSubmit?: () =>
             <ActivityIndicator color={colors.courtBlueDeep} />
           ) : (
             <View style={styles.submitContent}>
-              <Ionicons name="shield-checkmark-outline" size={18} color={colors.courtBlueDeep} />
-              <Text style={styles.submitLabel}>Enviar para verificación</Text>
+              <Ionicons name={profile ? 'checkmark-outline' : 'shield-checkmark-outline'} size={18} color={colors.courtBlueDeep} />
+              <Text style={styles.submitLabel}>{profile ? 'Guardar cambios' : 'Enviar para verificación'}</Text>
             </View>
           )}
         </Pressable>
@@ -240,11 +302,24 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg,
   },
   header: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
     paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: 18,
     borderBottomWidth: 1,
     borderBottomColor: colors.borderSoft,
+  },
+  backButton: {
+    paddingRight: 12,
+    paddingTop: 2,
+  },
+  backIcon: {
+    color: colors.lineWhite,
+    fontSize: 20,
+  },
+  headerText: {
+    flex: 1,
   },
   headerTitle: {
     color: colors.lineWhite,

@@ -79,6 +79,22 @@ export async function registerCoachProfile(
   });
 }
 
+/** CoachRegistrationScreen "Editar perfil" — datos personales/tarifa, sin tocar
+ * ageCategories/levels (eso lo cubre updateCoachTraining aparte) ni documentos/verificación. */
+export async function updateCoachProfileDetails(
+  coachId: string,
+  params: {
+    city: string;
+    region: string | null;
+    country: CountryCode;
+    yearsExperience: number;
+    specialty: string | null;
+    hourlyRate: number;
+  },
+): Promise<CoachProfile> {
+  return coachRepository.update(coachId, params);
+}
+
 /**
  * CoachRegistrationScreen guarda categorías de edad y niveles de juego
  * juntos (un solo botón "Enviar para verificación"); se hacen atómicos para
