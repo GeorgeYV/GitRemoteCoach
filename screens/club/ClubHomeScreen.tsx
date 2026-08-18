@@ -105,7 +105,7 @@ export default function ClubHomeScreen({
         <Pressable style={styles.actionButton} onPress={onOpenTournaments}>
           <View style={styles.buttonContent}>
             <Ionicons name="trophy-outline" size={16} color={colors.courtBlueDeep} />
-            <Text style={styles.actionButtonLabel}>Ver torneos</Text>
+            <Text style={styles.actionButtonLabel}>Ver/Crear mis torneos</Text>
           </View>
         </Pressable>
         <Pressable style={[styles.actionButton, styles.actionButtonSecondary]} onPress={onOpenSettlements}>

@@ -18,6 +18,7 @@ export default function ClubTournamentListScreen({
   refreshKey,
   onSelect,
   onCreate,
+  onBack,
 }: {
   clubId: string;
   clubName: string;
@@ -25,6 +26,7 @@ export default function ClubTournamentListScreen({
   refreshKey?: number;
   onSelect: (tournament: TournamentSummary) => void;
   onCreate: () => void;
+  onBack?: () => void;
 }) {
   const [tournaments, setTournaments] = useState<TournamentSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -48,8 +50,17 @@ export default function ClubTournamentListScreen({
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Torneos</Text>
-        <Text style={styles.headerSubtitle}>{clubName}</Text>
+        <View style={styles.headerTopRow}>
+          {onBack && (
+            <Pressable style={styles.backButton} onPress={onBack}>
+              <Text style={styles.backIcon}>←</Text>
+            </Pressable>
+          )}
+          <View style={styles.headerText}>
+            <Text style={styles.headerTitle}>Torneos</Text>
+            <Text style={styles.headerSubtitle}>{clubName}</Text>
+          </View>
+        </View>
         <Pressable style={styles.createButton} onPress={onCreate}>
           <Ionicons name="add" size={16} color={colors.courtBlueDeep} />
           <Text style={styles.createLabel}>Crear torneo</Text>
@@ -117,6 +128,22 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.borderSoft,
   },
+  headerTopRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 14,
+  },
+  backButton: {
+    paddingRight: 12,
+    paddingTop: 2,
+  },
+  backIcon: {
+    color: colors.lineWhite,
+    fontSize: 20,
+  },
+  headerText: {
+    flex: 1,
+  },
   headerTitle: {
     color: colors.lineWhite,
     fontSize: 22,
@@ -126,7 +153,6 @@ const styles = StyleSheet.create({
   headerSubtitle: {
     color: colors.textDim,
     fontSize: 13,
-    marginBottom: 14,
   },
   createButton: {
     flexDirection: 'row',

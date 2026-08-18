@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import SettlementRow from '../../components/club/SettlementRow';
 import { ApiError, ClubSettlementWithTournamentName, listClubSettlements } from '../../lib/api';
@@ -9,7 +9,15 @@ function money(amount: number): string {
   return `$${amount.toFixed(2)}`;
 }
 
-export default function ClubSettlementsScreen({ clubId, clubName }: { clubId: string; clubName: string }) {
+export default function ClubSettlementsScreen({
+  clubId,
+  clubName,
+  onBack,
+}: {
+  clubId: string;
+  clubName: string;
+  onBack?: () => void;
+}) {
   const [settlements, setSettlements] = useState<ClubSettlementWithTournamentName[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -53,8 +61,17 @@ export default function ClubSettlementsScreen({ clubId, clubName }: { clubId: st
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Liquidaciones</Text>
-        <Text style={styles.headerSubtitle}>{clubName}</Text>
+        <View style={styles.headerTopRow}>
+          {onBack && (
+            <Pressable style={styles.backButton} onPress={onBack}>
+              <Text style={styles.backIcon}>←</Text>
+            </Pressable>
+          )}
+          <View style={styles.headerText}>
+            <Text style={styles.headerTitle}>Liquidaciones</Text>
+            <Text style={styles.headerSubtitle}>{clubName}</Text>
+          </View>
+        </View>
       </View>
 
       <View style={styles.summaryRow}>
@@ -94,6 +111,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: 12,
+  },
+  headerTopRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  backButton: {
+    paddingRight: 12,
+    paddingTop: 2,
+  },
+  backIcon: {
+    color: colors.lineWhite,
+    fontSize: 20,
+  },
+  headerText: {
+    flex: 1,
   },
   headerTitle: {
     color: colors.lineWhite,

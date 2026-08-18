@@ -710,7 +710,15 @@ export function CoachCapturePreview() {
 
 /** Local flow: lista de torneos del club (con opción de crear uno nuevo) → detalle (roster +
  * liquidar) → invitar entrenador. */
-export function ClubTournamentFlow({ clubId, clubName }: { clubId: string; clubName: string }) {
+export function ClubTournamentFlow({
+  clubId,
+  clubName,
+  onBack,
+}: {
+  clubId: string;
+  clubName: string;
+  onBack?: () => void;
+}) {
   const [tournament, setTournament] = useState<TournamentSummary | null>(null);
   const [inviting, setInviting] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -737,6 +745,7 @@ export function ClubTournamentFlow({ clubId, clubName }: { clubId: string; clubN
         refreshKey={refreshKey}
         onSelect={setTournament}
         onCreate={() => setCreating(true)}
+        onBack={onBack}
       />
     );
   }
@@ -831,11 +840,11 @@ export function ClubFlow({ adminUserId }: { adminUserId: string }) {
   }
 
   if (screen === 'tournaments') {
-    return <ClubTournamentFlow clubId={club.id} clubName={club.name} />;
+    return <ClubTournamentFlow clubId={club.id} clubName={club.name} onBack={() => setScreen('home')} />;
   }
 
   if (screen === 'settlements') {
-    return <ClubSettlementsScreen clubId={club.id} clubName={club.name} />;
+    return <ClubSettlementsScreen clubId={club.id} clubName={club.name} onBack={() => setScreen('home')} />;
   }
 
   return (

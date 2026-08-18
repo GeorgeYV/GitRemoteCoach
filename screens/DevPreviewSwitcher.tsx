@@ -218,9 +218,17 @@ export default function DevPreviewSwitcher() {
         ) : screen === 'parentHistory' ? (
           <BookingHistoryScreen />
         ) : screen === 'clubSettlements' ? (
-          <ClubSettlementsScreen clubId={mockClubAdmin.id} clubName={mockClubAdmin.name} />
+          <ClubSettlementsScreen
+            clubId={mockClubAdmin.id}
+            clubName={mockClubAdmin.name}
+            onBack={() => setScreen('clubHome')}
+          />
         ) : screen === 'clubTournaments' ? (
-          <ClubTournamentFlow clubId={mockClubAdmin.id} clubName={mockClubAdmin.name} />
+          <ClubTournamentFlow
+            clubId={mockClubAdmin.id}
+            clubName={mockClubAdmin.name}
+            onBack={() => setScreen('clubHome')}
+          />
         ) : screen === 'clubHome' ? (
           <ClubHomeScreen
             clubId={mockClubAdmin.id}
