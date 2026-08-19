@@ -2,7 +2,7 @@ import type { BookingForParent } from './api';
 import type { BookingHistoryEntry, BookingHistoryStatus } from '../mock/parentFlow';
 
 /** Colapsa el enum real de 8 estados al modelo de 5 estados que ya usa BookingHistoryScreen. */
-const STATUS_MAP: Record<BookingForParent['status'], BookingHistoryStatus> = {
+export const STATUS_MAP: Record<BookingForParent['status'], BookingHistoryStatus> = {
   requested: 'requested',
   accepted: 'accepted',
   paid: 'confirmed',

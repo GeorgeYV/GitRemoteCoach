@@ -1,13 +1,14 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import IconTextInput from '../../components/shared/IconTextInput';
 import TrainerAvatarPlaceholder from '../../components/shared/TrainerAvatarPlaceholder';
 import { useAuth } from '../../context/AuthContext';
-import { ApiError, RateMode, requestBooking, TournamentSearchResult } from '../../lib/api';
+import { ApiError, Booking, listParentBookings, RateMode, requestBooking, TournamentSearchResult } from '../../lib/api';
+import { STATUS_MAP } from '../../lib/parentBookingDisplay';
 import { colors, radius, withOpacity } from '../../lib/theme';
-import { AvailabilityDay, buildMatchDatetime } from '../../mock/parentFlow';
+import { AvailabilityDay, BOOKING_HISTORY_STATUS_LABELS, buildMatchDatetime } from '../../mock/parentFlow';
 
 export interface CreatedDayBooking {
   bookingId: string;
@@ -15,6 +16,11 @@ export interface CreatedDayBooking {
   isoDate: string;
   price: number;
 }
+
+/** Mismo criterio que idx_bookings_no_duplicate_active (db/schema.sql): estos son los únicos
+ * estados que bloquean una nueva solicitud para el mismo jugador+coach+horario. rejected/expired/
+ * cancelled/payment_failed no cuentan — el padre puede volver a solicitar ese día. */
+const BLOCKING_STATUSES: Booking['status'][] = ['requested', 'accepted', 'paid', 'completed'];
 
 export default function BookingConfirmScreen({
   playerId,
@@ -39,7 +45,7 @@ export default function BookingConfirmScreen({
   onBack: () => void;
   onContinue: (created: CreatedDayBooking[], note: string) => void;
 }) {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const [selectedIsoDates, setSelectedIsoDates] = useState<Set<string>>(new Set());
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -47,9 +53,48 @@ export default function BookingConfirmScreen({
   // Reservas ya creadas en el servidor en un intento previo — se preservan entre reintentos
   // (ver handleContinue) para no perder de vista una solicitud real si otro día falla.
   const [created, setCreated] = useState<CreatedDayBooking[]>([]);
+  // Días para los que este jugador ya tiene una solicitud activa con este coach en este torneo —
+  // se muestran bloqueados con su estado real en vez de dejar que el padre los vuelva a pedir y
+  // se entere recién al fallar el POST (ver duplicate_booking en requestBooking).
+  const [bookedStatusByIsoDate, setBookedStatusByIsoDate] = useState<Map<string, Booking['status']>>(new Map());
+
+  useEffect(() => {
+    if (!token || !user) return;
+    let cancelled = false;
+    listParentBookings(token, user.id)
+      .then((bookings) => {
+        if (cancelled) return;
+        const next = new Map<string, Booking['status']>();
+        for (const booking of bookings) {
+          if (
+            booking.playerId === playerId &&
+            booking.coachId === coachId &&
+            booking.tournamentId === tournament.id &&
+            BLOCKING_STATUSES.includes(booking.status)
+          ) {
+            next.set(booking.matchDatetime.slice(0, 10), booking.status);
+          }
+        }
+        setBookedStatusByIsoDate(next);
+        // Si el padre ya había marcado uno de estos días antes de que esto terminara de cargar,
+        // se lo destildamos — evita enviar una solicitud que el servidor va a rechazar de todos modos.
+        setSelectedIsoDates((prev) => {
+          const filtered = new Set([...prev].filter((iso) => !next.has(iso)));
+          return filtered.size === prev.size ? prev : filtered;
+        });
+      })
+      .catch(() => {
+        // Chequeo preventivo — si falla, el padre igual puede intentar reservar y se entera por
+        // el mensaje de error del propio POST si el día ya estaba tomado.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token, user, playerId, coachId, tournament.id]);
 
   function toggleDay(day: AvailabilityDay) {
     if (created.length > 0) return; // días ya bloqueados una vez que hay reservas reales creadas
+    if (bookedStatusByIsoDate.has(day.isoDate)) return;
     setSelectedIsoDates((prev) => {
       const next = new Set(prev);
       if (next.has(day.isoDate)) next.delete(day.isoDate);
@@ -78,7 +123,7 @@ export default function BookingConfirmScreen({
     const alreadyCreated = new Set(created.map((c) => c.isoDate));
     const pendingDays = selectedDays.filter((day) => !alreadyCreated.has(day.isoDate));
     const newlyCreated: CreatedDayBooking[] = [];
-    const failedDayLabels: string[] = [];
+    const failedDays: { label: string; message: string }[] = [];
 
     for (const day of pendingDays) {
       // Con 'per_tournament', solo el primer día (cronológicamente) de la selección carga el
@@ -96,7 +141,10 @@ export default function BookingConfirmScreen({
         });
         newlyCreated.push({ bookingId: booking.id, dayLabel: day.dayLabel, isoDate: day.isoDate, price: dayPrice });
       } catch (err) {
-        failedDayLabels.push(day.dayLabel);
+        // El backend ya devuelve un mensaje claro (ej. duplicate_booking: "Ya existe una
+        // solicitud activa..."), no hay que reemplazarlo por uno genérico.
+        const message = err instanceof ApiError ? err.message : 'No se pudo completar la solicitud.';
+        failedDays.push({ label: day.dayLabel, message });
       }
     }
 
@@ -104,8 +152,8 @@ export default function BookingConfirmScreen({
     setCreated(allCreated);
     setSubmitting(false);
 
-    if (failedDayLabels.length > 0) {
-      setError(`No se pudo solicitar: ${failedDayLabels.join(', ')}. Vuelve a intentar.`);
+    if (failedDays.length > 0) {
+      setError(failedDays.map((f) => `${f.label}: ${f.message}`).join(' · '));
       return;
     }
     onContinue(allCreated, note.trim());
@@ -141,6 +189,7 @@ export default function BookingConfirmScreen({
           <View style={styles.daysGrid}>
             {availability.map((day) => {
               const active = selectedIsoDates.has(day.isoDate);
+              const bookedStatus = bookedStatusByIsoDate.get(day.isoDate);
               const exception = day.available && day.unavailableFrom && day.unavailableTo
                 ? `No disp. ${day.unavailableFrom}–${day.unavailableTo}`
                 : null;
@@ -149,12 +198,13 @@ export default function BookingConfirmScreen({
                   <Text style={styles.dayLabel}>{day.dayLabel}</Text>
                   {day.isPreTournament && <Text style={styles.dayPreTag}>Previo</Text>}
                   <Pressable
-                    disabled={!day.available || daysLocked}
+                    disabled={!day.available || daysLocked || !!bookedStatus}
                     onPress={() => toggleDay(day)}
                     style={[
                       styles.slotPill,
                       !day.available && styles.slotPillDisabled,
                       active && styles.slotPillActive,
+                      !!bookedStatus && styles.slotPillBooked,
                     ]}
                   >
                     <Text
@@ -162,9 +212,10 @@ export default function BookingConfirmScreen({
                         styles.slotLabel,
                         !day.available && styles.slotLabelDisabled,
                         active && styles.slotLabelActive,
+                        !!bookedStatus && styles.slotLabelBooked,
                       ]}
                     >
-                      Disponible
+                      {bookedStatus ? BOOKING_HISTORY_STATUS_LABELS[STATUS_MAP[bookedStatus]] : 'Disponible'}
                     </Text>
                   </Pressable>
                   {exception && <Text style={styles.dayException}>{exception}</Text>}
@@ -332,6 +383,13 @@ const styles = StyleSheet.create({
     borderColor: colors.ballLime,
     backgroundColor: withOpacity(colors.ballLime, 0.16),
   },
+  // Distinto de slotPillDisabled (día que el coach no ofrece) — este es un día que el propio
+  // padre ya solicitó, así que se mantiene a opacidad completa y con el acento de la app en vez
+  // de leer como "no disponible".
+  slotPillBooked: {
+    borderColor: colors.courtBlue,
+    backgroundColor: withOpacity(colors.courtBlue, 0.12),
+  },
   slotLabel: {
     fontSize: 10,
     fontWeight: '700',
@@ -341,6 +399,9 @@ const styles = StyleSheet.create({
     color: colors.textDim,
   },
   slotLabelActive: {
+    color: colors.courtBlue,
+  },
+  slotLabelBooked: {
     color: colors.courtBlue,
   },
   hint: {
