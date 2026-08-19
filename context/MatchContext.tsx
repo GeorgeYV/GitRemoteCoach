@@ -34,8 +34,17 @@ import {
   updateMatchStatus,
 } from '../lib/api';
 
-const STORAGE_KEY = 'tennis-live-capture:match-v1';
+const STORAGE_KEY_PREFIX = 'tennis-live-capture:match-v1';
 const OBSERVATIONS_DEBOUNCE_MS = 800;
+
+/** Sin el matchId, un partido recién terminado (matchClosed: true, ya persistido) quedaba en la
+ * misma clave global y se lo "heredaba" el próximo partido con otro alumno — el coach terminaba
+ * en la pantalla de resumen del partido anterior en vez de arrancar uno nuevo. Cada partido ahora
+ * tiene su propio slot; retomar el MISMO partido (recarga, reanudar suspendido) sigue funcionando
+ * porque createOrGetMatch es idempotente por bookingId y por lo tanto devuelve el mismo matchId. */
+function storageKeyFor(matchId: string): string {
+  return `${STORAGE_KEY_PREFIX}:${matchId}`;
+}
 
 interface MatchContextValue {
   config: MatchConfig;
@@ -170,7 +179,7 @@ export function MatchProvider({
   }
 
   useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY).then((raw) => {
+    AsyncStorage.getItem(storageKeyFor(matchId)).then((raw) => {
       if (raw) {
         try {
           const parsed: MatchReducerState = JSON.parse(raw);
@@ -190,8 +199,8 @@ export function MatchProvider({
 
   useEffect(() => {
     if (!hydrated.current) return;
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(reducerState)).catch(() => {});
-  }, [reducerState]);
+    AsyncStorage.setItem(storageKeyFor(matchId), JSON.stringify(reducerState)).catch(() => {});
+  }, [reducerState, matchId]);
 
   // Observaciones del entrenador: el TextInput actualiza el estado local en cada tecla (sin
   // cambio de UX); solo se sincroniza al servidor cuando el usuario deja de escribir.
@@ -275,7 +284,7 @@ export function MatchProvider({
       // does the same server-side, so stale retiro/pausa data from the previous match doesn't
       // leak into what the coach sees as a brand new one.
       setMatch((m) => ({ ...m, status: 'in_progress', completedAt: null, pausedAt: null, totalPausedSeconds: 0, retiredBy: null }));
-      AsyncStorage.removeItem(STORAGE_KEY).catch(() => {});
+      AsyncStorage.removeItem(storageKeyFor(matchId)).catch(() => {});
       enqueue((authToken) => restartMatch(authToken, matchId));
     },
     canUndo: reducerState.undoBudget > 0,
