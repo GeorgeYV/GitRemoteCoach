@@ -2,10 +2,10 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import React, { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import DatePickerField from '../../components/shared/DatePickerField';
 import IconTextInput from '../../components/shared/IconTextInput';
 import { useAuth } from '../../context/AuthContext';
 import { ApiError, CountryCode, createUnclaimedTournament } from '../../lib/api';
-import { isValidDateString } from '../../lib/dateSlots';
 import { colors, radius, withOpacity } from '../../lib/theme';
 import { COUNTRY_LABELS, COUNTRY_OPTIONS } from '../../mock/coachFlow';
 
@@ -39,13 +39,9 @@ export default function PlatformAdminTournamentScreen() {
       setError('No hay una sesión activa.');
       return;
     }
-    const trimmedStart = startDate.trim();
-    const trimmedEnd = endDate.trim();
-    if (!isValidDateString(trimmedStart) || !isValidDateString(trimmedEnd)) {
-      setError('Fecha inválida. Usa el formato AAAA-MM-DD (ej. 2026-03-15).');
-      return;
-    }
-    if (trimmedEnd < trimmedStart) {
+    // El picker ya no deja elegir un fin anterior al inicio (minDate={startDate}), pero se
+    // mantiene como respaldo por si startDate cambia después de haber elegido endDate.
+    if (endDate < startDate) {
       setError('La fecha de fin no puede ser anterior a la de inicio.');
       return;
     }
@@ -58,8 +54,8 @@ export default function PlatformAdminTournamentScreen() {
         venue: venue.trim(),
         city: city.trim(),
         country,
-        startDate: startDate.trim(),
-        endDate: endDate.trim(),
+        startDate,
+        endDate,
       });
       setSuccessMessage(`"${tournament.name}" creado — visible para clubes de ${COUNTRY_LABELS[country]} para reclamar.`);
       setName('');
@@ -112,17 +108,21 @@ export default function PlatformAdminTournamentScreen() {
         </Section>
 
         <Section label="Fechas">
-          <IconTextInput
+          <DatePickerField
             icon="calendar-outline"
-            placeholder="Fecha de inicio (AAAA-MM-DD)"
+            placeholder="Fecha de inicio"
             value={startDate}
-            onChangeText={setStartDate}
+            onChange={(iso) => {
+              setStartDate(iso);
+              if (endDate && endDate < iso) setEndDate('');
+            }}
           />
-          <IconTextInput
+          <DatePickerField
             icon="calendar-outline"
-            placeholder="Fecha de fin (AAAA-MM-DD)"
+            placeholder="Fecha de fin"
             value={endDate}
-            onChangeText={setEndDate}
+            onChange={setEndDate}
+            minDate={startDate || undefined}
           />
         </Section>
       </ScrollView>

@@ -2,10 +2,10 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import React, { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import DatePickerField from '../../components/shared/DatePickerField';
 import IconTextInput from '../../components/shared/IconTextInput';
 import { useAuth } from '../../context/AuthContext';
 import { ApiError, createTournament, TournamentSummary } from '../../lib/api';
-import { isValidDateString } from '../../lib/dateSlots';
 import { colors, radius, withOpacity } from '../../lib/theme';
 
 export default function ClubCreateTournamentScreen({
@@ -34,13 +34,9 @@ export default function ClubCreateTournamentScreen({
       setError('No hay una sesión activa.');
       return;
     }
-    const trimmedStart = startDate.trim();
-    const trimmedEnd = endDate.trim();
-    if (!isValidDateString(trimmedStart) || !isValidDateString(trimmedEnd)) {
-      setError('Fecha inválida. Usa el formato AAAA-MM-DD (ej. 2026-03-15).');
-      return;
-    }
-    if (trimmedEnd < trimmedStart) {
+    // El picker ya no deja elegir un fin anterior al inicio (minDate={startDate}), pero se
+    // mantiene como respaldo por si startDate cambia después de haber elegido endDate.
+    if (endDate < startDate) {
       setError('La fecha de fin no puede ser anterior a la de inicio.');
       return;
     }
@@ -50,8 +46,8 @@ export default function ClubCreateTournamentScreen({
       const tournament = await createTournament(token, clubId, {
         name: name.trim(),
         venue: venue.trim(),
-        startDate: startDate.trim(),
-        endDate: endDate.trim(),
+        startDate,
+        endDate,
       });
       onCreated(tournament);
     } catch (err) {
@@ -80,17 +76,23 @@ export default function ClubCreateTournamentScreen({
         </Section>
 
         <Section label="Fechas">
-          <IconTextInput
+          <DatePickerField
             icon="calendar-outline"
-            placeholder="Fecha de inicio (AAAA-MM-DD)"
+            placeholder="Fecha de inicio"
             value={startDate}
-            onChangeText={setStartDate}
+            onChange={(iso) => {
+              setStartDate(iso);
+              // Si ya había un fin elegido y quedó antes del nuevo inicio, se limpia — el picker
+              // de fin usa minDate={startDate} así que no lo iba a dejar elegido de nuevo así.
+              if (endDate && endDate < iso) setEndDate('');
+            }}
           />
-          <IconTextInput
+          <DatePickerField
             icon="calendar-outline"
-            placeholder="Fecha de fin (AAAA-MM-DD)"
+            placeholder="Fecha de fin"
             value={endDate}
-            onChangeText={setEndDate}
+            onChange={setEndDate}
+            minDate={startDate || undefined}
           />
         </Section>
       </ScrollView>

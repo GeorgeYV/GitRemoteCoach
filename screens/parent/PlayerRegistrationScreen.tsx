@@ -2,10 +2,11 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import React, { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import DatePickerField from '../../components/shared/DatePickerField';
 import IconTextInput from '../../components/shared/IconTextInput';
 import { useAuth } from '../../context/AuthContext';
 import { AgeCategory, ApiError, CountryCode, Player, registerPlayer, updatePlayer } from '../../lib/api';
-import { isValidDateString } from '../../lib/dateSlots';
+import { todayIso } from '../../lib/dateSlots';
 import { colors, radius, withOpacity } from '../../lib/theme';
 import { AGE_CATEGORY_OPTIONS, COUNTRY_LABELS, COUNTRY_OPTIONS } from '../../mock/coachFlow';
 
@@ -33,10 +34,6 @@ export default function PlayerRegistrationScreen({
       return;
     }
     if (!ageCategory || !country) return;
-    if (!isValidDateString(birthDate.trim())) {
-      setError('Fecha de nacimiento inválida. Usa el formato AAAA-MM-DD (ej. 2015-03-15).');
-      return;
-    }
     setSubmitting(true);
     setError(null);
     const params = {
@@ -83,11 +80,12 @@ export default function PlayerRegistrationScreen({
       <ScrollView contentContainerStyle={styles.content}>
         <Section label="Datos del jugador">
           <IconTextInput icon="person-outline" placeholder="Nombre completo" value={fullName} onChangeText={setFullName} />
-          <IconTextInput
+          <DatePickerField
             icon="calendar-outline"
-            placeholder="Fecha de nacimiento (AAAA-MM-DD)"
+            placeholder="Fecha de nacimiento"
             value={birthDate}
-            onChangeText={setBirthDate}
+            onChange={setBirthDate}
+            maxDate={todayIso()}
           />
         </Section>
 

@@ -93,3 +93,11 @@ export function isoToLocalDateAndTime(iso: string): { date: string; time: string
 export function localDateAndTimeToIso(date: string, time: string): string {
   return new Date(`${date}T${time}:00`).toISOString();
 }
+
+/** Fecha de HOY (AAAA-MM-DD) en el huso horario LOCAL del dispositivo — a propósito no usa
+ * toISOString() (convierte a UTC primero y puede correr el día). Usado por DatePickerField como
+ * mes/día por defecto y como maxDate en campos que no aceptan fechas futuras (ej. nacimiento). */
+export function todayIso(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
