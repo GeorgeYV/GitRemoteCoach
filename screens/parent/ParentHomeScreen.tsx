@@ -8,7 +8,14 @@ import ParentTabBar from '../../components/parent/ParentTabBar';
 import IconTextInput from '../../components/shared/IconTextInput';
 import InitialAvatar from '../../components/shared/InitialAvatar';
 import { useAuth } from '../../context/AuthContext';
-import { CountryCode, listParentBookings, listPlayers, searchTournaments, TournamentSearchResult } from '../../lib/api';
+import {
+  BookingForParent,
+  CountryCode,
+  listParentBookings,
+  listPlayers,
+  searchTournaments,
+  TournamentSearchResult,
+} from '../../lib/api';
 import { dateRangeLabel } from '../../lib/dateSlots';
 import { colors, radius, withOpacity } from '../../lib/theme';
 import { COUNTRY_LABELS, COUNTRY_OPTIONS } from '../../mock/coachFlow';
@@ -42,6 +49,31 @@ function daysUntilCountdown(startIso: string): { text: string; color: string } |
   return { text: `faltan ${days} d`, color };
 }
 
+// "En proceso" (esperando decisión del entrenador o el pago) o "concretada" (pagada o ya jugada) —
+// un compromiso real con ese torneo, a diferencia de rejected/expired/cancelled/payment_failed.
+const ACTIVE_ENGAGEMENT_STATUSES = new Set<BookingForParent['status']>(['requested', 'accepted', 'paid', 'completed']);
+
+/** El torneo de "Continuar con" prioriza uno donde el padre ya tiene una reserva en curso, mientras
+ * ese torneo siga vigente (fecha de fin no pasada) — con reservas en más de un torneo, el que
+ * empieza más pronto. null si no hay ninguna reserva activa en un torneo todavía vigente. */
+function bookedTournamentFeatured(bookings: BookingForParent[]): TournamentSearchResult | null {
+  const now = Date.now();
+  const candidates = bookings
+    .filter((b) => ACTIVE_ENGAGEMENT_STATUSES.has(b.status) && new Date(b.tournamentEndDate).getTime() >= now)
+    .sort((a, b) => new Date(a.tournamentStartDate).getTime() - new Date(b.tournamentStartDate).getTime());
+  const next = candidates[0];
+  if (!next) return null;
+  return {
+    id: next.tournamentId,
+    name: next.tournamentName,
+    venue: next.tournamentVenue,
+    city: next.tournamentCity,
+    country: null,
+    startDate: next.tournamentStartDate,
+    endDate: next.tournamentEndDate,
+  };
+}
+
 export default function ParentHomeScreen() {
   const router = useRouter();
   const { user, token } = useAuth();
@@ -53,22 +85,24 @@ export default function ParentHomeScreen() {
   const [tournaments, setTournaments] = useState<TournamentSearchResult[] | null>(null);
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState<TournamentSearchResult[] | null>(null);
-  const [pendingPaymentCount, setPendingPaymentCount] = useState(0);
+  const [bookings, setBookings] = useState<BookingForParent[]>([]);
 
-  // Reservas ya aceptadas por el entrenador pero sin pagar todavía — el padre puede perder el cupo
-  // si no completa el pago, así que se lo recordamos apenas entra a la pantalla de inicio.
+  // Alimenta tanto el recordatorio de pago pendiente como el destacado de "Continuar con" — una
+  // sola carga para ambos en vez de repetir la misma llamada.
   useEffect(() => {
     if (!user || !token) return;
     let cancelled = false;
     listParentBookings(token, user.id)
-      .then((bookings) => {
-        if (!cancelled) setPendingPaymentCount(bookings.filter((b) => b.status === 'accepted').length);
+      .then((result) => {
+        if (!cancelled) setBookings(result);
       })
       .catch(() => {});
     return () => {
       cancelled = true;
     };
   }, [user, token]);
+
+  const pendingPaymentCount = bookings.filter((b) => b.status === 'accepted').length;
 
   useEffect(() => {
     if (!token) return;
@@ -131,7 +165,7 @@ export default function ParentHomeScreen() {
   }
 
   const firstName = user?.fullName.split(' ')[0] ?? '';
-  const featured = tournaments?.[0] ?? null;
+  const featured = bookedTournamentFeatured(bookings) ?? tournaments?.[0] ?? null;
   const isSearching = query.trim().length > 0;
   // Sin búsqueda activa: el resto de la carga fija, sin repetir el destacado. Buscando: la lista
   // completa de resultados del servidor — puede incluir al destacado, y eso está bien (ya no hay

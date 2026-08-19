@@ -260,6 +260,9 @@ export interface BookingForParent extends Booking {
   ageCategory: AgeCategory;
   tournamentName: string;
   tournamentVenue: string;
+  tournamentCity: string;
+  tournamentStartDate: string;
+  tournamentEndDate: string;
   reviewed: boolean;
   hasUnreadMessages: boolean;
 }

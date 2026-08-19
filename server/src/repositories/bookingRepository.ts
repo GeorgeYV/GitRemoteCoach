@@ -60,6 +60,9 @@ function mapRowForParent(row: any): BookingForParent {
     ageCategory: row.age_category,
     tournamentName: row.tournament_name,
     tournamentVenue: row.tournament_venue,
+    tournamentCity: row.tournament_city,
+    tournamentStartDate: row.tournament_start_date,
+    tournamentEndDate: row.tournament_end_date,
     reviewed: row.reviewed,
     hasUnreadMessages: row.has_unread_messages,
   };
@@ -395,8 +398,12 @@ export async function listBookingsForParent(
     // LEFT JOIN en vez de EXISTS(SELECT ...) correlacionado: pg-mem (smoke tests, ver
     // setupDb.ts) no resuelve una subquery en el SELECT list que referencia una columna
     // de la consulta externa (b.id) — mismo tipo de limitación ya documentada ahí.
+    // COALESCE(cl.city, t.city): mismo criterio que tournamentRepository.search — un torneo sin
+    // reclamar (club_id NULL) todavía tiene su propia ciudad, uno reclamado la hereda del club.
     `SELECT b.*, cu.full_name AS coach_name, p.full_name AS player_name, p.age_category,
             t.name AS tournament_name, t.venue AS tournament_venue,
+            COALESCE(cl.city, t.city) AS tournament_city,
+            t.start_date AS tournament_start_date, t.end_date AS tournament_end_date,
             (rv.id IS NOT NULL) AS reviewed,
             (coach_msgs.last_at IS NOT NULL
              AND coach_msgs.last_at > COALESCE(b.parent_messages_read_at, TIMESTAMP '1970-01-01')) AS has_unread_messages
@@ -404,6 +411,7 @@ export async function listBookingsForParent(
      JOIN players p ON p.id = b.player_id
      JOIN users cu ON cu.id = b.coach_id
      JOIN tournaments t ON t.id = b.tournament_id
+     LEFT JOIN clubs cl ON cl.id = t.club_id
      LEFT JOIN reviews rv ON rv.booking_id = b.id
      LEFT JOIN (
        SELECT booking_id, MAX(created_at) AS last_at
