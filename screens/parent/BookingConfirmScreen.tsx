@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import IconTextInput from '../../components/shared/IconTextInput';
 import TrainerAvatarPlaceholder from '../../components/shared/TrainerAvatarPlaceholder';
@@ -184,6 +184,11 @@ export default function BookingConfirmScreen({
         </View>
       </View>
 
+      <KeyboardAvoidingView
+        style={styles.flexArea}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={8}
+      >
       <ScrollView contentContainerStyle={styles.content}>
         <Section label="Elige uno o más días">
           <View style={styles.daysGrid}>
@@ -264,6 +269,7 @@ export default function BookingConfirmScreen({
           )}
         </Pressable>
       </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -281,6 +287,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.bg,
+  },
+  flexArea: {
+    flex: 1,
   },
   header: {
     flexDirection: 'row',
