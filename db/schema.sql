@@ -885,6 +885,9 @@ CREATE TABLE bookings (
   payment_provider               TEXT CHECK (payment_provider IS NULL OR payment_provider IN ('deuna', 'yape', 'plin', 'bank_transfer')),
   payment_submitted_at           TIMESTAMPTZ,
   payment_verified_by            UUID REFERENCES users (id),
+  -- Se setea la primera vez que jobs/paymentReminders le manda el push de "tu pago está por
+  -- vencer" a esta reserva — evita mandarlo de nuevo en cada corrida del job.
+  payment_reminder_sent_at       TIMESTAMPTZ,
 
   payment_reference             TEXT,
   requested_at                  TIMESTAMPTZ NOT NULL DEFAULT now(),

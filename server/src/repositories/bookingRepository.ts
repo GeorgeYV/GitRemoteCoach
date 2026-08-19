@@ -36,6 +36,7 @@ function mapRow(row: any): Booking {
     paymentProvider: row.payment_provider,
     paymentSubmittedAt: row.payment_submitted_at,
     paymentVerifiedBy: row.payment_verified_by,
+    paymentReminderSentAt: row.payment_reminder_sent_at,
     paymentReference: row.payment_reference,
     requestedAt: row.requested_at,
     decidedAt: row.decided_at,
@@ -252,6 +253,30 @@ export async function expireOverduePayments(db: Queryable = pool): Promise<Booki
      RETURNING *`,
   );
   return rows.map(mapRow);
+}
+
+/** jobs/paymentReminders: reservas 'accepted' cuyo payment_deadline cae dentro del umbral (ver
+ * businessRules.paymentReminderHoursBeforeDeadline) y todavía no vencido, sin recordatorio ya
+ * mandado. payment_deadline > now() la excluye a propósito — si ya venció, el job de expiración
+ * (expireOverduePayments) es el que la mata, no tiene sentido recordarle un pago ya muerto. */
+export async function findAcceptedBookingsNeedingPaymentReminder(
+  reminderThreshold: Date,
+  db: Queryable = pool,
+): Promise<Booking[]> {
+  const { rows } = await db.query(
+    `SELECT * FROM bookings
+     WHERE status = 'accepted'
+       AND payment_reminder_sent_at IS NULL
+       AND payment_deadline IS NOT NULL
+       AND payment_deadline <= $1
+       AND payment_deadline > now()`,
+    [reminderThreshold],
+  );
+  return rows.map(mapRow);
+}
+
+export async function markPaymentReminderSent(bookingId: string, db: Queryable = pool): Promise<void> {
+  await db.query(`UPDATE bookings SET payment_reminder_sent_at = now() WHERE id = $1`, [bookingId]);
 }
 
 /** TrainerProfileScreen: cuántos jugadores distintos tienen una reserva activa (no rechazada,

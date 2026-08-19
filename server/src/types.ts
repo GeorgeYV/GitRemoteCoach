@@ -79,6 +79,7 @@ export interface Booking {
   paymentProvider: PaymentProvider | null;
   paymentSubmittedAt: string | null;
   paymentVerifiedBy: string | null;
+  paymentReminderSentAt: string | null;
   paymentReference: string | null;
   requestedAt: string;
   decidedAt: string | null;

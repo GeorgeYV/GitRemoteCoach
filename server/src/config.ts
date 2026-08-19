@@ -26,8 +26,12 @@ export const env = {
 export const businessRules = {
   /** Ventana del entrenador para aceptar/rechazar una solicitud. */
   coachResponseWindowHours: 4,
-  /** Ventana del padre para pagar tras la aceptación del entrenador. */
-  paymentWindowHours: 2,
+  /** Ventana del padre para pagar tras la aceptación del entrenador — pensada para dar tiempo a
+   * un padre que tiene que viajar a la ciudad del torneo, no solo a alguien frente al celular. */
+  paymentWindowHours: 6,
+  /** Cuánto antes de que venza payment_deadline se manda el recordatorio push (jobs/paymentReminders) —
+   * a las 4h de una ventana de 6h, para que todavía haya margen real de reaccionar. */
+  paymentReminderHoursBeforeDeadline: 2,
   /** Bajo esta antelación, la cancelación del padre es "tardía". */
   lateCancellationWindowHours: 24,
   /** % del monto pagado que se reembolsa al padre en cancelación tardía. */
