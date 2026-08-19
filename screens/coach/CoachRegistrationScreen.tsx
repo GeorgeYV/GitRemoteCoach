@@ -188,6 +188,7 @@ export default function CoachRegistrationScreen({
             onChangeText={setExperience}
             keyboardType="number-pad"
           />
+          {experience.length > 0 && <Text style={styles.fieldHint}>Años de experiencia entrenando</Text>}
           <IconTextInput
             icon="cash-outline"
             placeholder="Tarifa por hora ($)"
@@ -366,6 +367,13 @@ const styles = StyleSheet.create({
     color: colors.textDim,
     fontSize: 12,
     marginTop: 10,
+  },
+  fieldHint: {
+    color: colors.textDim,
+    fontSize: 11,
+    marginTop: -6,
+    marginBottom: 10,
+    marginLeft: 4,
   },
   section: {
     marginBottom: 24,
