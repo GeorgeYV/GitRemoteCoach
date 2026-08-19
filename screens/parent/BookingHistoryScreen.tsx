@@ -16,9 +16,10 @@ import BookingRescheduleScreen from './BookingRescheduleScreen';
 import BookingReviewScreen from './BookingReviewScreen';
 import ParentChatScreen from './ParentChatScreen';
 
-/** Only requests still awaiting the coach, accepted-but-unpaid, or already-paid bookings can be
- * cancelled by the parent. */
-const CANCELLABLE_STATUSES = ['requested', 'accepted', 'confirmed'];
+/** Only requests still awaiting the coach, accepted-but-unpaid, comprobante-por-verificar, or
+ * already-paid bookings can be cancelled by the parent. Also drives "Próximas" vs "Anteriores":
+ * a booking waiting on payment verification is for a future match, not a past one. */
+const CANCELLABLE_STATUSES = ['requested', 'accepted', 'paymentSubmitted', 'confirmed'];
 
 export default function BookingHistoryScreen() {
   const { user, token } = useAuth();
@@ -73,8 +74,10 @@ export default function BookingHistoryScreen() {
 
   function confirmPayment() {
     if (!payTargets) return;
-    const paidIds = new Set(payTargets.map((b) => b.id));
-    setBookings((prev) => prev?.map((b) => (paidIds.has(b.id) ? { ...b, status: 'confirmed' } : b)) ?? null);
+    const submittedIds = new Set(payTargets.map((b) => b.id));
+    setBookings(
+      (prev) => prev?.map((b) => (submittedIds.has(b.id) ? { ...b, status: 'paymentSubmitted' } : b)) ?? null,
+    );
     setPayTargets(null);
     setSelectionMode(false);
     setSelectedIds(new Set());
@@ -145,6 +148,7 @@ export default function BookingHistoryScreen() {
           tournamentName: b.tournamentName,
           venue: b.venue,
         }))}
+        country={payTargets[0].tournamentCountry ?? 'EC'}
         note=""
         {...(singleTrainer
           ? { trainerName: payTargets[0].trainerName, tournamentName: payTargets[0].tournamentName, venue: payTargets[0].venue }
@@ -177,7 +181,14 @@ export default function BookingHistoryScreen() {
     .filter((b) => CANCELLABLE_STATUSES.includes(b.status))
     .sort((a, b) => new Date(a.matchDatetime).getTime() - new Date(b.matchDatetime).getTime());
   const past = bookings.filter((b) => !CANCELLABLE_STATUSES.includes(b.status));
-  const payable = upcoming.filter((b) => b.status === 'accepted');
+  // "Pagar todas"/selección múltiple manda un solo código de referencia para todo el lote — no
+  // puede cubrir un pago a Deuna y a Yape/Plin a la vez, así que el lote se limita al país del
+  // primer torneo "por pagar" que aparezca. Reservas por pagar de otro país siguen teniendo su
+  // propio link "Pagar" individual en la fila (ver onPay más abajo, sin esta restricción).
+  const allPayable = upcoming.filter((b) => b.status === 'accepted');
+  const batchCountry = allPayable[0]?.tournamentCountry ?? null;
+  const payable = allPayable.filter((b) => b.tournamentCountry === batchCountry);
+  const payableIds = new Set(payable.map((b) => b.id));
   const selectedPayable = payable.filter((b) => selectedIds.has(b.id));
 
   return (
@@ -237,7 +248,7 @@ export default function BookingHistoryScreen() {
                 onChat={() => setChatTarget(booking)}
                 onPay={booking.status === 'accepted' ? () => setPayTargets([booking]) : undefined}
                 onReschedule={() => setRescheduleTarget(booking)}
-                selectable={selectionMode && booking.status === 'accepted'}
+                selectable={selectionMode && payableIds.has(booking.id)}
                 selected={selectedIds.has(booking.id)}
                 onToggleSelect={() => toggleSelected(booking.id)}
               />

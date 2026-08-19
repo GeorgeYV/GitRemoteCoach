@@ -5,6 +5,7 @@ import type { CoachBooking, CoachBookingStatus } from '../mock/coachFlow';
 const STATUS_MAP: Record<BookingWithParticipants['status'], CoachBookingStatus> = {
   requested: 'confirmed',
   accepted: 'confirmed',
+  payment_submitted: 'confirmed',
   paid: 'confirmed',
   completed: 'completed',
   cancelled: 'cancelled',
@@ -14,7 +15,7 @@ const STATUS_MAP: Record<BookingWithParticipants['status'], CoachBookingStatus> 
 };
 
 /** Reservas que de verdad van a suceder — lo que CoachHomeScreen llama "próxima sesión". */
-const UPCOMING_RAW_STATUSES: BookingWithParticipants['status'][] = ['accepted', 'paid'];
+const UPCOMING_RAW_STATUSES: BookingWithParticipants['status'][] = ['accepted', 'payment_submitted', 'paid'];
 
 export function isUpcoming(booking: BookingWithParticipants): boolean {
   return UPCOMING_RAW_STATUSES.includes(booking.status) && new Date(booking.matchDatetime).getTime() > Date.now();

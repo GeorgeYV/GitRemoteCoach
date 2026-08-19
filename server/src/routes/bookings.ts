@@ -38,6 +38,17 @@ const payBookingsBatchSchema = z.object({
   paymentMethodId: z.string().min(1),
 });
 
+const submitPaymentProofSchema = z.object({
+  provider: z.enum(['deuna', 'yape', 'plin']),
+  referenceCode: z.string().min(1).max(100),
+});
+
+const submitPaymentProofBatchSchema = z.object({
+  bookingIds: z.array(z.string().uuid()).min(1),
+  provider: z.enum(['deuna', 'yape', 'plin']),
+  referenceCode: z.string().min(1).max(100),
+});
+
 const cancelBookingSchema = z.object({
   reason: z.string().max(500).optional(),
 });
@@ -121,6 +132,32 @@ export async function bookingRoutes(app: FastifyInstance): Promise<void> {
       if (sub !== guardianUserId) throw new ForbiddenError('Solo el padre/madre de la reserva puede pagarla');
     }
     return paymentService.initiatePaymentBatch(parsed.data.bookingIds, parsed.data.paymentMethodId);
+  });
+
+  // Fase 1 sin Stripe: el padre paga por fuera de la app (Deuna/Yape/Plin) y manda el código de
+  // operación acá — solo registra la intención, platform_admin lo confirma después (ver
+  // /bookings/payment-verification-queue y /bookings/verify-payment).
+  app.post('/bookings/:id/submit-payment-proof', { preHandler: app.authenticate }, async (req) => {
+    const { id } = req.params as { id: string };
+    const parsed = submitPaymentProofSchema.safeParse(req.body);
+    if (!parsed.success) throw new ValidationError(parsed.error.message);
+    const { sub } = req.user as { sub: string };
+    const { guardianUserId } = await bookingRepository.getBookingParticipants(id);
+    if (sub !== guardianUserId) throw new ForbiddenError('Solo el padre/madre de la reserva puede pagarla');
+    return paymentService.submitPaymentProof([id], parsed.data);
+  });
+
+  // Un solo comprobante para varias reservas a la vez (mismo criterio que /bookings/pay-batch):
+  // todas deben pertenecer al padre autenticado y quedar cubiertas por el mismo pago manual.
+  app.post('/bookings/submit-payment-proof-batch', { preHandler: app.authenticate }, async (req) => {
+    const parsed = submitPaymentProofBatchSchema.safeParse(req.body);
+    if (!parsed.success) throw new ValidationError(parsed.error.message);
+    const { sub } = req.user as { sub: string };
+    for (const id of parsed.data.bookingIds) {
+      const { guardianUserId } = await bookingRepository.getBookingParticipants(id);
+      if (sub !== guardianUserId) throw new ForbiddenError('Solo el padre/madre de la reserva puede pagarla');
+    }
+    return paymentService.submitPaymentProof(parsed.data.bookingIds, parsed.data);
   });
 
   // Libera los fondos retenidos al entrenador — solo el propio entrenador de la reserva puede

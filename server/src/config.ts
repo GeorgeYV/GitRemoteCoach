@@ -40,3 +40,24 @@ export const businessRules = {
   /** Intentos fallidos permitidos antes de invalidar el código. */
   passwordResetMaxAttempts: 5,
 };
+
+/**
+ * Cuentas de cobro de la plataforma para el pago manual por país (fase 1 sin Stripe: el padre
+ * paga a estas cuentas por fuera de la app y manda un código de operación, ver
+ * paymentService.submitPaymentProof). Vive en env vars (no hardcodeado ni en una tabla) porque
+ * son datos operativos que pueden necesitar cambiar sin tocar código — un número bloqueado, una
+ * cuenta nueva — pero sí requieren deploy, mismo criterio MVP que businessRules. El placeholder
+ * por defecto deja claro en la UI que todavía no se configuró una cuenta real.
+ */
+const PLACEHOLDER_ACCOUNT = 'Pendiente de configurar';
+
+export const paymentCollectionAccounts: Record<
+  'EC' | 'PE',
+  { provider: 'deuna' | 'yape' | 'plin'; label: string; handle: string }[]
+> = {
+  EC: [{ provider: 'deuna', label: 'Deuna', handle: process.env.PAYMENT_ACCOUNT_DEUNA ?? PLACEHOLDER_ACCOUNT }],
+  PE: [
+    { provider: 'yape', label: 'Yape', handle: process.env.PAYMENT_ACCOUNT_YAPE ?? PLACEHOLDER_ACCOUNT },
+    { provider: 'plin', label: 'Plin', handle: process.env.PAYMENT_ACCOUNT_PLIN ?? PLACEHOLDER_ACCOUNT },
+  ],
+};

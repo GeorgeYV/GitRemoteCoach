@@ -43,7 +43,7 @@ CREATE TYPE tournament_status AS ENUM ('scheduled', 'in_progress', 'completed', 
 CREATE TYPE age_category AS ENUM ('U10', 'U12', 'U14', 'U16', 'U18');
 
 CREATE TYPE booking_status AS ENUM (
-  'requested', 'accepted', 'rejected', 'expired', 'payment_failed',
+  'requested', 'accepted', 'payment_submitted', 'rejected', 'expired', 'payment_failed',
   'paid', 'completed', 'cancelled'
 );
 
@@ -823,6 +823,14 @@ CREATE TABLE bookings (
   -- futuro decida el impacto en rating_avg / rating_count. Sin lógica
   -- de penalización todavía.
   flagged_for_coach_penalty      BOOLEAN NOT NULL DEFAULT FALSE,
+
+  -- Fase 1 sin Stripe: el padre paga por fuera de la app (Deuna/Yape/Plin) y manda un código de
+  -- operación — payment_reference (ya existía para el id de Stripe) se reutiliza para ese código.
+  -- payment_provider no-nulo es la señal de "esto se pagó manual" que usan completeBooking/
+  -- cancelBooking para no intentar un cargo/transfer/reembolso real de Stripe sobre esta reserva.
+  payment_provider               TEXT CHECK (payment_provider IS NULL OR payment_provider IN ('deuna', 'yape', 'plin')),
+  payment_submitted_at           TIMESTAMPTZ,
+  payment_verified_by            UUID REFERENCES users (id),
 
   payment_reference             TEXT,
   requested_at                  TIMESTAMPTZ NOT NULL DEFAULT now(),

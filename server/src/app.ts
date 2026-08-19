@@ -5,6 +5,8 @@ import { env } from './config.js';
 import { AppError } from './lib/errors.js';
 import { authRoutes } from './routes/auth.js';
 import { bookingRoutes } from './routes/bookings.js';
+import { paymentVerificationRoutes } from './routes/paymentVerification.js';
+import { paymentInstructionsRoutes } from './routes/paymentInstructions.js';
 import { webhookRoutes } from './routes/webhooks.js';
 import { settlementRoutes } from './routes/settlements.js';
 import { coachRoutes } from './routes/coaches.js';
@@ -64,6 +66,8 @@ export function buildApp() {
   app.register(pushTokenRoutes);
   app.register(webhookRoutes);
   app.register(bookingRoutes);
+  app.register(paymentVerificationRoutes);
+  app.register(paymentInstructionsRoutes);
   app.register(settlementRoutes);
   app.register(coachRoutes);
   app.register(coachVerificationDocumentRoutes);

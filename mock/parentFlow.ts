@@ -1,3 +1,5 @@
+import type { CountryCode } from '../lib/api';
+
 export interface Trainer {
   id: string;
   name: string;
@@ -75,11 +77,19 @@ export const PARENT_QUICK_REPLIES = [
 /** Mirrors the subset of the server's booking_status enum (db/schema.sql) a parent needs to see.
  * 'accepted' is kept distinct from 'confirmed' (== paid) — collapsing them hid the "still needs
  * payment" signal entirely, leaving accepted-but-unpaid bookings with no visible next action. */
-export type BookingHistoryStatus = 'requested' | 'accepted' | 'confirmed' | 'completed' | 'cancelled' | 'rejected';
+export type BookingHistoryStatus =
+  | 'requested'
+  | 'accepted'
+  | 'paymentSubmitted'
+  | 'confirmed'
+  | 'completed'
+  | 'cancelled'
+  | 'rejected';
 
 export const BOOKING_HISTORY_STATUS_LABELS: Record<BookingHistoryStatus, string> = {
   requested: 'Por confirmar',
   accepted: 'Por pagar',
+  paymentSubmitted: 'Pago por verificar',
   confirmed: 'Confirmada',
   completed: 'Completada',
   cancelled: 'Cancelada',
@@ -101,6 +111,10 @@ export interface BookingHistoryEntry {
   venue: string;
   price: number;
   status: BookingHistoryStatus;
+  /** País del torneo (no del padre/entrenador) — decide qué app de pago mostrar en
+   * BookingPaymentScreen (Deuna en Ecuador, Yape/Plin en Perú) y restringe "Pagar todas" a
+   * reservas del mismo país en BookingHistoryScreen. */
+  tournamentCountry?: CountryCode | null;
   /** Only meaningful once status is 'completed' — whether the parent already left a review. */
   reviewed?: boolean;
   hasUnreadMessages?: boolean;

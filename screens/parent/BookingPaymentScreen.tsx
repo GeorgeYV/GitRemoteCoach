@@ -1,13 +1,18 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import React, { useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import PaymentMethodRow from '../../components/parent/PaymentMethodRow';
 import TrainerAvatarPlaceholder from '../../components/shared/TrainerAvatarPlaceholder';
 import { useAuth } from '../../context/AuthContext';
-import { ApiError, payBookingsBatch } from '../../lib/api';
-import { colors, radius } from '../../lib/theme';
-import { mockPaymentMethods } from '../../mock/parentFlow';
+import {
+  ApiError,
+  CountryCode,
+  getPaymentInstructions,
+  PaymentInstructions,
+  PaymentProvider,
+  submitPaymentProofBatch,
+} from '../../lib/api';
+import { colors, radius, withOpacity } from '../../lib/theme';
 
 export interface PayableBooking {
   bookingId: string;
@@ -24,6 +29,7 @@ export interface PayableBooking {
 
 export default function BookingPaymentScreen({
   bookings,
+  country,
   venue,
   note,
   trainerName,
@@ -32,6 +38,10 @@ export default function BookingPaymentScreen({
   onConfirm,
 }: {
   bookings: PayableBooking[];
+  /** País del torneo — decide qué app de pago mostrar (Deuna en Ecuador, Yape/Plin en Perú). Con
+   * un lote mixto, BookingHistoryScreen ya restringe la selección a un solo país antes de llegar
+   * acá (un código de operación no puede cubrir un pago a Deuna y a Yape a la vez). */
+  country: CountryCode;
   venue?: string;
   note: string;
   trainerName?: string;
@@ -40,36 +50,57 @@ export default function BookingPaymentScreen({
   onConfirm: () => void;
 }) {
   const { token } = useAuth();
-  const [methodId, setMethodId] = useState(mockPaymentMethods[0].id);
+  const [instructions, setInstructions] = useState<PaymentInstructions | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [provider, setProvider] = useState<PaymentProvider | null>(null);
+  const [referenceCode, setReferenceCode] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+    getPaymentInstructions(token)
+      .then((result) => {
+        if (cancelled) return;
+        setInstructions(result);
+        const options = result[country as 'EC' | 'PE'] ?? [];
+        if (options.length === 1) setProvider(options[0].provider);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setLoadError(err instanceof ApiError ? err.message : 'No se pudo cargar la cuenta de cobro.');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token, country]);
 
   // Un solo entrenador/torneo para todo el lote: header compartido de siempre. Lote mixto (p. ej.
   // "Pagar todas" desde el historial, con reservas de distintos entrenadores): cada reserva se
   // lista con sus propios datos en vez de un único encabezado que no aplicaría a todas por igual.
   const singleHeader = trainerName !== undefined && tournamentName !== undefined;
   const total = bookings.reduce((sum, b) => sum + b.price, 0);
+  const options = instructions ? (instructions[country as 'EC' | 'PE'] ?? []) : [];
+  const selectedAccount = options.find((o) => o.provider === provider);
+  const canSubmit = !!provider && referenceCode.trim().length > 0 && !submitting;
 
   async function handleConfirm() {
-    if (!token) {
+    if (!token || !provider) {
       setError('No hay una sesión activa.');
       return;
     }
     setSubmitting(true);
     setError(null);
     try {
-      const result = await payBookingsBatch(
+      await submitPaymentProofBatch(
         token,
         bookings.map((b) => b.bookingId),
-        methodId,
+        { provider, referenceCode: referenceCode.trim() },
       );
-      if (result.requiresAction) {
-        setError('El pago requiere verificación adicional (3DS), no soportada en este demo.');
-        return;
-      }
       onConfirm();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'No se pudo procesar el pago. Intenta de nuevo.');
+      setError(err instanceof ApiError ? err.message : 'No se pudo enviar el comprobante. Intenta de nuevo.');
     } finally {
       setSubmitting(false);
     }
@@ -81,7 +112,7 @@ export default function BookingPaymentScreen({
         <Pressable style={styles.backButton} onPress={onBack}>
           <Text style={styles.backIcon}>←</Text>
         </Pressable>
-        <Text style={styles.headerTitle}>Confirmar y pagar</Text>
+        <Text style={styles.headerTitle}>Confirmar pago</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
@@ -119,32 +150,71 @@ export default function BookingPaymentScreen({
           </View>
         </Section>
 
-        <Section label="Método de pago">
-          {mockPaymentMethods.map((method) => (
-            <PaymentMethodRow
-              key={method.id}
-              method={method}
-              selected={methodId === method.id}
-              onPress={() => setMethodId(method.id)}
-            />
-          ))}
+        <Section label="Cómo pagar">
+          {loadError ? (
+            <Text style={styles.errorText}>{loadError}</Text>
+          ) : !instructions ? (
+            <ActivityIndicator color={colors.courtBlue} />
+          ) : (
+            <>
+              {options.length > 1 && (
+                <View style={styles.providerRow}>
+                  {options.map((option) => {
+                    const selected = provider === option.provider;
+                    return (
+                      <Pressable
+                        key={option.provider}
+                        style={[styles.providerChip, selected && styles.providerChipActive]}
+                        onPress={() => setProvider(option.provider)}
+                      >
+                        <Text style={[styles.providerChipLabel, selected && styles.providerChipLabelActive]}>
+                          {option.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              )}
+
+              {selectedAccount && (
+                <View style={styles.accountCard}>
+                  <Text style={styles.accountInstructions}>
+                    Paga <Text style={styles.accountAmount}>${total}</Text> por {selectedAccount.label} a:
+                  </Text>
+                  <Text style={styles.accountHandle} selectable>
+                    {selectedAccount.handle}
+                  </Text>
+                </View>
+              )}
+
+              <Text style={styles.referenceLabel}>Código de operación</Text>
+              <TextInput
+                style={styles.referenceInput}
+                placeholder="El código que te da la app al pagar"
+                placeholderTextColor={colors.textDim}
+                value={referenceCode}
+                onChangeText={setReferenceCode}
+                autoCapitalize="characters"
+              />
+            </>
+          )}
         </Section>
       </ScrollView>
 
       <View style={styles.footer}>
         {error && <Text style={styles.errorText}>{error}</Text>}
-        <Text style={styles.footerNote}>El cobro se libera al entrenador tras completar el partido</Text>
+        <Text style={styles.footerNote}>Un administrador confirmará tu pago en cuanto lo revise</Text>
         <Pressable
-          style={[styles.confirmButton, submitting && styles.confirmButtonDisabled]}
+          style={[styles.confirmButton, !canSubmit && styles.confirmButtonDisabled]}
           onPress={handleConfirm}
-          disabled={submitting}
+          disabled={!canSubmit}
         >
           {submitting ? (
             <ActivityIndicator color={colors.courtBlueDeep} />
           ) : (
             <View style={styles.confirmContent}>
-              <Ionicons name="card-outline" size={17} color={colors.courtBlueDeep} />
-              <Text style={styles.confirmLabel}>Confirmar y pagar ${total}</Text>
+              <Ionicons name="paper-plane-outline" size={17} color={colors.courtBlueDeep} />
+              <Text style={styles.confirmLabel}>Enviar comprobante</Text>
             </View>
           )}
         </Pressable>
@@ -271,6 +341,70 @@ const styles = StyleSheet.create({
     color: colors.courtBlue,
     fontSize: 17,
     fontWeight: '800',
+  },
+  providerRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 14,
+  },
+  providerChip: {
+    flex: 1,
+    alignItems: 'center',
+    backgroundColor: colors.panel,
+    borderRadius: 14,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  providerChipActive: {
+    borderColor: colors.ballLime,
+    backgroundColor: withOpacity(colors.ballLime, 0.08),
+  },
+  providerChipLabel: {
+    color: colors.textSoft,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  providerChipLabelActive: {
+    color: colors.lineWhite,
+  },
+  accountCard: {
+    backgroundColor: withOpacity(colors.ballLime, 0.1),
+    borderRadius: radius,
+    borderWidth: 1,
+    borderColor: withOpacity(colors.ballLime, 0.35),
+    padding: 16,
+    marginBottom: 18,
+  },
+  accountInstructions: {
+    color: colors.textSoft,
+    fontSize: 13,
+    marginBottom: 6,
+  },
+  accountAmount: {
+    color: colors.lineWhite,
+    fontWeight: '800',
+  },
+  accountHandle: {
+    color: colors.lineWhite,
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  referenceLabel: {
+    color: colors.textDim,
+    fontSize: 12,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  referenceInput: {
+    backgroundColor: colors.panel,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    color: colors.lineWhite,
+    fontSize: 14,
   },
   footer: {
     borderTopWidth: 1,

@@ -32,6 +32,9 @@ function mapRow(row: any): Booking {
     refundAmount: row.refund_amount,
     coachCompensationAmount: row.coach_compensation_amount,
     flaggedForCoachPenalty: row.flagged_for_coach_penalty,
+    paymentProvider: row.payment_provider,
+    paymentSubmittedAt: row.payment_submitted_at,
+    paymentVerifiedBy: row.payment_verified_by,
     paymentReference: row.payment_reference,
     requestedAt: row.requested_at,
     decidedAt: row.decided_at,
@@ -61,6 +64,7 @@ function mapRowForParent(row: any): BookingForParent {
     tournamentName: row.tournament_name,
     tournamentVenue: row.tournament_venue,
     tournamentCity: row.tournament_city,
+    tournamentCountry: row.tournament_country,
     tournamentStartDate: row.tournament_start_date,
     tournamentEndDate: row.tournament_end_date,
     reviewed: row.reviewed,
@@ -403,6 +407,7 @@ export async function listBookingsForParent(
     `SELECT b.*, cu.full_name AS coach_name, p.full_name AS player_name, p.age_category,
             t.name AS tournament_name, t.venue AS tournament_venue,
             COALESCE(cl.city, t.city) AS tournament_city,
+            COALESCE(cl.country, t.country) AS tournament_country,
             t.start_date AS tournament_start_date, t.end_date AS tournament_end_date,
             (rv.id IS NOT NULL) AS reviewed,
             (coach_msgs.last_at IS NOT NULL
@@ -439,6 +444,26 @@ export async function markBookingsSettled(
     `UPDATE bookings SET club_commission_status = 'settled', settlement_id = $1 WHERE id IN (${placeholders})`,
     [settlementId, ...bookingIds],
   );
+}
+
+/** PlatformAdminPaymentsScreen: reservas con un código de pago manual enviado, esperando que
+ * platform_admin lo confirme. Trae los mismos nombres que listBookingsForCoach/listBookingsForParent
+ * (padre, jugador, entrenador, torneo) porque el admin necesita el cuadro completo para verificar. */
+export async function findPendingPaymentVerification(
+  db: Queryable = pool,
+): Promise<BookingWithParticipants[]> {
+  const { rows } = await db.query(
+    `SELECT b.*, p.full_name AS player_name, p.age_category, u.full_name AS parent_name,
+            t.name AS tournament_name, t.venue AS tournament_venue,
+            FALSE AS has_unread_messages
+     FROM bookings b
+     JOIN players p ON p.id = b.player_id
+     JOIN users u ON u.id = p.guardian_user_id
+     JOIN tournaments t ON t.id = b.tournament_id
+     WHERE b.status = 'payment_submitted'
+     ORDER BY b.payment_submitted_at ASC`,
+  );
+  return rows.map(mapRowWithParticipants);
 }
 
 /** notificationService: a quién avisar (push) cuando cambia el estado de esta reserva. */

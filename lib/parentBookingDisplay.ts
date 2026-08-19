@@ -5,6 +5,7 @@ import type { BookingHistoryEntry, BookingHistoryStatus } from '../mock/parentFl
 export const STATUS_MAP: Record<BookingForParent['status'], BookingHistoryStatus> = {
   requested: 'requested',
   accepted: 'accepted',
+  payment_submitted: 'paymentSubmitted',
   paid: 'confirmed',
   completed: 'completed',
   rejected: 'rejected',
@@ -29,6 +30,7 @@ export function toBookingHistoryEntry(booking: BookingForParent): BookingHistory
     venue: booking.tournamentVenue,
     price: Number(booking.agreedRate),
     status: STATUS_MAP[booking.status],
+    tournamentCountry: booking.tournamentCountry,
     reviewed: booking.reviewed,
     hasUnreadMessages: booking.hasUnreadMessages,
   };

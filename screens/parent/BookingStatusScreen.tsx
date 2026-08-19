@@ -19,6 +19,7 @@ const WAITING_STATUSES: Booking['status'][] = ['requested'];
 const DAY_STATUS_LABELS: Record<Booking['status'], string> = {
   requested: 'Por confirmar',
   accepted: 'Aceptado',
+  payment_submitted: 'Aceptado',
   paid: 'Aceptado',
   completed: 'Aceptado',
   rejected: 'Rechazado',

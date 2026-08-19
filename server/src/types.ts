@@ -3,12 +3,17 @@ import type { MatchFormatId } from './lib/matchFormats.js';
 export type BookingStatus =
   | 'requested'
   | 'accepted'
+  | 'payment_submitted'
   | 'rejected'
   | 'expired'
   | 'payment_failed'
   | 'paid'
   | 'completed'
   | 'cancelled';
+
+/** Apps de pago P2P soportadas para el cobro manual (ver decisión: Stripe despriorizado para
+ * esta fase). No confundir con el country del torneo — cada país habilita un subconjunto. */
+export type PaymentProvider = 'deuna' | 'yape' | 'plin';
 
 export type ClubCommissionStatus = 'generated' | 'settled';
 
@@ -62,6 +67,13 @@ export interface Booking {
   refundAmount: string | null;
   coachCompensationAmount: string | null;
   flaggedForCoachPenalty: boolean;
+  // Fase 1 sin Stripe: paymentProvider no-nulo marca esta reserva como pagada manualmente
+  // (Deuna/Yape/Plin, ver PaymentProvider) — completeBooking/cancelBooking lo usan para no
+  // intentar un cargo/transfer/reembolso real de Stripe sobre ella. paymentReference (ya
+  // existía) se reutiliza para el código de operación que escribe el padre.
+  paymentProvider: PaymentProvider | null;
+  paymentSubmittedAt: string | null;
+  paymentVerifiedBy: string | null;
   paymentReference: string | null;
   requestedAt: string;
   decidedAt: string | null;
@@ -89,6 +101,7 @@ export interface BookingForParent extends Booking {
   tournamentName: string;
   tournamentVenue: string;
   tournamentCity: string;
+  tournamentCountry: CountryCode | null;
   tournamentStartDate: string;
   tournamentEndDate: string;
   reviewed: boolean;

@@ -298,6 +298,7 @@ export function ParentBookingFlow({ initialTournamentId }: { initialTournamentId
   return (
     <BookingPaymentScreen
       bookings={payableBookings}
+      country={tournament.country ?? 'EC'}
       venue={tournament.venue}
       note={note}
       trainerName={selectedTrainer.name}

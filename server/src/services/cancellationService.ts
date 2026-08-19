@@ -8,7 +8,9 @@ import * as coachRepository from '../repositories/coachRepository.js';
 import type { Booking, CancelActor } from '../types.js';
 
 const CURRENCY = 'mxn';
-const NON_TERMINAL_UNPAID_STATUSES: Booking['status'][] = ['requested', 'accepted', 'payment_failed'];
+// 'payment_submitted' cuenta como "sin pago capturado todavía": el padre mandó un comprobante,
+// pero platform_admin todavía no lo verificó, así que no hay ningún cargo real que reembolsar.
+const NON_TERMINAL_UNPAID_STATUSES: Booking['status'][] = ['requested', 'accepted', 'payment_submitted', 'payment_failed'];
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
@@ -28,12 +30,10 @@ export async function cancelBooking(params: CancelBookingParams): Promise<Bookin
     const booking = await bookingRepository.getBookingByIdForUpdate(bookingId, client);
 
     if (booking.status === 'completed') {
-      // Caso borde de carrera (requisito 5): el servicio ya se completó y
-      // los fondos ya fueron liberados al entrenador. No revertimos
-      // automáticamente un Transfer ya ejecutado — se rechaza y se enruta
-      // a revisión manual/soporte.
+      // Caso borde de carrera (requisito 5): el partido ya se jugó (completeBooking ya corrió).
+      // No se revierte automáticamente — se rechaza y se enruta a revisión manual/soporte.
       throw new ConflictError(
-        'La reserva ya fue completada y los fondos liberados; no se puede cancelar automáticamente. Contactar soporte.',
+        'La reserva ya fue completada; no se puede cancelar automáticamente. Contactar soporte.',
         'already_completed',
       );
     }
@@ -68,6 +68,11 @@ export async function cancelBooking(params: CancelBookingParams): Promise<Bookin
     if (!booking.paymentReference) {
       throw new ValidationError('La reserva está pagada pero no tiene payment_reference; estado inconsistente');
     }
+    // Reserva pagada manual (paymentProvider no nulo): payment_reference es el código de
+    // operación que escribió el padre, no un payment_intent real — no hay nada que reembolsar
+    // vía Stripe. El reembolso real (Deuna/Yape/Plin) lo hace el admin por fuera de la app,
+    // usando estos mismos montos calculados acá.
+    const isManualPayment = booking.paymentProvider !== null;
     const totalPaid = Number(booking.totalAmountPaid);
     const hoursUntilMatch = (new Date(booking.matchDatetime).getTime() - Date.now()) / 3600_000;
 
@@ -91,29 +96,42 @@ export async function cancelBooking(params: CancelBookingParams): Promise<Bookin
       coachCompensationAmount = round2(retained * (1 - businessRules.platformCommissionRate));
     }
 
-    const refund = await stripe.refunds.create({
-      payment_intent: booking.paymentReference,
-      amount: Math.round(refundAmount * 100),
-    });
-    await paymentRepository.recordTransaction(
-      { bookingId, type: 'refund', status: 'succeeded', amount: refundAmount, stripeObjectId: refund.id, rawResponse: refund },
-      client,
-    );
-
-    if (coachCompensationAmount > 0) {
-      const coach = await coachRepository.getCoachPayoutInfo(booking.coachId, client);
-      if (coach.stripeConnectedAccountId) {
-        const transfer = await stripe.transfers.create({
-          amount: Math.round(coachCompensationAmount * 100),
-          currency: CURRENCY,
-          destination: coach.stripeConnectedAccountId,
-          transfer_group: bookingId,
-          metadata: { bookingId, reason: 'late_cancellation_compensation' },
-        });
+    if (isManualPayment) {
+      await paymentRepository.recordTransaction(
+        { bookingId, type: 'refund', status: 'succeeded', amount: refundAmount },
+        client,
+      );
+      if (coachCompensationAmount > 0) {
         await paymentRepository.recordTransaction(
-          { bookingId, type: 'transfer', status: 'succeeded', amount: coachCompensationAmount, stripeObjectId: transfer.id, rawResponse: transfer },
+          { bookingId, type: 'transfer', status: 'succeeded', amount: coachCompensationAmount },
           client,
         );
+      }
+    } else {
+      const refund = await stripe.refunds.create({
+        payment_intent: booking.paymentReference,
+        amount: Math.round(refundAmount * 100),
+      });
+      await paymentRepository.recordTransaction(
+        { bookingId, type: 'refund', status: 'succeeded', amount: refundAmount, stripeObjectId: refund.id, rawResponse: refund },
+        client,
+      );
+
+      if (coachCompensationAmount > 0) {
+        const coach = await coachRepository.getCoachPayoutInfo(booking.coachId, client);
+        if (coach.stripeConnectedAccountId) {
+          const transfer = await stripe.transfers.create({
+            amount: Math.round(coachCompensationAmount * 100),
+            currency: CURRENCY,
+            destination: coach.stripeConnectedAccountId,
+            transfer_group: bookingId,
+            metadata: { bookingId, reason: 'late_cancellation_compensation' },
+          });
+          await paymentRepository.recordTransaction(
+            { bookingId, type: 'transfer', status: 'succeeded', amount: coachCompensationAmount, stripeObjectId: transfer.id, rawResponse: transfer },
+            client,
+          );
+        }
       }
     }
 

@@ -6,6 +6,7 @@ import { BOOKING_HISTORY_STATUS_LABELS, BookingHistoryStatus } from '../../mock/
 const TONE: Record<BookingHistoryStatus, 'positive' | 'neutral' | 'negative' | 'warning'> = {
   requested: 'warning',
   accepted: 'warning',
+  paymentSubmitted: 'warning',
   confirmed: 'positive',
   completed: 'neutral',
   cancelled: 'negative',

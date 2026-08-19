@@ -8,7 +8,7 @@ import * as bookingRepository from '../repositories/bookingRepository.js';
 import * as paymentRepository from '../repositories/paymentRepository.js';
 import * as coachRepository from '../repositories/coachRepository.js';
 import * as tournamentRepository from '../repositories/tournamentRepository.js';
-import type { Booking } from '../types.js';
+import type { Booking, PaymentProvider } from '../types.js';
 
 const CURRENCY = 'mxn';
 
@@ -335,7 +335,129 @@ export async function initiatePaymentBatch(
   });
 }
 
-/** Libera los fondos retenidos al entrenador y marca el servicio como completado. */
+/**
+ * Fase 1 sin Stripe: el padre paga por fuera de la app (Deuna/Yape/Plin) y manda un código de
+ * operación con esta función — solo registra la intención, sin mover plata ni calcular el split
+ * todavía (eso pasa recién al verificar, ver verifyPayment). Mismo criterio de reintento que
+ * initiatePayment: válido desde 'accepted' o 'payment_failed'.
+ */
+export async function submitPaymentProof(
+  bookingIds: string[],
+  params: { provider: PaymentProvider; referenceCode: string },
+): Promise<Booking[]> {
+  return withTransaction(async (client) => {
+    const bookings = await bookingRepository.getBookingsByIdsForUpdate(bookingIds, client);
+    for (const booking of bookings) {
+      if (booking.status !== 'accepted' && booking.status !== 'payment_failed') {
+        throw new ConflictError(`No se puede pagar una reserva en estado "${booking.status}"`, 'invalid_transition');
+      }
+      if (booking.paymentDeadline && new Date(booking.paymentDeadline).getTime() < Date.now()) {
+        throw new ConflictError('La ventana de pago para esta reserva ya venció', 'payment_window_expired');
+      }
+    }
+
+    const updated: Booking[] = [];
+    for (const booking of bookings) {
+      const result = await bookingRepository.updateStatus(
+        booking.id,
+        ['accepted', 'payment_failed'],
+        'payment_submitted',
+        {
+          payment_provider: params.provider,
+          payment_reference: params.referenceCode,
+          payment_submitted_at: new Date(),
+        },
+        client,
+      );
+      if (!result) throw new ConflictError('La reserva cambió de estado antes de enviar el comprobante', 'invalid_transition');
+      updated.push(result);
+    }
+    return updated;
+  });
+}
+
+/**
+ * platform_admin confirma o rechaza un pago manual enviado con submitPaymentProof
+ * (PlatformAdminPaymentsScreen). Al verificar, recién acá se calcula el split — misma
+ * matemática que initiatePayment/Batch, sin Stripe — y se registra como 'charge' succeeded
+ * (stripeObjectId ausente: no hay objeto real de Stripe detrás de este cobro). Al rechazar,
+ * vuelve a 'accepted' con payment_deadline re-armado — si no, el job de expiración podría matarla
+ * antes de que el padre pueda reintentar con otro comprobante.
+ */
+export async function verifyPayment(
+  bookingIds: string[],
+  verifiedByUserId: string,
+  decision: 'verified' | 'rejected',
+): Promise<Booking[]> {
+  return withTransaction(async (client) => {
+    const bookings = await bookingRepository.getBookingsByIdsForUpdate(bookingIds, client);
+    for (const booking of bookings) {
+      if (booking.status !== 'payment_submitted') {
+        throw new ConflictError(`No se puede verificar una reserva en estado "${booking.status}"`, 'invalid_transition');
+      }
+    }
+
+    const updated: Booking[] = [];
+
+    if (decision === 'rejected') {
+      for (const booking of bookings) {
+        const result = await bookingRepository.updateStatus(
+          booking.id,
+          ['payment_submitted'],
+          'accepted',
+          {
+            payment_provider: null,
+            payment_reference: null,
+            payment_submitted_at: null,
+            payment_deadline: new Date(Date.now() + businessRules.paymentWindowHours * 60 * 60 * 1000),
+          },
+          client,
+        );
+        if (!result) throw new ConflictError('La reserva cambió de estado durante la revisión', 'invalid_transition');
+        updated.push(result);
+      }
+      return updated;
+    }
+
+    const commissionRateByTournament = new Map<string, number>();
+    for (const booking of bookings) {
+      let clubCommissionRate = commissionRateByTournament.get(booking.tournamentId);
+      if (clubCommissionRate === undefined) {
+        clubCommissionRate = (
+          await tournamentRepository.getTournamentCommissionInfo(booking.tournamentId, client)
+        ).clubCommissionRate;
+        commissionRateByTournament.set(booking.tournamentId, clubCommissionRate);
+      }
+      const split = computeSplit(Number(booking.agreedRate), clubCommissionRate);
+
+      await paymentRepository.recordTransaction(
+        { bookingId: booking.id, type: 'charge', status: 'succeeded', amount: split.totalAmountPaid },
+        client,
+      );
+      const result = await bookingRepository.updateStatus(
+        booking.id,
+        ['payment_submitted'],
+        'paid',
+        {
+          total_amount_paid: split.totalAmountPaid,
+          platform_commission_amount: split.platformCommissionAmount,
+          club_commission_amount: split.clubCommissionAmount,
+          coach_net_amount: split.coachNetAmount,
+          payment_verified_by: verifiedByUserId,
+        },
+        client,
+      );
+      if (!result) throw new ConflictError('La reserva cambió de estado durante la verificación', 'invalid_transition');
+      updated.push(result);
+    }
+    return updated;
+  });
+}
+
+/** Libera los fondos retenidos al entrenador y marca el servicio como completado. Reserva pagada
+ * manual (paymentProvider no nulo): solo bookkeeping, sin transfer real — no hay cuenta de Stripe
+ * Connect de por medio. Reserva pagada por Stripe (paymentProvider null, camino dormido en esta
+ * fase): comportamiento real sin cambios. */
 export async function completeBooking(bookingId: string): Promise<Booking> {
   return withTransaction(async (client) => {
     const booking = await bookingRepository.getBookingByIdForUpdate(bookingId, client);
@@ -343,23 +465,30 @@ export async function completeBooking(bookingId: string): Promise<Booking> {
       throw new ConflictError(`No se puede completar una reserva en estado "${booking.status}"`, 'invalid_transition');
     }
 
-    const coach = await coachRepository.getCoachPayoutInfo(booking.coachId, client);
-    if (!coach.stripeConnectedAccountId) {
-      throw new ValidationError('El entrenador no tiene una cuenta de Stripe Connect configurada');
+    if (booking.paymentProvider) {
+      await paymentRepository.recordTransaction(
+        { bookingId, type: 'transfer', status: 'succeeded', amount: Number(booking.coachNetAmount) },
+        client,
+      );
+    } else {
+      const coach = await coachRepository.getCoachPayoutInfo(booking.coachId, client);
+      if (!coach.stripeConnectedAccountId) {
+        throw new ValidationError('El entrenador no tiene una cuenta de Stripe Connect configurada');
+      }
+
+      const transfer = await stripe.transfers.create({
+        amount: Math.round(Number(booking.coachNetAmount) * 100),
+        currency: CURRENCY,
+        destination: coach.stripeConnectedAccountId,
+        transfer_group: bookingId,
+        metadata: { bookingId },
+      });
+
+      await paymentRepository.recordTransaction(
+        { bookingId, type: 'transfer', status: 'succeeded', amount: Number(booking.coachNetAmount), stripeObjectId: transfer.id, rawResponse: transfer },
+        client,
+      );
     }
-
-    const transfer = await stripe.transfers.create({
-      amount: Math.round(Number(booking.coachNetAmount) * 100),
-      currency: CURRENCY,
-      destination: coach.stripeConnectedAccountId,
-      transfer_group: bookingId,
-      metadata: { bookingId },
-    });
-
-    await paymentRepository.recordTransaction(
-      { bookingId, type: 'transfer', status: 'succeeded', amount: Number(booking.coachNetAmount), stripeObjectId: transfer.id, rawResponse: transfer },
-      client,
-    );
 
     const updated = await bookingRepository.updateStatus(
       bookingId,

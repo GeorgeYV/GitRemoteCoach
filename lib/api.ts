@@ -186,12 +186,16 @@ export function listCoachReviews(coachId: string): Promise<ReviewWithParent[]> {
 export type BookingStatus =
   | 'requested'
   | 'accepted'
+  | 'payment_submitted'
   | 'rejected'
   | 'expired'
   | 'payment_failed'
   | 'paid'
   | 'completed'
   | 'cancelled';
+
+/** Espeja server/src/types.ts#PaymentProvider. */
+export type PaymentProvider = 'deuna' | 'yape' | 'plin';
 
 /** Espeja server/src/types.ts#Booking. */
 export interface Booking {
@@ -215,6 +219,9 @@ export interface Booking {
   coachCompensationAmount: string | null;
   cancelledAt: string | null;
   cancellationReason: string | null;
+  paymentProvider: PaymentProvider | null;
+  paymentSubmittedAt: string | null;
+  paymentReference: string | null;
   requestedAt: string;
   decidedAt: string | null;
   completedAt: string | null;
@@ -261,6 +268,7 @@ export interface BookingForParent extends Booking {
   tournamentName: string;
   tournamentVenue: string;
   tournamentCity: string;
+  tournamentCountry: CountryCode | null;
   tournamentStartDate: string;
   tournamentEndDate: string;
   reviewed: boolean;
@@ -396,6 +404,64 @@ export function payBookingsBatch(
     method: 'POST',
     headers: { Authorization: `Bearer ${authToken}` },
     body: JSON.stringify({ bookingIds, paymentMethodId }),
+  });
+}
+
+/** Cuenta de cobro de la plataforma por país (Deuna en Ecuador, Yape/Plin en Perú) — mostrada en
+ * BookingPaymentScreen. Espeja server/src/config.ts#paymentCollectionAccounts. */
+export type PaymentInstructions = Record<'EC' | 'PE', { provider: PaymentProvider; label: string; handle: string }[]>;
+
+/** GET /payment-instructions — a qué cuenta pagar según el país del torneo. */
+export function getPaymentInstructions(authToken: string): Promise<PaymentInstructions> {
+  return request('/payment-instructions', { headers: { Authorization: `Bearer ${authToken}` } });
+}
+
+/** POST /bookings/:id/submit-payment-proof — BookingPaymentScreen (fase 1 sin Stripe): el padre
+ * ya pagó por fuera de la app (Deuna/Yape/Plin) y manda el código de operación. Reserva pasa a
+ * 'payment_submitted' hasta que platform_admin la confirme (ver verifyPayment). */
+export function submitPaymentProof(
+  authToken: string,
+  bookingId: string,
+  params: { provider: PaymentProvider; referenceCode: string },
+): Promise<Booking[]> {
+  return request(`/bookings/${bookingId}/submit-payment-proof`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${authToken}` },
+    body: JSON.stringify(params),
+  });
+}
+
+/** POST /bookings/submit-payment-proof-batch — mismo criterio que payBookingsBatch: un solo
+ * comprobante cubre varias reservas pagadas juntas en un solo envío por Deuna/Yape/Plin. */
+export function submitPaymentProofBatch(
+  authToken: string,
+  bookingIds: string[],
+  params: { provider: PaymentProvider; referenceCode: string },
+): Promise<Booking[]> {
+  return request('/bookings/submit-payment-proof-batch', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${authToken}` },
+    body: JSON.stringify({ bookingIds, ...params }),
+  });
+}
+
+/** GET /bookings/payment-verification-queue — PlatformAdminPaymentsScreen: reservas con un
+ * comprobante enviado, esperando confirmación. */
+export function listPaymentVerificationQueue(authToken: string): Promise<BookingWithParticipants[]> {
+  return request('/bookings/payment-verification-queue', { headers: { Authorization: `Bearer ${authToken}` } });
+}
+
+/** PUT /bookings/verify-payment — PlatformAdminPaymentsScreen: confirma o rechaza un lote de
+ * pagos manuales enviados juntos (mismo código de referencia). */
+export function verifyPayment(
+  authToken: string,
+  bookingIds: string[],
+  decision: 'verified' | 'rejected',
+): Promise<Booking[]> {
+  return request('/bookings/verify-payment', {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${authToken}` },
+    body: JSON.stringify({ bookingIds, decision }),
   });
 }
 
