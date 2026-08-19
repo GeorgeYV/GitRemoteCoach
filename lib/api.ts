@@ -195,7 +195,7 @@ export type BookingStatus =
   | 'cancelled';
 
 /** Espeja server/src/types.ts#PaymentProvider. */
-export type PaymentProvider = 'deuna' | 'yape' | 'plin';
+export type PaymentProvider = 'deuna' | 'yape' | 'plin' | 'bank_transfer';
 
 /** Espeja server/src/types.ts#Booking. */
 export interface Booking {
@@ -411,9 +411,31 @@ export function payBookingsBatch(
   });
 }
 
-/** Cuenta de cobro de la plataforma por país (Deuna en Ecuador, Yape/Plin en Perú) — mostrada en
- * BookingPaymentScreen. Espeja server/src/config.ts#paymentCollectionAccounts. */
-export type PaymentInstructions = Record<'EC' | 'PE', { provider: PaymentProvider; label: string; handle: string }[]>;
+/** Cuenta de cobro por app P2P (número/celular alcanza — Deuna en Ecuador, Yape/Plin en Perú). */
+export interface PhonePaymentAccount {
+  provider: 'deuna' | 'yape' | 'plin';
+  label: string;
+  handle: string;
+}
+
+/** Cuenta de cobro por transferencia bancaria tradicional — a diferencia de las apps P2P, hace
+ * falta más que un número de celular para identificar la cuenta. interbankAccountNumber (CCI en
+ * Perú) es opcional — solo aplica para transferencias desde un banco distinto. */
+export interface BankTransferAccount {
+  provider: 'bank_transfer';
+  label: string;
+  bankName: string;
+  accountType: string;
+  accountNumber: string;
+  accountHolderName: string;
+  interbankAccountNumber?: string;
+}
+
+export type PaymentAccount = PhonePaymentAccount | BankTransferAccount;
+
+/** Cuentas de cobro de la plataforma por país — mostradas en BookingPaymentScreen. Espeja
+ * server/src/config.ts#paymentCollectionAccounts. */
+export type PaymentInstructions = Record<'EC' | 'PE', PaymentAccount[]>;
 
 /** GET /payment-instructions — a qué cuenta pagar según el país del torneo. */
 export function getPaymentInstructions(authToken: string): Promise<PaymentInstructions> {

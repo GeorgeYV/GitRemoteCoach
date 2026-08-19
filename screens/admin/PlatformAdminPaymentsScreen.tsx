@@ -10,6 +10,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   deuna: 'Deuna',
   yape: 'Yape',
   plin: 'Plin',
+  bank_transfer: 'Transferencia bancaria',
 };
 
 interface PaymentGroup {

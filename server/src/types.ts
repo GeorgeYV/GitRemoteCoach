@@ -11,9 +11,10 @@ export type BookingStatus =
   | 'completed'
   | 'cancelled';
 
-/** Apps de pago P2P soportadas para el cobro manual (ver decisión: Stripe despriorizado para
- * esta fase). No confundir con el country del torneo — cada país habilita un subconjunto. */
-export type PaymentProvider = 'deuna' | 'yape' | 'plin';
+/** Apps de pago P2P + transferencia bancaria tradicional, soportados para el cobro manual (ver
+ * decisión: Stripe despriorizado para esta fase). No confundir con el country del torneo — cada
+ * país habilita un subconjunto. */
+export type PaymentProvider = 'deuna' | 'yape' | 'plin' | 'bank_transfer';
 
 export type ClubCommissionStatus = 'generated' | 'settled';
 

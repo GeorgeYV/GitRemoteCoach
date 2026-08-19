@@ -39,13 +39,13 @@ const payBookingsBatchSchema = z.object({
 });
 
 const submitPaymentProofSchema = z.object({
-  provider: z.enum(['deuna', 'yape', 'plin']),
+  provider: z.enum(['deuna', 'yape', 'plin', 'bank_transfer']),
   referenceCode: z.string().min(1).max(100),
 });
 
 const submitPaymentProofBatchSchema = z.object({
   bookingIds: z.array(z.string().uuid()).min(1),
-  provider: z.enum(['deuna', 'yape', 'plin']),
+  provider: z.enum(['deuna', 'yape', 'plin', 'bank_transfer']),
   referenceCode: z.string().min(1).max(100),
 });
 

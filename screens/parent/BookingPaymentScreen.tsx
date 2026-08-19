@@ -181,9 +181,21 @@ export default function BookingPaymentScreen({
                   <Text style={styles.accountInstructions}>
                     Paga <Text style={styles.accountAmount}>${total}</Text> por {selectedAccount.label} a:
                   </Text>
-                  <Text style={styles.accountHandle} selectable>
-                    {selectedAccount.handle}
-                  </Text>
+                  {selectedAccount.provider === 'bank_transfer' ? (
+                    <>
+                      <AccountDetailLine label="Banco" value={selectedAccount.bankName} />
+                      <AccountDetailLine label="Tipo de cuenta" value={selectedAccount.accountType} />
+                      <AccountDetailLine label="Número de cuenta" value={selectedAccount.accountNumber} />
+                      <AccountDetailLine label="Titular" value={selectedAccount.accountHolderName} />
+                      {selectedAccount.interbankAccountNumber && (
+                        <AccountDetailLine label="Cuenta interbancaria (CCI)" value={selectedAccount.interbankAccountNumber} />
+                      )}
+                    </>
+                  ) : (
+                    <Text style={styles.accountHandle} selectable>
+                      {selectedAccount.handle}
+                    </Text>
+                  )}
                 </View>
               )}
 
@@ -228,6 +240,17 @@ function Section({ label, children }: { label: string; children: React.ReactNode
     <View style={styles.section}>
       <Text style={styles.sectionLabel}>{label}</Text>
       {children}
+    </View>
+  );
+}
+
+function AccountDetailLine({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.accountDetailLine}>
+      <Text style={styles.accountDetailLabel}>{label}</Text>
+      <Text style={styles.accountDetailValue} selectable>
+        {value}
+      </Text>
     </View>
   );
 }
@@ -389,6 +412,23 @@ const styles = StyleSheet.create({
     color: colors.lineWhite,
     fontSize: 18,
     fontWeight: '800',
+  },
+  accountDetailLine: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 6,
+    gap: 12,
+  },
+  accountDetailLabel: {
+    color: colors.textDim,
+    fontSize: 12,
+  },
+  accountDetailValue: {
+    color: colors.lineWhite,
+    fontSize: 13,
+    fontWeight: '700',
+    flexShrink: 1,
+    textAlign: 'right',
   },
   referenceLabel: {
     color: colors.textDim,

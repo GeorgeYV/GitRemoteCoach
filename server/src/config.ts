@@ -51,13 +51,48 @@ export const businessRules = {
  */
 const PLACEHOLDER_ACCOUNT = 'Pendiente de configurar';
 
-export const paymentCollectionAccounts: Record<
-  'EC' | 'PE',
-  { provider: 'deuna' | 'yape' | 'plin'; label: string; handle: string }[]
-> = {
-  EC: [{ provider: 'deuna', label: 'Deuna', handle: process.env.PAYMENT_ACCOUNT_DEUNA ?? PLACEHOLDER_ACCOUNT }],
+interface PhonePaymentAccount {
+  provider: 'deuna' | 'yape' | 'plin';
+  label: string;
+  handle: string;
+}
+
+/** Transferencia bancaria tradicional — a diferencia de Deuna/Yape/Plin (un número de celular
+ * alcanza), hace falta banco/tipo de cuenta/número/titular para identificar la cuenta.
+ * interbankAccountNumber (CCI en Perú) es opcional — solo hace falta para transferencias desde
+ * un banco distinto al de la cuenta destino, no todos los países/bancos lo usan. */
+interface BankTransferAccount {
+  provider: 'bank_transfer';
+  label: string;
+  bankName: string;
+  accountType: string;
+  accountNumber: string;
+  accountHolderName: string;
+  interbankAccountNumber?: string;
+}
+
+function bankTransferAccount(prefix: string): BankTransferAccount {
+  return {
+    provider: 'bank_transfer',
+    label: 'Transferencia bancaria',
+    bankName: process.env[`${prefix}_BANK`] ?? PLACEHOLDER_ACCOUNT,
+    accountType: process.env[`${prefix}_TYPE`] ?? PLACEHOLDER_ACCOUNT,
+    accountNumber: process.env[`${prefix}_NUMBER`] ?? PLACEHOLDER_ACCOUNT,
+    accountHolderName: process.env[`${prefix}_HOLDER`] ?? PLACEHOLDER_ACCOUNT,
+    interbankAccountNumber: process.env[`${prefix}_CCI`],
+  };
+}
+
+type PaymentAccount = PhonePaymentAccount | BankTransferAccount;
+
+export const paymentCollectionAccounts: Record<'EC' | 'PE', PaymentAccount[]> = {
+  EC: [
+    { provider: 'deuna', label: 'Deuna', handle: process.env.PAYMENT_ACCOUNT_DEUNA ?? PLACEHOLDER_ACCOUNT },
+    bankTransferAccount('PAYMENT_BANK_EC'),
+  ],
   PE: [
     { provider: 'yape', label: 'Yape', handle: process.env.PAYMENT_ACCOUNT_YAPE ?? PLACEHOLDER_ACCOUNT },
     { provider: 'plin', label: 'Plin', handle: process.env.PAYMENT_ACCOUNT_PLIN ?? PLACEHOLDER_ACCOUNT },
+    bankTransferAccount('PAYMENT_BANK_PE'),
   ],
 };
