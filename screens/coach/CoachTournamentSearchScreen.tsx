@@ -22,6 +22,14 @@ function dateRangeLabel(startIso: string, endIso: string): string {
   return `${start} – ${end}`;
 }
 
+/** "faltan N d" mientras el torneo no arranca (con color según urgencia), null si ya empezó. */
+function daysUntilCountdown(startIso: string): { text: string; color: string } | null {
+  const days = Math.ceil((new Date(startIso).getTime() - Date.now()) / (24 * 60 * 60 * 1000));
+  if (days <= 0) return null;
+  const color = days < 7 ? colors.errorCoral : days < 14 ? colors.amber : colors.ballLime;
+  return { text: `faltan ${days} d`, color };
+}
+
 export default function CoachTournamentSearchScreen({
   onSelect,
   onBack,
@@ -168,6 +176,7 @@ function TournamentCard({
   onPress: () => void;
 }) {
   const tagging = clubTags.find((t) => t.tournamentId === tournament.id);
+  const countdown = daysUntilCountdown(tournament.startDate);
 
   return (
     <Pressable style={styles.card} onPress={onPress}>
@@ -176,9 +185,12 @@ function TournamentCard({
         {tagging && <ClubTagBadge clubName={tagging.clubName} />}
       </View>
       <Text style={styles.tournamentMeta}>
-        {tournament.venue} · {tournament.city}
+        {tournament.venue} · <Text style={styles.tournamentCity}>{tournament.city}</Text>
       </Text>
-      <Text style={styles.tournamentMeta}>{dateRangeLabel(tournament.startDate, tournament.endDate)}</Text>
+      <Text style={styles.tournamentMeta}>
+        {dateRangeLabel(tournament.startDate, tournament.endDate)}
+        {countdown && <Text style={[styles.countdown, { color: countdown.color }]}> · {countdown.text}</Text>}
+      </Text>
       <View style={styles.selectRow}>
         <Text style={styles.selectLabel}>Configurar disponibilidad</Text>
         <Text style={styles.chevron}>›</Text>
@@ -293,6 +305,13 @@ const styles = StyleSheet.create({
     color: colors.textDim,
     fontSize: 12,
     marginBottom: 2,
+  },
+  tournamentCity: {
+    color: colors.textSoft,
+    fontWeight: '800',
+  },
+  countdown: {
+    fontWeight: '800',
   },
   selectRow: {
     flexDirection: 'row',
