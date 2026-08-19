@@ -191,6 +191,12 @@ function StatChip({
 }) {
   return (
     <Pressable style={[styles.statChip, urgent && styles.statChipUrgent]} onPress={onPress}>
+      <Ionicons
+        name="chevron-forward"
+        size={12}
+        color={urgent ? colors.amber : colors.textDim}
+        style={styles.statChevron}
+      />
       <Text style={[styles.statValue, urgent && styles.statValueUrgent]} numberOfLines={1}>
         {value}
       </Text>
@@ -272,6 +278,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     alignItems: 'center',
+    position: 'relative',
+  },
+  statChevron: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
   },
   statValue: {
     color: colors.courtBlue,
