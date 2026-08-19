@@ -34,6 +34,14 @@ function tournamentBadgeLabel(tournament: TournamentSearchResult): string | null
   return null;
 }
 
+/** "faltan N d" mientras el torneo no arranca (con color según urgencia), null si ya empezó. */
+function daysUntilCountdown(startIso: string): { text: string; color: string } | null {
+  const days = Math.ceil((new Date(startIso).getTime() - Date.now()) / (24 * 60 * 60 * 1000));
+  if (days <= 0) return null;
+  const color = days < 7 ? colors.errorCoral : days < 14 ? colors.amber : colors.ballLime;
+  return { text: `faltan ${days} d`, color };
+}
+
 export default function ParentHomeScreen() {
   const router = useRouter();
   const { user, token } = useAuth();
@@ -238,12 +246,16 @@ export default function ParentHomeScreen() {
 }
 
 function TournamentRow({ tournament, onPress }: { tournament: TournamentSearchResult; onPress?: () => void }) {
+  const countdown = daysUntilCountdown(tournament.startDate);
+
   return (
     <Pressable style={styles.tournamentRow} onPress={onPress}>
       <View style={styles.tournamentInfo}>
         <Text style={styles.tournamentName}>{tournament.name}</Text>
         <Text style={styles.tournamentMeta}>
-          {tournament.venue} · {tournament.city} · {dateRangeLabel(tournament.startDate, tournament.endDate)}
+          {tournament.venue} · <Text style={styles.tournamentCity}>{tournament.city}</Text> ·{' '}
+          {dateRangeLabel(tournament.startDate, tournament.endDate)}
+          {countdown && <Text style={[styles.countdown, { color: countdown.color }]}> · {countdown.text}</Text>}
         </Text>
       </View>
       <Text style={styles.chevron}>›</Text>
@@ -432,6 +444,13 @@ const styles = StyleSheet.create({
   tournamentMeta: {
     color: colors.textDim,
     fontSize: 12,
+  },
+  tournamentCity: {
+    color: colors.textSoft,
+    fontWeight: '800',
+  },
+  countdown: {
+    fontWeight: '800',
   },
   chevron: {
     color: colors.textDim,
