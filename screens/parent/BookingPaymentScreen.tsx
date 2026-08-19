@@ -1,6 +1,16 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import TrainerAvatarPlaceholder from '../../components/shared/TrainerAvatarPlaceholder';
 import { useAuth } from '../../context/AuthContext';
@@ -115,6 +125,11 @@ export default function BookingPaymentScreen({
         <Text style={styles.headerTitle}>Confirmar pago</Text>
       </View>
 
+      <KeyboardAvoidingView
+        style={styles.flexArea}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={8}
+      >
       <ScrollView contentContainerStyle={styles.content}>
         <Section label="Resumen">
           <View style={styles.summaryCard}>
@@ -231,6 +246,7 @@ export default function BookingPaymentScreen({
           )}
         </Pressable>
       </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -270,6 +286,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.bg,
+  },
+  flexArea: {
+    flex: 1,
   },
   header: {
     flexDirection: 'row',
