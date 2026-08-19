@@ -9,6 +9,19 @@ import { ApiError, payBookingsBatch } from '../../lib/api';
 import { colors, radius } from '../../lib/theme';
 import { mockPaymentMethods } from '../../mock/parentFlow';
 
+export interface PayableBooking {
+  bookingId: string;
+  dayLabel: string;
+  price: number;
+  /** Solo hace falta cuando el lote mezcla reservas de distintos entrenadores/torneos (ver
+   * "Pagar todas"/selección múltiple en BookingHistoryScreen) — con un solo entrenador para todo
+   * el lote (el caso de BookingConfirmScreen, varios días con el mismo coach) se usan en cambio
+   * los props trainerName/tournamentName/venue de más abajo, compartidos para todo el resumen. */
+  trainerName?: string;
+  tournamentName?: string;
+  venue?: string;
+}
+
 export default function BookingPaymentScreen({
   bookings,
   venue,
@@ -18,11 +31,11 @@ export default function BookingPaymentScreen({
   onBack,
   onConfirm,
 }: {
-  bookings: { bookingId: string; dayLabel: string; price: number }[];
-  venue: string;
+  bookings: PayableBooking[];
+  venue?: string;
   note: string;
-  trainerName: string;
-  tournamentName: string;
+  trainerName?: string;
+  tournamentName?: string;
   onBack: () => void;
   onConfirm: () => void;
 }) {
@@ -31,6 +44,10 @@ export default function BookingPaymentScreen({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Un solo entrenador/torneo para todo el lote: header compartido de siempre. Lote mixto (p. ej.
+  // "Pagar todas" desde el historial, con reservas de distintos entrenadores): cada reserva se
+  // lista con sus propios datos en vez de un único encabezado que no aplicaría a todas por igual.
+  const singleHeader = trainerName !== undefined && tournamentName !== undefined;
   const total = bookings.reduce((sum, b) => sum + b.price, 0);
 
   async function handleConfirm() {
@@ -70,18 +87,32 @@ export default function BookingPaymentScreen({
       <ScrollView contentContainerStyle={styles.content}>
         <Section label="Resumen">
           <View style={styles.summaryCard}>
-            <View style={styles.summaryTopRow}>
-              <TrainerAvatarPlaceholder size={48} />
-              <View style={styles.summaryInfo}>
-                <Text style={styles.trainerName}>{trainerName}</Text>
-                <Text style={styles.summaryMeta}>{tournamentName}</Text>
-              </View>
-            </View>
-            <View style={styles.summaryDivider} />
-            <SummaryLine label="Sede" value={venue} />
-            {bookings.map((b) => (
-              <SummaryLine key={b.bookingId} label={b.dayLabel} value={`$${b.price}`} />
-            ))}
+            {singleHeader ? (
+              <>
+                <View style={styles.summaryTopRow}>
+                  <TrainerAvatarPlaceholder size={48} />
+                  <View style={styles.summaryInfo}>
+                    <Text style={styles.trainerName}>{trainerName}</Text>
+                    <Text style={styles.summaryMeta}>{tournamentName}</Text>
+                  </View>
+                </View>
+                <View style={styles.summaryDivider} />
+                {venue && <SummaryLine label="Sede" value={venue} />}
+                {bookings.map((b) => (
+                  <SummaryLine key={b.bookingId} label={b.dayLabel} value={`$${b.price}`} />
+                ))}
+              </>
+            ) : (
+              bookings.map((b, i) => (
+                <View key={b.bookingId}>
+                  {i > 0 && <View style={styles.summaryDivider} />}
+                  <Text style={styles.itemTrainerName}>{b.trainerName}</Text>
+                  <Text style={styles.summaryMeta}>{b.tournamentName}</Text>
+                  <SummaryLine label={b.dayLabel} value={`$${b.price}`} />
+                  {b.venue && <SummaryLine label="Sede" value={b.venue} />}
+                </View>
+              ))
+            )}
             {note ? <SummaryLine label="Nota" value={note} /> : null}
             <View style={styles.summaryDivider} />
             <SummaryLine label="Total a pagar" value={`$${total}`} emphasize />
@@ -203,9 +234,16 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     marginBottom: 2,
   },
+  itemTrainerName: {
+    color: colors.lineWhite,
+    fontSize: 14,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
   summaryMeta: {
     color: colors.textDim,
     fontSize: 12,
+    marginBottom: 8,
   },
   summaryDivider: {
     height: 1,

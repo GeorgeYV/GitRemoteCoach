@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -7,7 +8,7 @@ import InitialAvatar from '../../components/shared/InitialAvatar';
 import { useAuth } from '../../context/AuthContext';
 import { ApiError, Booking, listParentBookings, markParentBookingDecisionsSeen } from '../../lib/api';
 import { toBookingHistoryEntry } from '../../lib/parentBookingDisplay';
-import { colors, radius } from '../../lib/theme';
+import { colors, radius, withOpacity } from '../../lib/theme';
 import { BookingHistoryEntry } from '../../mock/parentFlow';
 import BookingCancelScreen from './BookingCancelScreen';
 import BookingPaymentScreen from './BookingPaymentScreen';
@@ -26,8 +27,10 @@ export default function BookingHistoryScreen() {
   const [cancelTarget, setCancelTarget] = useState<BookingHistoryEntry | null>(null);
   const [reviewTarget, setReviewTarget] = useState<BookingHistoryEntry | null>(null);
   const [chatTarget, setChatTarget] = useState<BookingHistoryEntry | null>(null);
-  const [payTarget, setPayTarget] = useState<BookingHistoryEntry | null>(null);
+  const [payTargets, setPayTargets] = useState<BookingHistoryEntry[] | null>(null);
   const [rescheduleTarget, setRescheduleTarget] = useState<BookingHistoryEntry | null>(null);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!user || !token) {
@@ -69,10 +72,21 @@ export default function BookingHistoryScreen() {
   }
 
   function confirmPayment() {
-    if (!payTarget) return;
-    const targetId = payTarget.id;
-    setBookings((prev) => prev?.map((b) => (b.id === targetId ? { ...b, status: 'confirmed' } : b)) ?? null);
-    setPayTarget(null);
+    if (!payTargets) return;
+    const paidIds = new Set(payTargets.map((b) => b.id));
+    setBookings((prev) => prev?.map((b) => (paidIds.has(b.id) ? { ...b, status: 'confirmed' } : b)) ?? null);
+    setPayTargets(null);
+    setSelectionMode(false);
+    setSelectedIds(new Set());
+  }
+
+  function toggleSelected(bookingId: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(bookingId)) next.delete(bookingId);
+      else next.add(bookingId);
+      return next;
+    });
   }
 
   function confirmReschedule(updated: Booking) {
@@ -119,15 +133,23 @@ export default function BookingHistoryScreen() {
     return <ParentChatScreen booking={chatTarget} onBack={() => setChatTarget(null)} />;
   }
 
-  if (payTarget) {
+  if (payTargets) {
+    const singleTrainer = payTargets.every((b) => b.trainerName === payTargets[0].trainerName);
     return (
       <BookingPaymentScreen
-        bookings={[{ bookingId: payTarget.id, dayLabel: `${payTarget.date} · ${payTarget.time}`, price: payTarget.price }]}
-        venue={payTarget.venue}
+        bookings={payTargets.map((b) => ({
+          bookingId: b.id,
+          dayLabel: `${b.date} · ${b.time}`,
+          price: b.price,
+          trainerName: b.trainerName,
+          tournamentName: b.tournamentName,
+          venue: b.venue,
+        }))}
         note=""
-        trainerName={payTarget.trainerName}
-        tournamentName={payTarget.tournamentName}
-        onBack={() => setPayTarget(null)}
+        {...(singleTrainer
+          ? { trainerName: payTargets[0].trainerName, tournamentName: payTargets[0].tournamentName, venue: payTargets[0].venue }
+          : {})}
+        onBack={() => setPayTargets(null)}
         onConfirm={confirmPayment}
       />
     );
@@ -149,8 +171,14 @@ export default function BookingHistoryScreen() {
     );
   }
 
-  const upcoming = bookings.filter((b) => CANCELLABLE_STATUSES.includes(b.status));
+  // Más próxima primero — el backend trae todo ordenado por fecha descendente (pensado para
+  // "Anteriores", donde sí tiene sentido lo más reciente arriba), así que "Próximas" se reordena acá.
+  const upcoming = bookings
+    .filter((b) => CANCELLABLE_STATUSES.includes(b.status))
+    .sort((a, b) => new Date(a.matchDatetime).getTime() - new Date(b.matchDatetime).getTime());
   const past = bookings.filter((b) => !CANCELLABLE_STATUSES.includes(b.status));
+  const payable = upcoming.filter((b) => b.status === 'accepted');
+  const selectedPayable = payable.filter((b) => selectedIds.has(b.id));
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -159,6 +187,43 @@ export default function BookingHistoryScreen() {
         <Text style={styles.headerSubtitle}>
           {bookings.length} reserva{bookings.length === 1 ? '' : 's'} en total
         </Text>
+
+        {payable.length > 0 && (
+          <View style={styles.headerActions}>
+            {selectionMode ? (
+              <>
+                <Pressable
+                  style={[styles.payAllButton, selectedPayable.length === 0 && styles.payAllButtonDisabled]}
+                  disabled={selectedPayable.length === 0}
+                  onPress={() => setPayTargets(selectedPayable)}
+                >
+                  <Text style={styles.payAllLabel}>Pagar seleccionadas ({selectedPayable.length})</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.selectToggle}
+                  onPress={() => {
+                    setSelectionMode(false);
+                    setSelectedIds(new Set());
+                  }}
+                >
+                  <Text style={styles.selectToggleLabel}>Cancelar</Text>
+                </Pressable>
+              </>
+            ) : (
+              <>
+                <Pressable style={styles.payAllButton} onPress={() => setPayTargets(payable)}>
+                  <Ionicons name="card-outline" size={14} color={colors.courtBlueDeep} />
+                  <Text style={styles.payAllLabel}>Pagar todas ({payable.length})</Text>
+                </Pressable>
+                {payable.length > 1 && (
+                  <Pressable style={styles.selectToggle} onPress={() => setSelectionMode(true)}>
+                    <Text style={styles.selectToggleLabel}>Seleccionar</Text>
+                  </Pressable>
+                )}
+              </>
+            )}
+          </View>
+        )}
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
@@ -170,8 +235,11 @@ export default function BookingHistoryScreen() {
                 booking={booking}
                 onCancel={() => setCancelTarget(booking)}
                 onChat={() => setChatTarget(booking)}
-                onPay={booking.status === 'accepted' ? () => setPayTarget(booking) : undefined}
+                onPay={booking.status === 'accepted' ? () => setPayTargets([booking]) : undefined}
                 onReschedule={() => setRescheduleTarget(booking)}
+                selectable={selectionMode && booking.status === 'accepted'}
+                selected={selectedIds.has(booking.id)}
+                onToggleSelect={() => toggleSelected(booking.id)}
               />
             ))}
           </View>
@@ -220,6 +288,9 @@ function BookingRow({
   onChat,
   onPay,
   onReschedule,
+  selectable,
+  selected,
+  onToggleSelect,
 }: {
   booking: BookingHistoryEntry;
   onCancel?: () => void;
@@ -227,10 +298,23 @@ function BookingRow({
   onChat?: () => void;
   onPay?: () => void;
   onReschedule?: () => void;
+  selectable?: boolean;
+  selected?: boolean;
+  onToggleSelect?: () => void;
 }) {
   return (
     <View style={styles.row}>
-      <InitialAvatar initial={booking.trainerInitial} size={44} />
+      {selectable ? (
+        <Pressable style={styles.checkbox} onPress={onToggleSelect} hitSlop={8}>
+          <Ionicons
+            name={selected ? 'checkbox' : 'square-outline'}
+            size={22}
+            color={selected ? colors.ballLime : colors.textDim}
+          />
+        </Pressable>
+      ) : (
+        <InitialAvatar initial={booking.trainerInitial} size={44} />
+      )}
       <View style={styles.rowInfo}>
         <View style={styles.rowTopLine}>
           <Text style={styles.trainerName} numberOfLines={1}>
@@ -304,6 +388,44 @@ const styles = StyleSheet.create({
   headerSubtitle: {
     color: colors.textDim,
     fontSize: 13,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 14,
+  },
+  payAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.ballLime,
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+  },
+  payAllButtonDisabled: {
+    backgroundColor: withOpacity(colors.ballLime, 0.3),
+  },
+  payAllLabel: {
+    color: colors.courtBlueDeep,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  selectToggle: {
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+  },
+  selectToggleLabel: {
+    color: colors.textSoft,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  checkbox: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   content: {
     padding: 20,
