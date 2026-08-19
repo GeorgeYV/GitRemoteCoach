@@ -52,7 +52,7 @@ function CoachRoleHome({ user }: { user: PublicUser }) {
   }
 
   if (state === 'pending') {
-    return <CoachVerificationPendingScreen coachId={user.id} />;
+    return <CoachVerificationPendingScreen coachId={user.id} onContinue={reload} />;
   }
 
   if (state === 'error') {

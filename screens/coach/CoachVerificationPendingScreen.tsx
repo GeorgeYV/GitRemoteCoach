@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import VerificationRow from '../../components/shared/VerificationRow';
 import { useAuth } from '../../context/AuthContext';
@@ -13,6 +13,12 @@ import {
 } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
 import { VERIFICATION_DOC_LABELS } from '../../mock/coachFlow';
+import { CoachAvailabilityFlow } from '../previewFlows';
+
+/** Mismo criterio que BookingStatusScreen: el admin revisa a mano, así que pollear cada 5s
+ * alcanza para notar el cambio sin castigar al servidor. */
+const POLL_INTERVAL_MS = 5000;
+const WAITING_STATUSES: VerificationStatus[] = ['pending'];
 
 const DOC_STATUS_SUBTITLE: Record<VerificationStatus, string> = {
   pending: 'Recibido, en revisión',
@@ -41,11 +47,24 @@ const SUBTITLE_FOR_STATUS: Record<VerificationStatus, string> = {
   rejected: 'Revisa el mensaje que te enviamos por correo y vuelve a enviar tus documentos.',
 };
 
-export default function CoachVerificationPendingScreen({ coachId }: { coachId: string }) {
+export default function CoachVerificationPendingScreen({
+  coachId,
+  onContinue,
+}: {
+  coachId: string;
+  /** El admin revisa fuera de la app — sin esto, ni siquiera aprobado el coach tenía cómo salir
+   * de esta pantalla y llegar a su dashboard (reload() en app/index.tsx vuelve a resolver el
+   * rol con el estado real ya aprobado). */
+  onContinue?: () => void;
+}) {
   const { token } = useAuth();
   const [profile, setProfile] = useState<CoachProfileWithTraining | null>(null);
   const [documents, setDocuments] = useState<CoachVerificationDocument[]>([]);
   const [error, setError] = useState<string | null>(null);
+  // El coach todavía no es visible para padres, pero puede adelantar trabajo mientras espera la
+  // revisión — el poll de abajo sigue corriendo en segundo plano mientras está acá adentro, así
+  // que "volver" ya refleja la aprobación si llegó a pasar mientras tanto.
+  const [browsingAvailability, setBrowsingAvailability] = useState(false);
 
   useEffect(() => {
     if (!token) {
@@ -53,24 +72,41 @@ export default function CoachVerificationPendingScreen({ coachId }: { coachId: s
       return;
     }
     let cancelled = false;
-    setError(null);
-    Promise.all([getCoachProfile(coachId), listCoachVerificationDocuments(token, coachId)])
-      .then(([profileResult, documentsResult]) => {
+    let timer: ReturnType<typeof setTimeout>;
+
+    async function poll() {
+      try {
+        const [profileResult, documentsResult] = await Promise.all([
+          getCoachProfile(coachId),
+          listCoachVerificationDocuments(token!, coachId),
+        ]);
         if (cancelled) return;
         setProfile(profileResult);
         setDocuments(documentsResult);
-      })
-      .catch((err) => {
+        setError(null);
+        if (WAITING_STATUSES.includes(profileResult.profile.verificationStatus)) {
+          timer = setTimeout(poll, POLL_INTERVAL_MS);
+        }
+      } catch (err) {
         if (cancelled) return;
         setError(err instanceof ApiError ? err.message : 'No se pudo consultar el estado de tu verificación.');
-      });
+        timer = setTimeout(poll, POLL_INTERVAL_MS);
+      }
+    }
+
+    poll();
     return () => {
       cancelled = true;
+      clearTimeout(timer);
     };
   }, [coachId, token]);
 
   const status = profile?.profile.verificationStatus ?? 'pending';
   const currentStepIndex = STEP_INDEX_FOR_STATUS[status];
+
+  if (browsingAvailability) {
+    return <CoachAvailabilityFlow onBack={() => setBrowsingAvailability(false)} />;
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -125,12 +161,25 @@ export default function CoachVerificationPendingScreen({ coachId }: { coachId: s
           )}
         </View>
 
-        <View style={styles.reassuranceBox}>
-          <Text style={styles.reassuranceText}>
-            Te avisaremos con una notificación en cuanto tu perfil esté aprobado. Mientras tanto puedes explorar los
-            torneos disponibles y preparar tu disponibilidad.
-          </Text>
-        </View>
+        {status === 'approved' && onContinue ? (
+          <Pressable style={styles.continueButton} onPress={onContinue}>
+            <Text style={styles.continueLabel}>Continuar</Text>
+          </Pressable>
+        ) : (
+          <>
+            <View style={styles.reassuranceBox}>
+              <Text style={styles.reassuranceText}>
+                Te avisaremos con una notificación en cuanto tu perfil esté aprobado. Mientras tanto puedes explorar
+                los torneos disponibles y preparar tu disponibilidad — todavía no eres visible para los padres.
+              </Text>
+            </View>
+            {status === 'pending' && (
+              <Pressable style={styles.secondaryButton} onPress={() => setBrowsingAvailability(true)}>
+                <Text style={styles.secondaryLabel}>Ver torneos y preparar disponibilidad</Text>
+              </Pressable>
+            )}
+          </>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -270,5 +319,33 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
     textAlign: 'center',
+  },
+  continueButton: {
+    backgroundColor: colors.ballLime,
+    borderRadius: radius,
+    paddingVertical: 16,
+    paddingHorizontal: 48,
+    alignSelf: 'stretch',
+    alignItems: 'center',
+  },
+  continueLabel: {
+    color: colors.courtBlueDeep,
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  secondaryButton: {
+    borderRadius: radius,
+    borderWidth: 1.5,
+    borderColor: colors.courtBlue,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    alignSelf: 'stretch',
+    alignItems: 'center',
+    marginTop: 14,
+  },
+  secondaryLabel: {
+    color: colors.courtBlue,
+    fontSize: 14,
+    fontWeight: '700',
   },
 });
