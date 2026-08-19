@@ -1008,11 +1008,16 @@ CREATE TABLE payment_transactions (
 );
 
 CREATE INDEX idx_payment_transactions_booking_id ON payment_transactions (booking_id);
--- UNIQUE (no solo índice): Stripe entrega webhooks con al-menos-una vez,
--- puede reintentar el mismo evento. Sin esto un reintento duplicaría la
--- fila y corrompería cualquier suma sobre payment_transactions.
+-- UNIQUE compuesta (no solo stripe_object_id): Stripe entrega webhooks con
+-- al-menos-una-vez, puede reintentar el mismo evento — sin esto un reintento
+-- duplicaría la fila de ESA reserva y corrompería cualquier suma sobre
+-- payment_transactions. Pero un pago por lote (paymentService.initiatePaymentBatch,
+-- ver decisión "reservar más de 1 día") cobra varias reservas en un solo
+-- PaymentIntent de Stripe, así que varias reservas *distintas* legítimamente
+-- comparten un mismo stripe_object_id — con la unicidad simple, la 2ª reserva
+-- del lote violaba la restricción al insertar su fila.
 CREATE UNIQUE INDEX idx_payment_transactions_stripe_object_id
-  ON payment_transactions (stripe_object_id)
+  ON payment_transactions (stripe_object_id, booking_id)
   WHERE stripe_object_id IS NOT NULL;
 -- Cola de reconciliación: transacciones que quedaron 'pending' (pago
 -- asíncrono) y un job debe volver a consultar contra Stripe.
