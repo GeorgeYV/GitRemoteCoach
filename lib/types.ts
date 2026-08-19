@@ -59,6 +59,10 @@ export interface VoiceNote {
   timestamp: number;
   uri: string;
   durationMs: number;
+  /** Marcador del partido en el instante en que se grabó (ver scoringEngine#getScoreLabel) —
+   * congelado al crear la nota, no recalculado después, para que siga siendo el momento exacto
+   * aunque se deshagan/ajusten puntos más tarde. */
+  scoreLabel: string;
 }
 
 export interface MatchConfig {

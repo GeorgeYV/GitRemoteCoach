@@ -1,7 +1,13 @@
 import { RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync, useAudioRecorder } from 'expo-audio';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Platform } from 'react-native';
-import { NewVoiceNoteInput } from './matchReducer';
+
+/** Lo que el hook conoce del clip recién grabado — no sabe nada de marcador/puntaje, eso lo
+ * agrega quien lo llama (VoiceNoteRecorder, MatchSummaryView) antes de armar el VoiceNote completo. */
+export interface RecordedClip {
+  uri: string;
+  durationMs: number;
+}
 
 /** Debajo de esto se descarta la grabación — protege contra un tap accidental en vez de un
  * "mantén presionado" real. */
@@ -19,7 +25,7 @@ export function formatDuration(ms: number): string {
 /** Hold-to-record: mantén presionado un Pressable para grabar, suelta para guardar el clip.
  * Compartido entre la nota de voz de captura en vivo y el dictado de observaciones — misma
  * mecánica de grabación, solo cambia dónde termina el clip. */
-export function useVoiceRecorder(onRecorded: (input: NewVoiceNoteInput) => void) {
+export function useVoiceRecorder(onRecorded: (clip: RecordedClip) => void) {
   const recorder = useAudioRecorder(RECORDER_OPTIONS);
   const [isRecording, setIsRecording] = useState(false);
   const [elapsedMs, setElapsedMs] = useState(0);

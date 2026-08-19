@@ -6,8 +6,12 @@ import { colors } from '../lib/theme';
 import { VoiceNote } from '../lib/types';
 import { formatDuration } from '../lib/useVoiceRecorder';
 
-/** Lista horizontal de clips grabados con reproducción inline — compartida entre la nota de voz
- * de captura en vivo y el dictado de observaciones, ambos sobre el mismo pool de VoiceNote. */
+/** Lista vertical de clips grabados con reproducción inline, una fila por nota etiquetada con el
+ * marcador que llevaba el partido al grabarla — compartida entre la nota de voz de captura en
+ * vivo y el dictado de observaciones, ambos sobre el mismo pool de VoiceNote. Altura acotada con
+ * scroll propio (en vez de crecer libremente): sin este límite, cada nota nueva le quitaba
+ * espacio a los botones de punto en PointFlow, que no tienen un tamaño fijo. Más reciente primero
+ * — es lo que el entrenador acaba de grabar, no hace falta bajar a buscarlo. */
 export default function VoiceNotesList({
   notes,
   onDelete,
@@ -26,6 +30,8 @@ export default function VoiceNotesList({
   }, [playerStatus.didJustFinish]);
 
   if (notes.length === 0) return null;
+
+  const orderedNotes = [...notes].reverse();
 
   function togglePlay(note: VoiceNote) {
     if (playingId === note.id) {
@@ -47,15 +53,20 @@ export default function VoiceNotesList({
   }
 
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[styles.notesRow, style]}>
-      {notes.map((note) => (
-        <View key={note.id} style={styles.noteChip}>
+    <ScrollView style={[styles.notesScroll, style]} contentContainerStyle={styles.notesList} nestedScrollEnabled>
+      {orderedNotes.map((note) => (
+        <View key={note.id} style={styles.noteRow}>
           <Pressable style={styles.notePlayButton} onPress={() => togglePlay(note)} hitSlop={6}>
             <Ionicons name={playingId === note.id ? 'pause' : 'play'} size={13} color={colors.courtBlueDeep} />
           </Pressable>
-          <Text style={styles.noteDuration}>{formatDuration(note.durationMs)}</Text>
+          <View style={styles.noteInfo}>
+            <Text style={styles.noteScoreLabel} numberOfLines={1}>
+              {note.scoreLabel}
+            </Text>
+            <Text style={styles.noteDuration}>{formatDuration(note.durationMs)}</Text>
+          </View>
           <Pressable onPress={() => handleDelete(note)} hitSlop={6}>
-            <Ionicons name="close" size={13} color={colors.textDim} />
+            <Ionicons name="close" size={15} color={colors.textDim} />
           </Pressable>
         </View>
       ))}
@@ -64,32 +75,49 @@ export default function VoiceNotesList({
 }
 
 const styles = StyleSheet.create({
-  notesRow: {
-    flexGrow: 0,
+  notesScroll: {
+    // ~2.5 filas visibles y despues scroll propio — evita que una lista larga de notas le siga
+    // quitando alto a los botones de punto de PointFlow (ninguno de los dos tiene tamaño fijo).
+    maxHeight: 156,
   },
-  noteChip: {
+  notesList: {
+    gap: 8,
+  },
+  noteRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 10,
     backgroundColor: colors.panel,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 999,
-    paddingVertical: 6,
+    borderRadius: 12,
+    paddingVertical: 8,
     paddingHorizontal: 10,
-    marginRight: 8,
   },
   notePlayButton: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     backgroundColor: colors.ballLime,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  noteDuration: {
-    fontSize: 12,
+  noteInfo: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  noteScoreLabel: {
+    fontSize: 13,
     fontWeight: '700',
     color: colors.textSoft,
+    flexShrink: 1,
+  },
+  noteDuration: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textDim,
   },
 });

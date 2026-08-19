@@ -391,6 +391,25 @@ export function getGamePointLabels(points: { player1: number; player2: number },
   return { player1: '40', player2: 'AD' };
 }
 
+/** Texto compacto del marcador en un instante dado — mismo criterio que ScoreHeader (sets
+ * completados, set en curso, punto/tie-break actual) pero en una sola línea, para etiquetar cada
+ * nota de voz con el momento del partido en que se grabó. */
+export function getScoreLabel(state: MatchState, config: MatchConfig): string {
+  if (state.matchEnded) return `Set ${state.completedSets.length}`;
+
+  const setNumber = state.completedSets.length + 1;
+  const gamesCount = countGames(state.currentSetGames);
+  const setLabel = `Set ${setNumber} · ${gamesCount.player1}-${gamesCount.player2}`;
+
+  if (state.inTiebreak) {
+    return `${setLabel} · TB ${state.tiebreakPoints.player1}-${state.tiebreakPoints.player2}`;
+  }
+
+  const gameLabels = getGamePointLabels(state.currentGamePoints, config.noAd);
+  if (gameLabels.player1 === '0' && gameLabels.player2 === '0') return setLabel;
+  return `${setLabel} · ${gameLabels.player1}-${gameLabels.player2}`;
+}
+
 export type PressureLevel = 'alta' | 'media' | 'baja';
 
 /** (leader, trailer) game-point pairs the coach reads as a clear cushion: 40-0, 40-15, 30-0 and their mirrors. */
