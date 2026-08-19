@@ -8,7 +8,7 @@ import ParentTabBar from '../../components/parent/ParentTabBar';
 import IconTextInput from '../../components/shared/IconTextInput';
 import InitialAvatar from '../../components/shared/InitialAvatar';
 import { useAuth } from '../../context/AuthContext';
-import { CountryCode, listPlayers, searchTournaments, TournamentSearchResult } from '../../lib/api';
+import { CountryCode, listParentBookings, listPlayers, searchTournaments, TournamentSearchResult } from '../../lib/api';
 import { dateRangeLabel } from '../../lib/dateSlots';
 import { colors, radius, withOpacity } from '../../lib/theme';
 import { COUNTRY_LABELS, COUNTRY_OPTIONS } from '../../mock/coachFlow';
@@ -45,6 +45,22 @@ export default function ParentHomeScreen() {
   const [tournaments, setTournaments] = useState<TournamentSearchResult[] | null>(null);
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState<TournamentSearchResult[] | null>(null);
+  const [pendingPaymentCount, setPendingPaymentCount] = useState(0);
+
+  // Reservas ya aceptadas por el entrenador pero sin pagar todavía — el padre puede perder el cupo
+  // si no completa el pago, así que se lo recordamos apenas entra a la pantalla de inicio.
+  useEffect(() => {
+    if (!user || !token) return;
+    let cancelled = false;
+    listParentBookings(token, user.id)
+      .then((bookings) => {
+        if (!cancelled) setPendingPaymentCount(bookings.filter((b) => b.status === 'accepted').length);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [user, token]);
 
   useEffect(() => {
     if (!token) return;
@@ -124,6 +140,21 @@ export default function ParentHomeScreen() {
 
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.greeting}>Hola, {firstName}</Text>
+
+        {pendingPaymentCount > 0 && (
+          <Pressable style={styles.paymentBanner} onPress={() => router.push('/bookings')}>
+            <View style={styles.paymentBannerTextWrap}>
+              <Text style={styles.paymentBannerTitle}>
+                {pendingPaymentCount === 1 ? 'Tienes 1 reserva por pagar' : `Tienes ${pendingPaymentCount} reservas por pagar`}
+              </Text>
+              <Text style={styles.paymentBannerMeta}>
+                Complétala{pendingPaymentCount === 1 ? '' : 's'} en Reservas antes de perder el cupo con el entrenador.
+              </Text>
+            </View>
+            <Text style={styles.chevron}>›</Text>
+          </Pressable>
+        )}
+
         <Text style={styles.headline}>
           {childName
             ? `Encuentra un entrenador para el próximo torneo de ${childName}`
@@ -254,6 +285,31 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     lineHeight: 28,
     marginBottom: 22,
+  },
+  paymentBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: withOpacity(colors.errorCoral, 0.12),
+    borderRadius: radius,
+    borderWidth: 1,
+    borderColor: withOpacity(colors.errorCoral, 0.4),
+    padding: 16,
+    marginBottom: 20,
+  },
+  paymentBannerTextWrap: {
+    flex: 1,
+    marginRight: 8,
+  },
+  paymentBannerTitle: {
+    color: colors.errorCoral,
+    fontSize: 14,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
+  paymentBannerMeta: {
+    color: colors.textSoft,
+    fontSize: 12,
+    lineHeight: 17,
   },
   sectionLabel: {
     color: colors.textDim,
