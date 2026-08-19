@@ -233,3 +233,19 @@ export async function findTournamentsEndedWithoutFullSettlement(db: Queryable = 
   );
   return rows.map((r: any) => r.id);
 }
+
+/** Lista propia (no reutiliza findTournamentsEndedWithoutFullSettlement): esa está filtrada por
+ * club_commission_status, una señal de "listo" distinta de coach_payout_id — un torneo sin club
+ * (que nunca liquida comisión, ver settleTournamentCommissions) igual le debe pagar a su
+ * entrenador, y uno que ya salió de la lista de comisiones puede seguir debiendo el payout. */
+export async function findTournamentsEndedWithoutCoachPayout(db: Queryable = pool): Promise<string[]> {
+  const { rows } = await db.query(
+    `SELECT DISTINCT t.id
+     FROM tournaments t
+     JOIN bookings b ON b.tournament_id = t.id
+     WHERE t.end_date < CURRENT_DATE
+       AND b.status = 'completed'
+       AND b.coach_payout_id IS NULL`,
+  );
+  return rows.map((r: any) => r.id);
+}

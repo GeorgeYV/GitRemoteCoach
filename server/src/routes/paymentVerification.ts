@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import * as bookingRepository from '../repositories/bookingRepository.js';
+import * as coachPayoutRepository from '../repositories/coachPayoutRepository.js';
 import * as paymentService from '../services/paymentService.js';
 import { ForbiddenError, ValidationError } from '../lib/errors.js';
 
@@ -34,5 +35,15 @@ export async function paymentVerificationRoutes(app: FastifyInstance): Promise<v
     const parsed = verifyPaymentSchema.safeParse(req.body);
     if (!parsed.success) throw new ValidationError(parsed.error.message);
     return paymentService.verifyPayment(parsed.data.bookingIds, sub, parsed.data.decision);
+  });
+
+  // PlatformAdminPayoutsScreen: cuánto se le ha pagado (agregado, ver
+  // settlementService.settleTournamentCoachPayouts) a cada entrenador por torneo.
+  app.get('/coaches/payouts', { preHandler: app.authenticate }, async (req) => {
+    const { role } = req.user as { role: string };
+    if (role !== 'platform_admin') {
+      throw new ForbiddenError('Solo un administrador de la plataforma puede ver los pagos a entrenadores');
+    }
+    return coachPayoutRepository.listAll();
   });
 }

@@ -129,6 +129,7 @@ const PREVIEW_COACH_MATCH_BOOKING: BookingWithParticipants = {
   coachNetAmount: null,
   platformCommissionAmount: null,
   clubCommissionAmount: null,
+  coachPayoutId: null,
   refundAmount: null,
   coachCompensationAmount: null,
   cancelledAt: null,

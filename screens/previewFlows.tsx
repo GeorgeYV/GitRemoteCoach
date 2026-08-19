@@ -401,8 +401,13 @@ export function CoachHomeFlow({ coachId, coachName }: { coachId: string; coachNa
 
   const suspendedBookingRaw = suspendedMatch ? bookings?.find((b) => b.id === suspendedMatch.bookingId) ?? null : null;
   const pendingRequests = bookings?.filter((b) => b.status === 'requested').length ?? 0;
+  // 'paid' siempre está pendiente de liberar; 'completed' lo está hasta que el torneo cierre y
+  // settleTournamentCoachPayouts le asigne un coach_payout_id (ver CoachEarningsScreen, mismo
+  // criterio) — status==='paid' solo no alcanza, un partido ya completado sigue "por liberar".
   const pendingEarnings =
-    bookings?.filter((b) => b.status === 'paid').reduce((sum, b) => sum + Number(b.coachNetAmount ?? 0), 0) ?? 0;
+    bookings
+      ?.filter((b) => b.status === 'paid' || (b.status === 'completed' && b.coachPayoutId === null))
+      .reduce((sum, b) => sum + Number(b.coachNetAmount ?? 0), 0) ?? 0;
 
   function confirmCancel(_reason: string) {
     if (!selectedBookingRaw) return;

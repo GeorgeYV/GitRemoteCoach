@@ -11,7 +11,9 @@ function money(amount: number): string {
   return `$${amount.toFixed(2)}`;
 }
 
-/** 'paid' = cobrado pero retenido hasta el partido; 'completed' = ya liberado al coach (paymentService.completeBooking). */
+/** 'paid'/'completed' = cobrado, retenido hasta que cierre el torneo; coachPayoutId no-nulo = ya
+ * incluido en el pago agregado al entrenador para ese torneo (settlementService.
+ * settleTournamentCoachPayouts) — "completed" ya no implica "liberado", son eventos separados. */
 function toEarningsEntry(booking: BookingWithParticipants): EarningsEntry {
   const matchDate = new Date(booking.matchDatetime);
   return {
@@ -22,7 +24,7 @@ function toEarningsEntry(booking: BookingWithParticipants): EarningsEntry {
     date: matchDate.toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' }),
     agreedRate: Number(booking.agreedRate),
     coachNetAmount: booking.coachNetAmount !== null ? Number(booking.coachNetAmount) : undefined,
-    payoutStatus: booking.status === 'completed' ? 'liberado' : 'pendiente',
+    payoutStatus: booking.coachPayoutId !== null ? 'liberado' : 'pendiente',
   };
 }
 

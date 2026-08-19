@@ -62,6 +62,10 @@ export interface Booking {
   clubCommissionAmount: string | null;
   clubCommissionStatus: ClubCommissionStatus;
   settlementId: string | null;
+  // Cuánto se le debe al entrenador se agrega al cerrar el torneo (settlementService.
+  // settleTournamentCoachPayouts), no al completar cada reserva — nulo == todavía no incluido en
+  // un pago agregado a este entrenador.
+  coachPayoutId: string | null;
   cancelledBy: string | null;
   cancellationReason: string | null;
   refundAmount: string | null;
@@ -134,6 +138,27 @@ export interface ClubSettlement {
 
 /** Lo que devuelve el listado por club (ClubSettlementsScreen) — nombre de torneo viene de un JOIN. */
 export interface ClubSettlementWithTournamentName extends ClubSettlement {
+  tournamentName: string;
+}
+
+/** Espejo de ClubSettlement pero por entrenador — ver settlementService.settleTournamentCoachPayouts. */
+export interface CoachPayout {
+  id: string;
+  coachId: string;
+  tournamentId: string;
+  periodStart: string;
+  periodEnd: string;
+  totalNetAmount: string;
+  status: 'pending' | 'paid';
+  createdAt: string;
+  paidAt: string | null;
+}
+
+/** Lo que devuelve la cola del admin (PlatformAdminPayoutsScreen) — todos los entrenadores, así
+ * que hace falta el nombre del entrenador además del torneo (ClubSettlementWithTournamentName
+ * solo necesita el torneo porque ya está scoped a un club). */
+export interface CoachPayoutWithNames extends CoachPayout {
+  coachName: string;
   tournamentName: string;
 }
 

@@ -772,6 +772,54 @@ WHEN (NEW.status IS DISTINCT FROM OLD.status)
 EXECUTE FUNCTION fn_club_settlements_set_paid_at();
 
 -- ---------------------------------------------------------------------
+-- Pagos a entrenadores (se referencian desde bookings) — espejo de
+-- club_settlements pero por coach en vez de por club. A diferencia de
+-- club_settlements.total_commission_amount, total_net_amount NO se
+-- mantiene con un trigger de recálculo: se calcula una sola vez en JS
+-- (settlementService.settleTournamentCoachPayouts, mismo criterio que
+-- ya usa settleTournamentCommissions antes de insertar) porque un
+-- coach_payout no se corrige después de creado, a diferencia de un
+-- club_settlement — simplificación consciente para la primera versión.
+-- ---------------------------------------------------------------------
+CREATE TABLE coach_payouts (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  coach_id          UUID NOT NULL REFERENCES coach_profiles (user_id),
+  tournament_id     UUID NOT NULL REFERENCES tournaments (id),
+  period_start      DATE NOT NULL,
+  period_end        DATE NOT NULL CHECK (period_end >= period_start),
+  total_net_amount  NUMERIC(12, 2) NOT NULL DEFAULT 0 CHECK (total_net_amount >= 0),
+  status            settlement_status NOT NULL DEFAULT 'pending',
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  paid_at           TIMESTAMPTZ,
+
+  CONSTRAINT chk_coach_payouts_paid_at
+    CHECK ((status = 'paid') = (paid_at IS NOT NULL))
+);
+
+CREATE INDEX idx_coach_payouts_coach_id ON coach_payouts (coach_id);
+CREATE INDEX idx_coach_payouts_tournament_id ON coach_payouts (tournament_id);
+
+-- Mismo patrón que fn_club_settlements_set_paid_at — la app solo tiene que hacer
+-- UPDATE coach_payouts SET status = 'paid' WHERE id = ... (aunque en la práctica
+-- settleTournamentCoachPayouts siempre inserta directo en 'paid').
+CREATE OR REPLACE FUNCTION fn_coach_payouts_set_paid_at() RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.status = 'paid' THEN
+    NEW.paid_at := now();
+  ELSE
+    NEW.paid_at := NULL;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_coach_payouts_set_paid_at
+BEFORE UPDATE OF status ON coach_payouts
+FOR EACH ROW
+WHEN (NEW.status IS DISTINCT FROM OLD.status)
+EXECUTE FUNCTION fn_coach_payouts_set_paid_at();
+
+-- ---------------------------------------------------------------------
 -- Reservas / transacciones
 -- ---------------------------------------------------------------------
 CREATE TABLE bookings (
@@ -811,6 +859,11 @@ CREATE TABLE bookings (
   -- == comisión aún no pagada al club.
   club_commission_status        club_commission_status NOT NULL DEFAULT 'generated',
   settlement_id                 UUID REFERENCES club_settlements (id),
+  -- Cuánto se le debe al entrenador se agrega recién al cerrar el torneo (ver
+  -- settlementService.settleTournamentCoachPayouts), no al completar cada reserva por separado
+  -- (completeBooking marca 'completed' para gatillar reseñas/historial, sin mover fondos) —
+  -- coach_payout_id nulo == todavía no incluido en un pago agregado a este entrenador.
+  coach_payout_id                UUID REFERENCES coach_payouts (id),
 
   -- Detalle de cancelación. cancelled_by identifica al actor (padre o
   -- entrenador) para aplicar la regla de reembolso/compensación correcta
@@ -867,6 +920,15 @@ CREATE INDEX idx_bookings_settlement_id
 CREATE INDEX idx_bookings_pending_commission
   ON bookings (tournament_id)
   WHERE club_commission_status = 'generated' AND status = 'completed';
+-- Mismo criterio que idx_bookings_settlement_id/idx_bookings_pending_commission, pero para el
+-- pago agregado al entrenador (settlementService.settleTournamentCoachPayouts) — no se filtra
+-- por club_commission_status porque un torneo sin club también le debe pagar a su entrenador.
+CREATE INDEX idx_bookings_coach_payout_id
+  ON bookings (coach_payout_id, coach_net_amount)
+  WHERE coach_payout_id IS NOT NULL;
+CREATE INDEX idx_bookings_pending_coach_payout
+  ON bookings (tournament_id)
+  WHERE coach_payout_id IS NULL AND status = 'completed';
 -- Job de expiración: reservas 'requested' cuya ventana de respuesta venció.
 CREATE INDEX idx_bookings_pending_response
   ON bookings (response_deadline)
@@ -953,6 +1015,44 @@ BEFORE UPDATE OF settlement_id ON bookings
 FOR EACH ROW
 WHEN (NEW.settlement_id IS DISTINCT FROM OLD.settlement_id)
 EXECUTE FUNCTION fn_bookings_apply_settlement();
+
+-- ---------------------------------------------------------------------
+-- Trigger: valida que un coach_payout asignado a una reserva sea del
+-- mismo entrenador Y del mismo torneo que la reserva — mismo espíritu
+-- que fn_bookings_apply_settlement, sin el espejo de status (coach_payout_id
+-- nulo/no-nulo ya es la señal de "pendiente"/"pagado", no hace falta una
+-- columna de estado redundante en bookings como club_commission_status).
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION fn_bookings_apply_coach_payout() RETURNS TRIGGER AS $$
+DECLARE
+  v_payout_coach_id UUID;
+  v_payout_tournament_id UUID;
+BEGIN
+  IF NEW.coach_payout_id IS NOT NULL THEN
+    SELECT coach_id, tournament_id INTO v_payout_coach_id, v_payout_tournament_id
+      FROM coach_payouts
+     WHERE id = NEW.coach_payout_id;
+
+    IF v_payout_coach_id IS NULL THEN
+      RAISE EXCEPTION 'coach_payouts % no existe', NEW.coach_payout_id;
+    END IF;
+
+    IF v_payout_coach_id <> NEW.coach_id OR v_payout_tournament_id <> NEW.tournament_id THEN
+      RAISE EXCEPTION
+        'booking % es del entrenador %/torneo %, no puede pagarse con coach_payout % (entrenador %/torneo %)',
+        NEW.id, NEW.coach_id, NEW.tournament_id, NEW.coach_payout_id, v_payout_coach_id, v_payout_tournament_id;
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_bookings_apply_coach_payout
+BEFORE UPDATE OF coach_payout_id ON bookings
+FOR EACH ROW
+WHEN (NEW.coach_payout_id IS DISTINCT FROM OLD.coach_payout_id)
+EXECUTE FUNCTION fn_bookings_apply_coach_payout();
 
 -- ---------------------------------------------------------------------
 -- Trigger: mantener club_settlements.total_commission_amount al día

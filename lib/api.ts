@@ -215,6 +215,10 @@ export interface Booking {
   coachNetAmount: string | null;
   platformCommissionAmount: string | null;
   clubCommissionAmount: string | null;
+  // Cuánto se le debe al entrenador se agrega al cerrar el torneo (settlementService.
+  // settleTournamentCoachPayouts), no al completar cada reserva — nulo == todavía no incluido en
+  // un pago agregado a este entrenador (ver CoachEarningsScreen).
+  coachPayoutId: string | null;
   refundAmount: string | null;
   coachCompensationAmount: string | null;
   cancelledAt: string | null;
@@ -904,6 +908,30 @@ export interface ClubSettlement {
 /** Espeja server/src/types.ts#ClubSettlementWithTournamentName — lo que devuelve el listado por club. */
 export interface ClubSettlementWithTournamentName extends ClubSettlement {
   tournamentName: string;
+}
+
+/** Espeja server/src/types.ts#CoachPayout. */
+export interface CoachPayout {
+  id: string;
+  coachId: string;
+  tournamentId: string;
+  periodStart: string;
+  periodEnd: string;
+  totalNetAmount: string;
+  status: 'pending' | 'paid';
+  createdAt: string;
+  paidAt: string | null;
+}
+
+/** Espeja server/src/types.ts#CoachPayoutWithNames — lo que devuelve GET /coaches/payouts. */
+export interface CoachPayoutWithNames extends CoachPayout {
+  coachName: string;
+  tournamentName: string;
+}
+
+/** GET /coaches/payouts — PlatformAdminPayoutsScreen (platform_admin). */
+export function listCoachPayouts(authToken: string): Promise<CoachPayoutWithNames[]> {
+  return request('/coaches/payouts', { headers: { Authorization: `Bearer ${authToken}` } });
 }
 
 /** Espeja server/src/types.ts#Club. */

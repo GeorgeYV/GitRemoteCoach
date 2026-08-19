@@ -9,6 +9,7 @@
     "start": "tsx src/index.ts",
     "jobs:expire-bookings": "tsx src/jobs/expireBookingsRunner.ts",
     "jobs:settle-clubs": "tsx src/jobs/settleClubsRunner.ts",
+    "jobs:settle-coach-payouts": "tsx src/jobs/settleCoachPayoutsRunner.ts",
     "typecheck": "tsc --noEmit",
     "test:smoke": "tsx test/smokeTest.ts"
   },

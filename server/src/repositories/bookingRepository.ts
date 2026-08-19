@@ -27,6 +27,7 @@ function mapRow(row: any): Booking {
     clubCommissionAmount: row.club_commission_amount,
     clubCommissionStatus: row.club_commission_status,
     settlementId: row.settlement_id,
+    coachPayoutId: row.coach_payout_id,
     cancelledBy: row.cancelled_by,
     cancellationReason: row.cancellation_reason,
     refundAmount: row.refund_amount,
@@ -362,6 +363,21 @@ export async function findPendingCommissionsForTournament(
   return rows.map(mapRow);
 }
 
+/** Mismo criterio que findPendingCommissionsForTournament, para el pago agregado al entrenador —
+ * no filtra por club_commission_status porque un torneo sin club también le debe pagar. */
+export async function findPendingCoachPayoutsForTournament(
+  tournamentId: string,
+  db: Queryable = pool,
+): Promise<Booking[]> {
+  const { rows } = await db.query(
+    `SELECT * FROM bookings
+     WHERE tournament_id = $1 AND status = 'completed' AND coach_payout_id IS NULL
+     FOR UPDATE`,
+    [tournamentId],
+  );
+  return rows.map(mapRow);
+}
+
 /** CoachHomeScreen, CoachRequestInboxScreen, CoachSessionHistoryScreen, CoachEarningsScreen: todas las
  * reservas de un coach, con nombre de jugador/padre y datos del torneo, más recientes primero. */
 export async function listBookingsForCoach(
@@ -443,6 +459,21 @@ export async function markBookingsSettled(
   await client.query(
     `UPDATE bookings SET club_commission_status = 'settled', settlement_id = $1 WHERE id IN (${placeholders})`,
     [settlementId, ...bookingIds],
+  );
+}
+
+/** Mismo criterio que markBookingsSettled — trg_bookings_apply_coach_payout valida que las
+ * reservas de verdad sean del entrenador/torneo del payout antes de dejar asignar coach_payout_id. */
+export async function markBookingsPaidOut(
+  bookingIds: string[],
+  coachPayoutId: string,
+  client: PoolClient,
+): Promise<void> {
+  if (bookingIds.length === 0) return;
+  const placeholders = bookingIds.map((_, i) => `$${i + 2}`).join(', ');
+  await client.query(
+    `UPDATE bookings SET coach_payout_id = $1 WHERE id IN (${placeholders})`,
+    [coachPayoutId, ...bookingIds],
   );
 }
 
