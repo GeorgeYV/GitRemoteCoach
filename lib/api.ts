@@ -1174,6 +1174,31 @@ export function settleTournament(
   });
 }
 
+/** Espeja server/src/types.ts#TournamentReadyForCoachPayout. */
+export interface TournamentReadyForCoachPayout {
+  id: string;
+  name: string;
+  endDate: string;
+}
+
+/** GET /tournaments/ready-for-coach-payout — PlatformAdminPayoutsScreen: torneos ya finalizados
+ * con pagos a entrenadores sin liquidar. */
+export function listTournamentsReadyForCoachPayout(authToken: string): Promise<TournamentReadyForCoachPayout[]> {
+  return request('/tournaments/ready-for-coach-payout', { headers: { Authorization: `Bearer ${authToken}` } });
+}
+
+/** POST /tournaments/:id/settle-coach-payouts — PlatformAdminPayoutsScreen "Liquidar". Solo un
+ * administrador de la plataforma puede liquidar pagos a entrenadores (verificado en el server). */
+export function settleTournamentCoachPayouts(
+  authToken: string,
+  tournamentId: string,
+): Promise<{ message?: string; payouts: CoachPayout[] }> {
+  return request(`/tournaments/${tournamentId}/settle-coach-payouts`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${authToken}` },
+  });
+}
+
 export type MatchPlayerSlot = 'player1' | 'player2';
 export type MatchStatus = 'in_progress' | 'completed' | 'suspended';
 export type CaptureMode = 'rapida' | 'detallada';

@@ -275,6 +275,16 @@ export interface TournamentSummary {
   pendingCommissionAmount: string;
 }
 
+/** Lo que devuelve GET /tournaments/ready-for-coach-payout (PlatformAdminPayoutsScreen) — torneos
+ * ya finalizados con reservas 'completed' que todavía no entraron a un coach_payout (ver
+ * settlementService.settleTournamentCoachPayouts). Lista propia, no reutiliza TournamentSummary
+ * (esa está scoped a un club vía clubId, esta cruza todos los torneos). */
+export interface TournamentReadyForCoachPayout {
+  id: string;
+  name: string;
+  endDate: string;
+}
+
 /** Descubrimiento público de torneos activos (CoachTournamentSearchScreen) — ciudad viene de un
  * JOIN con clubs, a diferencia de TournamentSummary que ya trae clubId directo. */
 export interface TournamentSearchResult {

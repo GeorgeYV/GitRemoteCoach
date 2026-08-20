@@ -1,7 +1,13 @@
 import type { Pool, PoolClient } from 'pg';
 import { pool } from '../lib/db.js';
 import { NotFoundError } from '../lib/errors.js';
-import type { CountryCode, TournamentSearchResult, TournamentSummary, UnclaimedTournament } from '../types.js';
+import type {
+  CountryCode,
+  TournamentReadyForCoachPayout,
+  TournamentSearchResult,
+  TournamentSummary,
+  UnclaimedTournament,
+} from '../types.js';
 
 type Queryable = Pool | PoolClient;
 
@@ -248,4 +254,23 @@ export async function findTournamentsEndedWithoutCoachPayout(db: Queryable = poo
        AND b.coach_payout_id IS NULL`,
   );
   return rows.map((r: any) => r.id);
+}
+
+/** PlatformAdminPayoutsScreen: mismo criterio que findTournamentsEndedWithoutCoachPayout, con
+ * nombre/fecha para mostrar el botón "Liquidar" manual (jobs/settleCoachPayoutsRunner.ts es el
+ * mismo cálculo sin programar todavía, ver decisión de fase 1 — esto le da al admin una forma de
+ * dispararlo desde la app mientras tanto). */
+export async function findTournamentsEndedWithoutCoachPayoutWithNames(
+  db: Queryable = pool,
+): Promise<TournamentReadyForCoachPayout[]> {
+  const { rows } = await db.query(
+    `SELECT DISTINCT t.id, t.name, t.end_date
+     FROM tournaments t
+     JOIN bookings b ON b.tournament_id = t.id
+     WHERE t.end_date < CURRENT_DATE
+       AND b.status = 'completed'
+       AND b.coach_payout_id IS NULL
+     ORDER BY t.end_date DESC`,
+  );
+  return rows.map((r: any) => ({ id: r.id, name: r.name, endDate: r.end_date }));
 }
