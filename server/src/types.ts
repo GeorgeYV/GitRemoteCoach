@@ -95,6 +95,9 @@ export interface BookingWithParticipants extends Booking {
   parentName: string;
   tournamentName: string;
   tournamentVenue: string;
+  /** Solo poblado por listBookingsForCoach (CoachHomeScreen) — las colas de admin que comparten
+   * este mismo tipo (verificación de pagos, reembolsos) no necesitan la ciudad todavía. */
+  tournamentCity?: string;
   hasUnreadMessages: boolean;
 }
 

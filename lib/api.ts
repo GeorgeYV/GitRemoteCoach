@@ -243,6 +243,7 @@ export interface BookingWithParticipants extends Booking {
   parentName: string;
   tournamentName: string;
   tournamentVenue: string;
+  tournamentCity?: string;
   hasUnreadMessages: boolean;
 }
 

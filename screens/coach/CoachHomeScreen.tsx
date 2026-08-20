@@ -18,6 +18,15 @@ function money(amount: number): string {
   return `$${amount.toFixed(2)}`;
 }
 
+/** "faltan N d" con color según urgencia — mismo criterio que CoachTournamentSearchScreen/
+ * ParentHomeScreen, null si la sesión ya empezó. */
+function daysUntilCountdown(matchDatetime: string): { text: string; color: string } | null {
+  const days = Math.ceil((new Date(matchDatetime).getTime() - Date.now()) / (24 * 60 * 60 * 1000));
+  if (days <= 0) return null;
+  const color = days < 7 ? colors.errorCoral : days < 14 ? colors.amber : colors.ballLime;
+  return { text: `faltan ${days} d`, color };
+}
+
 export default function CoachHomeScreen({
   coachName,
   rating,
@@ -108,31 +117,42 @@ export default function CoachHomeScreen({
         <Text style={styles.sectionLabel}>{nextSessions && nextSessions.length > 1 ? 'Próximas sesiones' : 'Próxima sesión'}</Text>
         {nextSessions && nextSessions.length > 0 ? (
           <View style={styles.nextGroup}>
-            {nextSessions.map((session) => (
-              <Pressable key={session.id} style={styles.nextCard} onPress={() => onOpenBooking?.(session.id)}>
-                <View style={styles.nextTopRow}>
-                  <InitialAvatar initial={session.playerInitial} size={44} />
-                  <View style={styles.nextInfo}>
-                    <Text style={styles.nextPlayerName} numberOfLines={1}>
-                      {session.playerName}
-                    </Text>
-                    <Text style={styles.nextMeta}>{session.category}</Text>
-                  </View>
-                  {session.hasUnreadMessages && (
-                    <View style={styles.unreadPill}>
-                      <Ionicons name="chatbubble-ellipses" size={12} color={colors.bg} />
-                      <Text style={styles.unreadPillLabel}>Nuevo mensaje</Text>
+            {nextSessions.map((session) => {
+              const countdown = daysUntilCountdown(session.matchDatetime);
+              return (
+                <Pressable key={session.id} style={styles.nextCard} onPress={() => onOpenBooking?.(session.id)}>
+                  <View style={styles.nextTopRow}>
+                    <InitialAvatar initial={session.playerInitial} size={44} />
+                    <View style={styles.nextInfo}>
+                      <Text style={styles.nextPlayerName} numberOfLines={1}>
+                        {session.playerName}
+                      </Text>
+                      <Text style={styles.nextMeta}>{session.category}</Text>
                     </View>
-                  )}
-                  <Text style={styles.chevron}>›</Text>
-                </View>
-                <View style={styles.nextDivider} />
-                <Text style={styles.nextLine}>
-                  {session.date} · {session.time}
-                </Text>
-                <Text style={styles.nextLine}>{session.venue}</Text>
-              </Pressable>
-            ))}
+                    {session.hasUnreadMessages && (
+                      <View style={styles.unreadPill}>
+                        <Ionicons name="chatbubble-ellipses" size={12} color={colors.bg} />
+                        <Text style={styles.unreadPillLabel}>Nuevo mensaje</Text>
+                      </View>
+                    )}
+                    <Text style={styles.chevron}>›</Text>
+                  </View>
+                  <View style={styles.nextDivider} />
+                  <View style={styles.nextDateRow}>
+                    <Text style={[styles.nextLine, styles.nextDateText]}>
+                      {session.date} · {session.time}
+                    </Text>
+                    {countdown && (
+                      <Text style={[styles.countdown, { color: countdown.color }]}>{countdown.text}</Text>
+                    )}
+                  </View>
+                  <Text style={styles.nextLine}>
+                    {session.venue}
+                    {session.city ? ` · ${session.city}` : ''}
+                  </Text>
+                </Pressable>
+              );
+            })}
             {!!upcomingCount && upcomingCount > nextSessions.length && (
               <Pressable style={styles.seeAllRow} onPress={onOpenSessions}>
                 <Text style={styles.seeAllLabel}>Ver todas ({upcomingCount})</Text>
@@ -398,6 +418,19 @@ const styles = StyleSheet.create({
     color: colors.textSoft,
     fontSize: 13,
     marginBottom: 3,
+  },
+  nextDateRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    marginBottom: 3,
+  },
+  nextDateText: {
+    marginBottom: 0,
+  },
+  countdown: {
+    fontSize: 12,
+    fontWeight: '800',
   },
   chevron: {
     color: colors.textDim,

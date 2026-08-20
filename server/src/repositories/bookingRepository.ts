@@ -53,6 +53,7 @@ function mapRowWithParticipants(row: any): BookingWithParticipants {
     parentName: row.parent_name,
     tournamentName: row.tournament_name,
     tournamentVenue: row.tournament_venue,
+    tournamentCity: row.tournament_city ?? undefined,
     hasUnreadMessages: row.has_unread_messages,
   };
 }
@@ -414,12 +415,14 @@ export async function listBookingsForCoach(
     // list — mismo motivo que reviewed en listBookingsForParent, pg-mem no resuelve esa forma.
     `SELECT b.*, p.full_name AS player_name, p.age_category, u.full_name AS parent_name,
             t.name AS tournament_name, t.venue AS tournament_venue,
+            COALESCE(cl.city, t.city) AS tournament_city,
             (parent_msgs.last_at IS NOT NULL
              AND parent_msgs.last_at > COALESCE(b.coach_messages_read_at, TIMESTAMP '1970-01-01')) AS has_unread_messages
      FROM bookings b
      JOIN players p ON p.id = b.player_id
      JOIN users u ON u.id = p.guardian_user_id
      JOIN tournaments t ON t.id = b.tournament_id
+     LEFT JOIN clubs cl ON cl.id = t.club_id
      LEFT JOIN (
        SELECT booking_id, MAX(created_at) AS last_at
        FROM booking_messages

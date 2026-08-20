@@ -159,6 +159,7 @@ export interface CoachBooking {
   date: string;
   time: string;
   venue: string;
+  city?: string;
   agreedRate: number;
   /** Monto real ya calculado por el servidor. Ausente si la reserva aún no llega a 'paid'. */
   coachNetAmount?: number;

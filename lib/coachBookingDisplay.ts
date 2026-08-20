@@ -36,6 +36,7 @@ export function toCoachBooking(booking: BookingWithParticipants): CoachBooking {
     date: matchDate.toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric', month: 'short' }),
     time: matchDate.toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit' }),
     venue: booking.tournamentVenue,
+    city: booking.tournamentCity,
     agreedRate: Number(booking.agreedRate),
     coachNetAmount: booking.coachNetAmount !== null ? Number(booking.coachNetAmount) : undefined,
     status: STATUS_MAP[booking.status],
