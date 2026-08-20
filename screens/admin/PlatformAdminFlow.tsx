@@ -19,7 +19,12 @@ export default function PlatformAdminFlow() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabBar}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.tabBarScroll}
+        contentContainerStyle={styles.tabBar}
+      >
         <Pressable style={[styles.tab, tab === 'documents' && styles.tabActive]} onPress={() => setTab('documents')}>
           <Text style={[styles.tabLabel, tab === 'documents' && styles.tabLabelActive]}>Documentos</Text>
         </Pressable>
@@ -27,7 +32,7 @@ export default function PlatformAdminFlow() {
           <Text style={[styles.tabLabel, tab === 'payments' && styles.tabLabelActive]}>Pagos</Text>
         </Pressable>
         <Pressable style={[styles.tab, tab === 'payouts' && styles.tabActive]} onPress={() => setTab('payouts')}>
-          <Text style={[styles.tabLabel, tab === 'payouts' && styles.tabLabelActive]}>Pagos a entrenadores</Text>
+          <Text style={[styles.tabLabel, tab === 'payouts' && styles.tabLabelActive]}>Liquidaciones</Text>
         </Pressable>
         <Pressable style={[styles.tab, tab === 'tournaments' && styles.tabActive]} onPress={() => setTab('tournaments')}>
           <Text style={[styles.tabLabel, tab === 'tournaments' && styles.tabLabelActive]}>Torneos</Text>
@@ -53,6 +58,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.bg,
+  },
+  tabBarScroll: {
+    flexGrow: 0,
   },
   tabBar: {
     flexDirection: 'row',
