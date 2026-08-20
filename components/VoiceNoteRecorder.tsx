@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useMatch } from '../context/MatchContext';
-import { getScoreLabel } from '../lib/scoringEngine';
+import { getScoreLabel, getSetGameIndex } from '../lib/scoringEngine';
 import { colors, radius, withOpacity } from '../lib/theme';
 import { formatDuration, useVoiceRecorder } from '../lib/useVoiceRecorder';
 import UndoMenuRow from './UndoMenuRow';
@@ -11,7 +11,7 @@ import VoiceNotesList from './VoiceNotesList';
 export default function VoiceNoteRecorder({ onOpenMenu }: { onOpenMenu: () => void }) {
   const { config, matchState, reducerState, addVoiceNote, deleteVoiceNote, undoLast, canUndo, undoBudget } = useMatch();
   const { isRecording, elapsedMs, pressHandlers } = useVoiceRecorder((clip) =>
-    addVoiceNote({ ...clip, scoreLabel: getScoreLabel(matchState, config) }),
+    addVoiceNote({ ...clip, scoreLabel: getScoreLabel(matchState, config), ...getSetGameIndex(matchState) }),
   );
 
   return (

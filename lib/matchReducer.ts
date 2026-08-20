@@ -6,6 +6,10 @@ export interface MatchReducerState {
   events: PointEvent[];
   adjustments: ScoreAdjustment[];
   voiceNotes: VoiceNote[];
+  /** Próximo VoiceNote.sequenceNumber a asignar — nunca decrece, ni siquiera al borrar una nota
+   * (a diferencia de events.length): una nota borrada no debe poder "renacer" con el mismo
+   * sequenceNumber que otra nota nueva, o el servidor las trataría como la misma fila. */
+  nextVoiceNoteSequence: number;
   matchClosed: boolean;
   observations: string;
   /** Bounded undo stack (0-UNDO_STACK_DEPTH): grows by 1 on each new point (capped), shrinks by
@@ -33,6 +37,7 @@ export const initialReducerState: MatchReducerState = {
   events: [],
   adjustments: [],
   voiceNotes: [],
+  nextVoiceNoteSequence: 1,
   matchClosed: false,
   observations: '',
   undoBudget: 0,
@@ -49,7 +54,11 @@ export function matchReducer(state: MatchReducerState, action: MatchAction): Mat
     case 'ADD_ADJUSTMENT':
       return { ...state, adjustments: [...state.adjustments, action.payload] };
     case 'ADD_VOICE_NOTE':
-      return { ...state, voiceNotes: [...state.voiceNotes, action.payload] };
+      return {
+        ...state,
+        voiceNotes: [...state.voiceNotes, action.payload],
+        nextVoiceNoteSequence: state.nextVoiceNoteSequence + 1,
+      };
     case 'DELETE_VOICE_NOTE':
       return { ...state, voiceNotes: state.voiceNotes.filter((note) => note.id !== action.payload.id) };
     case 'UNDO_LAST':
@@ -94,12 +103,13 @@ export function createScoreAdjustment(input: NewAdjustmentInput): ScoreAdjustmen
   };
 }
 
-export type NewVoiceNoteInput = Omit<VoiceNote, 'id' | 'timestamp'>;
+export type NewVoiceNoteInput = Omit<VoiceNote, 'id' | 'timestamp' | 'sequenceNumber'>;
 
-export function createVoiceNote(input: NewVoiceNoteInput): VoiceNote {
+export function createVoiceNote(input: NewVoiceNoteInput, sequenceNumber: number): VoiceNote {
   return {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     timestamp: Date.now(),
+    sequenceNumber,
     ...input,
   };
 }

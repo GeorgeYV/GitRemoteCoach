@@ -15,6 +15,13 @@ const MIN_DURATION_MS = 700;
 
 const RECORDER_OPTIONS = { ...RecordingPresets.HIGH_QUALITY, directory: 'document' as const };
 
+/** Extensión/mimetype real que produce RECORDER_OPTIONS (RecordingPresets.HIGH_QUALITY: .m4a en
+ * nativo vía MPEG4/AAC, .webm en web vía MediaRecorder) — quien sube el clip (lib/api.ts#
+ * uploadVoiceNote) lo necesita para armar el FormData sin adivinar a partir del uri. */
+export function getRecordingFileInfo(): { name: string; type: string } {
+  return Platform.OS === 'web' ? { name: 'voice-note.webm', type: 'audio/webm' } : { name: 'voice-note.m4a', type: 'audio/m4a' };
+}
+
 export function formatDuration(ms: number): string {
   const totalSeconds = Math.round(ms / 1000);
   const minutes = Math.floor(totalSeconds / 60);

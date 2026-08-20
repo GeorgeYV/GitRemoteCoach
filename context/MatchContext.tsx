@@ -14,13 +14,15 @@ import {
   NewPointInput,
   NewVoiceNoteInput,
 } from '../lib/matchReducer';
-import { MatchConfig, PlayerId, PointEvent, ScoreAdjustment } from '../lib/types';
+import { MatchConfig, PlayerId, PointEvent, ScoreAdjustment, VoiceNote } from '../lib/types';
+import { getRecordingFileInfo } from '../lib/useVoiceRecorder';
 import {
   ApiError,
   createMatchPoint,
   createMatchPointsBulk,
   createMatchScoreAdjustment,
   deleteMatchPoint,
+  deleteMatchVoiceNote,
   Match,
   MatchPointInput,
   MatchScoreAdjustmentInput,
@@ -32,6 +34,7 @@ import {
   suspendMatch as apiSuspendMatch,
   updateMatchObservations,
   updateMatchStatus,
+  uploadVoiceNote,
 } from '../lib/api';
 
 const STORAGE_KEY_PREFIX = 'tennis-live-capture:match-v1';
@@ -56,7 +59,6 @@ interface MatchContextValue {
   match: Match;
   addPoint: (input: NewPointInput) => void;
   addAdjustment: (input: NewAdjustmentInput) => void;
-  /** Solo local — el clip de audio nunca sale del dispositivo, no hay sync a servidor. */
   addVoiceNote: (input: NewVoiceNoteInput) => void;
   deleteVoiceNote: (id: string) => void;
   undoLast: () => void;
@@ -105,6 +107,21 @@ function toAdjustmentInput(adjustment: ScoreAdjustment, sequenceNumber: number):
   };
 }
 
+function uploadVoiceNoteInput(note: VoiceNote) {
+  const { name, type } = getRecordingFileInfo();
+  return {
+    uri: note.uri,
+    name,
+    type,
+    sequenceNumber: note.sequenceNumber,
+    durationMs: note.durationMs,
+    scoreLabel: note.scoreLabel,
+    setIndex: note.setIndex,
+    gameIndex: note.gameIndex,
+    isTiebreak: note.isTiebreak,
+  };
+}
+
 /** Segundos transcurridos de una pausa que empezó en `pausedAtIso`, nunca negativo (protege
  * contra reloj del cliente desincronizado). */
 function elapsedPauseSeconds(pausedAtIso: string): number {
@@ -148,7 +165,7 @@ export function MatchProvider({
     });
   }
 
-  function bulkSync(events: PointEvent[], adjustments: ScoreAdjustment[]) {
+  function bulkSync(events: PointEvent[], adjustments: ScoreAdjustment[], voiceNotes: VoiceNote[]) {
     if (events.length > 0) {
       // events.map(toPointInput) would pass Array.map's 0-based index straight through as
       // sequenceNumber — off by one against the server's 1-based, positive-only sequence.
@@ -158,6 +175,12 @@ export function MatchProvider({
     // by (match_id, sequence_number), same as points, so resending already-synced ones is safe.
     adjustments.forEach((adjustment, i) => {
       enqueue((authToken) => createMatchScoreAdjustment(authToken, matchId, toAdjustmentInput(adjustment, i + 1)));
+    });
+    // Tampoco hay bulk endpoint para notas de voz — cada nota ya trae su propio sequenceNumber
+    // (asignado al grabar, no por posición), así que reenviarlas todas es tan idempotente como
+    // los puntos: ON CONFLICT (match_id, sequence_number) DO NOTHING en el servidor.
+    voiceNotes.forEach((note) => {
+      enqueue((authToken) => uploadVoiceNote(authToken, matchId, uploadVoiceNoteInput(note)));
     });
   }
 
@@ -187,7 +210,7 @@ export function MatchProvider({
           // Recuperación tras cierre/crash: reenvía todo lo que ya estaba capturado localmente —
           // idempotente en el servidor (ON CONFLICT DO NOTHING por sequence_number), así que lo
           // que sí llegó a sincronizarse antes no se duplica.
-          bulkSync(parsed.events, parsed.adjustments);
+          bulkSync(parsed.events, parsed.adjustments, parsed.voiceNotes);
         } catch {
           // ignore corrupt persisted state, start fresh
         }
@@ -237,8 +260,16 @@ export function MatchProvider({
       dispatch({ type: 'ADD_ADJUSTMENT', payload: adjustment });
       enqueue((authToken) => createMatchScoreAdjustment(authToken, matchId, toAdjustmentInput(adjustment, sequenceNumber)));
     },
-    addVoiceNote: (input) => dispatch({ type: 'ADD_VOICE_NOTE', payload: createVoiceNote(input) }),
-    deleteVoiceNote: (id) => dispatch({ type: 'DELETE_VOICE_NOTE', payload: { id } }),
+    addVoiceNote: (input) => {
+      const note = createVoiceNote(input, reducerState.nextVoiceNoteSequence);
+      dispatch({ type: 'ADD_VOICE_NOTE', payload: note });
+      enqueue((authToken) => uploadVoiceNote(authToken, matchId, uploadVoiceNoteInput(note)));
+    },
+    deleteVoiceNote: (id) => {
+      const note = reducerState.voiceNotes.find((n) => n.id === id);
+      dispatch({ type: 'DELETE_VOICE_NOTE', payload: { id } });
+      if (note) enqueue((authToken) => deleteMatchVoiceNote(authToken, matchId, note.sequenceNumber));
+    },
     undoLast: performUndo,
     closeMatch: () => {
       dispatch({ type: 'CLOSE_MATCH' });
@@ -290,7 +321,7 @@ export function MatchProvider({
     canUndo: reducerState.undoBudget > 0,
     undoBudget: reducerState.undoBudget,
     syncError,
-    retrySync: () => bulkSync(reducerState.events, reducerState.adjustments),
+    retrySync: () => bulkSync(reducerState.events, reducerState.adjustments, reducerState.voiceNotes),
   };
 
   return <MatchContext.Provider value={value}>{children}</MatchContext.Provider>;

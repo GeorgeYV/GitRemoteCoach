@@ -476,6 +476,27 @@ export interface MatchScoreAdjustment {
   server: MatchPlayerSlot;
 }
 
+export type TranscriptStatus = 'pending' | 'completed' | 'failed';
+
+export interface VoiceNote {
+  id: string;
+  matchId: string;
+  sequenceNumber: number;
+  occurredAt: string;
+  /** null una vez que la transcripción termina (éxito o reintentos agotados) — el archivo en R2
+   * ya no existe, ver decisión #39 en db/schema.sql. */
+  audioUrl: string | null;
+  durationMs: number;
+  scoreLabel: string;
+  setIndex: number;
+  gameIndex: number;
+  isTiebreak: boolean;
+  transcript: string | null;
+  transcriptStatus: TranscriptStatus;
+  transcriptionAttempts: number;
+  transcribedAt: string | null;
+}
+
 /** ParentReportsScreen: reporte enriquecido de un partido completado — matchService.getMatchReport
  * lo calcula solo cuando el partido ya terminó (null mientras está en curso, ver MatchReport). */
 export interface MatchReportView {

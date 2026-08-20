@@ -1360,10 +1360,32 @@ export interface MatchReportView {
   tacticalDiagnosis: string | null;
 }
 
+export type TranscriptStatus = 'pending' | 'completed' | 'failed';
+
+/** Espeja server/src/types.ts#VoiceNote — nota de voz ya subida/persistida (distinto de
+ * lib/types.ts#VoiceNote, que es el clip local recién grabado en el dispositivo). */
+export interface MatchVoiceNote {
+  id: string;
+  matchId: string;
+  sequenceNumber: number;
+  occurredAt: string;
+  audioUrl: string | null;
+  durationMs: number;
+  scoreLabel: string;
+  setIndex: number;
+  gameIndex: number;
+  isTiebreak: boolean;
+  transcript: string | null;
+  transcriptStatus: TranscriptStatus;
+  transcriptionAttempts: number;
+  transcribedAt: string | null;
+}
+
 export interface MatchReport {
   match: Match;
   points: MatchPointEvent[];
   adjustments: MatchScoreAdjustment[];
+  voiceNotes: MatchVoiceNote[];
   report?: MatchReportView;
 }
 
@@ -1476,6 +1498,49 @@ export function retireMatch(authToken: string, matchId: string, retiredBy: Match
 /** DELETE /matches/:id/points/:sequenceNumber — LiveCaptureView, deshacer último punto. */
 export function deleteMatchPoint(authToken: string, matchId: string, sequenceNumber: number): Promise<void> {
   return request(`/matches/${matchId}/points/${sequenceNumber}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${authToken}` },
+  });
+}
+
+/** POST /matches/:id/voice-notes — VoiceNoteRecorder, cada nota grabada en vivo. `name`/`type`
+ * vienen de lib/useVoiceRecorder.ts#getRecordingFileInfo (el propio grabador es quien sabe qué
+ * formato produjo) — mismo patrón multipart que uploadCoachPhoto, `uri` es un archivo local. */
+export function uploadVoiceNote(
+  authToken: string,
+  matchId: string,
+  note: {
+    uri: string;
+    name: string;
+    type: string;
+    sequenceNumber: number;
+    durationMs: number;
+    scoreLabel: string;
+    setIndex: number;
+    gameIndex: number;
+    isTiebreak: boolean;
+  },
+): Promise<MatchVoiceNote> {
+  const formData = new FormData();
+  // Mismo shape {uri, name, type} que uploadCoachPhoto usa en nativo — RN's FormData lo acepta
+  // como archivo a streamear (no está tipado así en lib.dom.d.ts, de ahí el `as any`).
+  formData.append('file', { uri: note.uri, name: note.name, type: note.type } as any);
+  formData.append('sequenceNumber', String(note.sequenceNumber));
+  formData.append('durationMs', String(note.durationMs));
+  formData.append('scoreLabel', note.scoreLabel);
+  formData.append('setIndex', String(note.setIndex));
+  formData.append('gameIndex', String(note.gameIndex));
+  formData.append('isTiebreak', String(note.isTiebreak));
+  return request(`/matches/${matchId}/voice-notes`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${authToken}` },
+    body: formData,
+  });
+}
+
+/** DELETE /matches/:id/voice-notes/:sequenceNumber — VoiceNoteRecorder, borrar una nota. */
+export function deleteMatchVoiceNote(authToken: string, matchId: string, sequenceNumber: number): Promise<void> {
+  return request(`/matches/${matchId}/voice-notes/${sequenceNumber}`, {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${authToken}` },
   });

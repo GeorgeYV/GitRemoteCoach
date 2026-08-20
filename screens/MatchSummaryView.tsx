@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import IconTextInput from '../components/shared/IconTextInput';
 import VoiceNotesList from '../components/VoiceNotesList';
 import { useMatch } from '../context/MatchContext';
-import { getScoreLabel } from '../lib/scoringEngine';
+import { getScoreLabel, getSetGameIndex } from '../lib/scoringEngine';
 import { colors, radius } from '../lib/theme';
 import { useVoiceRecorder } from '../lib/useVoiceRecorder';
 
@@ -24,7 +24,7 @@ export default function MatchSummaryView({ onGoHome }: { onGoHome?: () => void }
   } = useMatch();
   const p1 = stats.player1;
   const { isRecording, pressHandlers } = useVoiceRecorder((clip) =>
-    addVoiceNote({ ...clip, scoreLabel: getScoreLabel(matchState, config) }),
+    addVoiceNote({ ...clip, scoreLabel: getScoreLabel(matchState, config), ...getSetGameIndex(matchState) }),
   );
 
   const setScoresLine = matchState.completedSets.map((s) => `${s.gamesPlayer1}-${s.gamesPlayer2}`).join(', ');

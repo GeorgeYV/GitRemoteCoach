@@ -80,6 +80,17 @@ const adjustmentSchema = z.object({
   server: z.enum(PLAYER_SLOT),
 });
 
+// Campos del multipart de POST /matches/:id/voice-notes — llegan como string (mismo formato que
+// cualquier campo de <form>), de ahí z.coerce en vez de z.number()/z.boolean() directo.
+const voiceNoteFieldsSchema = z.object({
+  sequenceNumber: z.coerce.number().int().positive(),
+  durationMs: z.coerce.number().int().positive(),
+  scoreLabel: z.string().min(1).max(200),
+  setIndex: z.coerce.number().int().min(0),
+  gameIndex: z.coerce.number().int().min(0),
+  isTiebreak: z.enum(['true', 'false']).transform((v) => v === 'true'),
+});
+
 /** Autorización compartida por todas las rutas de :id — solo el entrenador dueño de la
  * reserva del partido puede leer/modificarlo. */
 async function assertOwnsMatch(matchId: string, sub: string): Promise<void> {
@@ -222,5 +233,42 @@ export async function matchRoutes(app: FastifyInstance): Promise<void> {
     const { sub } = req.user as { sub: string };
     await assertOwnsMatch(id, sub);
     return matchService.setObservations(id, parsed.data.coachObservations);
+  });
+
+  // VoiceNoteRecorder: nota de voz grabada en vivo — multipart (archivo + campos de texto), sin
+  // attachFieldsToBody global (ver app.ts) así que se arma a mano iterando req.parts().
+  app.post('/matches/:id/voice-notes', { preHandler: app.authenticate }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const { sub } = req.user as { sub: string };
+    await assertOwnsMatch(id, sub);
+
+    let fileBuffer: Buffer | null = null;
+    let mimetype = '';
+    const rawFields: Record<string, string> = {};
+
+    for await (const part of req.parts()) {
+      if (part.type === 'file') {
+        fileBuffer = await part.toBuffer();
+        mimetype = part.mimetype;
+      } else {
+        rawFields[part.fieldname] = String(part.value);
+      }
+    }
+    if (!fileBuffer) throw new ValidationError('Falta el archivo de audio');
+
+    const parsed = voiceNoteFieldsSchema.safeParse(rawFields);
+    if (!parsed.success) throw new ValidationError(parsed.error.message);
+
+    const voiceNote = await matchService.addVoiceNote(id, fileBuffer, mimetype, parsed.data);
+    reply.code(201).send(voiceNote);
+  });
+
+  // LiveCaptureView: borrar una nota de voz (cualquier posición, no solo la última).
+  app.delete('/matches/:id/voice-notes/:sequenceNumber', { preHandler: app.authenticate }, async (req, reply) => {
+    const { id, sequenceNumber } = req.params as { id: string; sequenceNumber: string };
+    const { sub } = req.user as { sub: string };
+    await assertOwnsMatch(id, sub);
+    await matchService.removeVoiceNote(id, Number(sequenceNumber));
+    reply.code(204).send();
   });
 }

@@ -52,17 +52,26 @@ export interface ScoreAdjustment {
   server: PlayerId;
 }
 
-/** Clip de audio grabado durante la captura en vivo — solo local (uri de archivo/blob del
- * dispositivo), sin transcripción ni sync a servidor. */
+/** Clip de audio grabado durante la captura en vivo — uri de archivo/blob local para reproducirlo
+ * en el momento, más los campos que se suben al servidor (audio + transcripción real, ver
+ * lib/api.ts#uploadVoiceNote) para que el reporte del padre las incluya. */
 export interface VoiceNote {
   id: string;
   timestamp: number;
+  /** Asignado al grabar (no la posición en la lista) — a diferencia de los puntos, una nota se
+   * puede borrar desde cualquier posición, no solo la última. Ver matchReducer#nextVoiceNoteSequence. */
+  sequenceNumber: number;
   uri: string;
   durationMs: number;
   /** Marcador del partido en el instante en que se grabó (ver scoringEngine#getScoreLabel) —
    * congelado al crear la nota, no recalculado después, para que siga siendo el momento exacto
    * aunque se deshagan/ajusten puntos más tarde. */
   scoreLabel: string;
+  /** set/juego/tiebreak en el instante de grabar (ver scoringEngine#getSetGameIndex) — mismo
+   * criterio de "congelado al grabar" que scoreLabel, para el "dato duro" del reporte. */
+  setIndex: number;
+  gameIndex: number;
+  isTiebreak: boolean;
 }
 
 export interface MatchConfig {

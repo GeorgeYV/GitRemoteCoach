@@ -410,6 +410,19 @@ export function getScoreLabel(state: MatchState, config: MatchConfig): string {
   return `${setLabel} · ${gameLabels.player1}-${gameLabels.player2}`;
 }
 
+/** set/juego/tiebreak actuales, para congelarlos en una nota de voz en el instante en que se
+ * graba (VoiceNoteRecorder) — mismo criterio de "congelado, no recalculado después" que
+ * getScoreLabel. Espeja PointSnapshot.setIndex/gameIndexInSet/isTiebreak del servidor
+ * (server/src/lib/matchStatsEngine.ts), sin la parte de isBreakPointAgainstServer que ese usa
+ * para las stats — acá solo hace falta ubicar el juego, no re-derivar presión. */
+export function getSetGameIndex(state: MatchState): { setIndex: number; gameIndex: number; isTiebreak: boolean } {
+  return {
+    setIndex: state.completedSets.length,
+    gameIndex: state.currentSetGames.length,
+    isTiebreak: state.inTiebreak,
+  };
+}
+
 export type PressureLevel = 'alta' | 'media' | 'baja';
 
 /** (leader, trailer) game-point pairs the coach reads as a clear cushion: 40-0, 40-15, 30-0 and their mirrors. */

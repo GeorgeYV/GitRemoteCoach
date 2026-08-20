@@ -1,14 +1,17 @@
+import FormData_ from 'form-data';
 import { createTestPool } from './setupDb.js';
 import { createFakeStripe } from './fakeStripe.js';
 import { createFakePushSender } from './fakePush.js';
 import { createFakeEmailSender } from './fakeEmail.js';
 import { createFakeGoogleAuthenticator } from './fakeGoogleAuth.js';
+import { createFakeR2 } from './fakeR2.js';
 import { seedFixtures } from './seed.js';
 import { setPoolForTesting } from '../src/lib/db.js';
 import { setStripeClientForTesting } from '../src/lib/stripe.js';
 import { setPushSenderForTesting } from '../src/lib/pushNotifications.js';
 import { setEmailSenderForTesting } from '../src/lib/emailClient.js';
 import { setGoogleAuthenticatorForTesting } from '../src/lib/googleAuth.js';
+import { setR2ClientForTesting } from '../src/lib/r2.js';
 import { buildApp } from '../src/app.js';
 import { runExpireBookingsJob } from '../src/jobs/expireBookings.js';
 import { findTournamentsReadyForSettlement } from '../src/services/settlementService.js';
@@ -51,6 +54,9 @@ setEmailSenderForTesting(fakeEmailSender);
 
 const { authenticator: fakeGoogleAuthenticator, state: googleAuthState } = createFakeGoogleAuthenticator();
 setGoogleAuthenticatorForTesting(fakeGoogleAuthenticator);
+
+const { client: fakeR2Client, state: r2State } = createFakeR2();
+setR2ClientForTesting(fakeR2Client);
 
 const fixtures = await seedFixtures(testPool);
 const app = buildApp();
@@ -2295,7 +2301,162 @@ console.log('\n=== Escenario 26: reporte enriquecido de partido (semáforo, pres
   );
 }
 
-console.log('\n=== Escenario 27: Google sign-in (cuenta nueva, re-login, vinculación, correo sin verificar) ===');
+console.log('\n=== Escenario 27: notas de voz (subida, borrado, "Nuevo partido") ===');
+{
+  const registerRes = await app.inject({
+    method: 'POST',
+    url: '/auth/register',
+    payload: {
+      email: 'coach.voicenotes.e2e@example.com',
+      password: 'super-secreta-123',
+      fullName: 'Coach Voice Notes E2E',
+      primaryRole: 'coach',
+    },
+  });
+  const { token: vnCoachToken, user: vnCoach } = registerRes.json();
+  await app.inject({
+    method: 'POST',
+    url: '/coaches',
+    headers: { authorization: `Bearer ${vnCoachToken}` },
+    payload: { city: 'CDMX', country: 'EC', yearsExperience: 4, hourlyRate: 30, ageCategories: ['U14'], levels: ['competitivo'] },
+  });
+
+  const bookingRes = await requestBooking(vnCoach.id, inFuture(48));
+  const vnBooking = bookingRes.json();
+  const matchRes = await app.inject({
+    method: 'POST',
+    url: '/matches',
+    headers: { authorization: `Bearer ${vnCoachToken}` },
+    payload: {
+      bookingId: vnBooking.id,
+      player2Label: 'Rival de práctica',
+      format: 'single_set',
+      noAd: true,
+      initialServer: 'player1',
+      captureMode: 'detallada',
+    },
+  });
+  const vnMatch = matchRes.json();
+
+  function voiceNoteForm(fields: Record<string, string>, audioByte = 1): FormData_ {
+    const form = new FormData_();
+    form.append('file', Buffer.from([audioByte, audioByte, audioByte]), { filename: 'note.m4a', contentType: 'audio/m4a' });
+    for (const [key, value] of Object.entries(fields)) form.append(key, value);
+    return form;
+  }
+
+  const note1Fields = {
+    sequenceNumber: '1',
+    durationMs: '2400',
+    scoreLabel: 'Set 1 · 2-1',
+    setIndex: '0',
+    gameIndex: '2',
+    isTiebreak: 'false',
+  };
+  const note1Form = voiceNoteForm(note1Fields, 11);
+
+  const wrongCoachRes = await app.inject({
+    method: 'POST',
+    url: `/matches/${vnMatch.id}/voice-notes`,
+    headers: { authorization: `Bearer ${coachBToken}`, ...note1Form.getHeaders() },
+    payload: note1Form.getBuffer(),
+  });
+  assertEqual(wrongCoachRes.statusCode, 403, 'subir una nota con el token de otro entrenador devuelve 403');
+
+  const note1Res = await app.inject({
+    method: 'POST',
+    url: `/matches/${vnMatch.id}/voice-notes`,
+    headers: { authorization: `Bearer ${vnCoachToken}`, ...note1Form.getHeaders() },
+    payload: note1Form.getBuffer(),
+  });
+  assertEqual(note1Res.statusCode, 201, 'POST voice-notes devuelve 201');
+  const note1 = note1Res.json();
+  assertEqual(note1.transcriptStatus, 'pending', 'una nota recién subida arranca en pending');
+  assertEqual(note1.transcript, null, 'todavía sin transcripción');
+  assertEqual(note1.setIndex, 0, 'guarda el setIndex enviado');
+  assertEqual(note1.gameIndex, 2, 'guarda el gameIndex enviado');
+  assertEqual(note1.isTiebreak, false, 'guarda isTiebreak enviado');
+  assertEqual(note1.scoreLabel, 'Set 1 · 2-1', 'guarda el scoreLabel enviado');
+  assertTrue(typeof note1.audioUrl === 'string' && note1.audioUrl.length > 0, 'devuelve una audioUrl real');
+  assertEqual(r2State.objects.size, 1, 'el audio quedó "subido" en R2 (fake)');
+
+  const note2Form = voiceNoteForm(
+    { sequenceNumber: '2', durationMs: '1800', scoreLabel: 'Set 1 · 4-2', setIndex: '0', gameIndex: '6', isTiebreak: 'true' },
+    22,
+  );
+  const note2Res = await app.inject({
+    method: 'POST',
+    url: `/matches/${vnMatch.id}/voice-notes`,
+    headers: { authorization: `Bearer ${vnCoachToken}`, ...note2Form.getHeaders() },
+    payload: note2Form.getBuffer(),
+  });
+  assertEqual(note2Res.statusCode, 201, 'segunda nota también devuelve 201');
+  const note2 = note2Res.json();
+
+  const noFileForm = new FormData_();
+  noFileForm.append('sequenceNumber', '3');
+  const noFileRes = await app.inject({
+    method: 'POST',
+    url: `/matches/${vnMatch.id}/voice-notes`,
+    headers: { authorization: `Bearer ${vnCoachToken}`, ...noFileForm.getHeaders() },
+    payload: noFileForm.getBuffer(),
+  });
+  assertEqual(noFileRes.statusCode, 422, 'subir sin archivo devuelve 422');
+
+  const reportRes = await app.inject({
+    method: 'GET',
+    url: `/bookings/${vnBooking.id}/match`,
+    headers: { authorization: `Bearer ${vnCoachToken}` },
+  });
+  const reportBody = reportRes.json();
+  assertEqual(reportBody.voiceNotes.length, 2, 'GET /bookings/:id/match trae las 2 notas');
+  assertEqual(
+    reportBody.voiceNotes.map((n: { sequenceNumber: number }) => n.sequenceNumber),
+    [1, 2],
+    'en orden de sequenceNumber',
+  );
+
+  const deleteRes = await app.inject({
+    method: 'DELETE',
+    url: `/matches/${vnMatch.id}/voice-notes/1`,
+    headers: { authorization: `Bearer ${vnCoachToken}` },
+  });
+  assertEqual(deleteRes.statusCode, 204, 'DELETE voice-notes/:sequenceNumber devuelve 204');
+  assertEqual(r2State.deletedKeys.length, 1, 'borrar la nota también borra su audio en R2 (fake)');
+  assertEqual(r2State.objects.size, 1, 'solo queda el audio de la nota 2 en R2 (fake)');
+
+  const deleteAgainRes = await app.inject({
+    method: 'DELETE',
+    url: `/matches/${vnMatch.id}/voice-notes/1`,
+    headers: { authorization: `Bearer ${vnCoachToken}` },
+  });
+  assertEqual(deleteAgainRes.statusCode, 204, 'borrar una nota ya borrada sigue devolviendo 204 (no es un error)');
+
+  const afterDeleteRes = await app.inject({
+    method: 'GET',
+    url: `/bookings/${vnBooking.id}/match`,
+    headers: { authorization: `Bearer ${vnCoachToken}` },
+  });
+  assertEqual(afterDeleteRes.json().voiceNotes.length, 1, 'la nota borrada ya no aparece en el reporte');
+  assertEqual(afterDeleteRes.json().voiceNotes[0].id, note2.id, 'la que queda es la nota 2');
+
+  await app.inject({
+    method: 'POST',
+    url: `/matches/${vnMatch.id}/restart`,
+    headers: { authorization: `Bearer ${vnCoachToken}` },
+  });
+  assertEqual(r2State.deletedKeys.length, 2, '"Nuevo partido" también limpia el audio de las notas que quedaban');
+  assertEqual(r2State.objects.size, 0, 'no queda ningún audio de este partido en R2 (fake)');
+
+  const afterRestartRes = await app.inject({
+    method: 'GET',
+    url: `/bookings/${vnBooking.id}/match`,
+    headers: { authorization: `Bearer ${vnCoachToken}` },
+  });
+  assertEqual(afterRestartRes.json().voiceNotes.length, 0, '"Nuevo partido" borró todas las notas de voz');
+}
+
+console.log('\n=== Escenario 28: Google sign-in (cuenta nueva, re-login, vinculación, correo sin verificar) ===');
 {
   const newIdentity = {
     googleId: 'google-sub-nueva-mama',

@@ -1343,6 +1343,48 @@ CREATE TABLE match_score_adjustments (
 CREATE INDEX idx_match_score_adjustments_match_id ON match_score_adjustments (match_id, occurred_at);
 
 -- ---------------------------------------------------------------------
+-- Notas de voz del entrenador (captura en vivo), transcritas de forma asíncrona
+-- ---------------------------------------------------------------------
+CREATE TABLE voice_notes (
+  id                       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  match_id                 UUID NOT NULL REFERENCES matches (id) ON DELETE CASCADE,
+  -- Mismo patrón de idempotencia que match_point_events.sequence_number, pero asignado por el
+  -- cliente en el momento de grabar (no por posición en la lista) — a diferencia de los puntos,
+  -- una nota de voz se puede borrar desde cualquier posición, no solo la última.
+  sequence_number          INTEGER NOT NULL,
+  occurred_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
+  -- Nullable desde el arranque, no solo cuando se borra: en cuanto la transcripción termina
+  -- (con éxito o agotando reintentos) el archivo en R2 se borra y esta columna vuelve a NULL —
+  -- el reporte del padre solo muestra el texto transcrito, nunca reproduce el audio.
+  audio_url                TEXT,
+  duration_ms              INTEGER NOT NULL CHECK (duration_ms > 0),
+  -- Marcador del partido en el instante en que se grabó (ver lib/scoringEngine.ts#getScoreLabel),
+  -- congelado al grabar — mismo criterio que set_index/game_index/is_tiebreak abajo.
+  score_label               TEXT NOT NULL,
+  set_index                SMALLINT NOT NULL CHECK (set_index >= 0),
+  game_index                SMALLINT NOT NULL CHECK (game_index >= 0),
+  is_tiebreak               BOOLEAN NOT NULL DEFAULT FALSE,
+  transcript                TEXT,
+  -- TEXT + CHECK en vez de un ENUM nuevo — mismo motivo que la decisión #37 (barato de ampliar
+  -- con un ALTER TABLE si hace falta un estado nuevo, ej. 'transcribing').
+  transcript_status         TEXT NOT NULL DEFAULT 'pending'
+    CONSTRAINT chk_voice_notes_transcript_status CHECK (transcript_status IN ('pending', 'completed', 'failed')),
+  -- Cuántas veces el job de transcripción ya intentó y falló — al llegar a un máximo (constante
+  -- en server/src/jobs/transcribeVoiceNotes.ts) se da por vencido, pasa a 'failed' y borra el
+  -- audio igual (ni éxito ni más reintentos posibles, no vale la pena seguir pagando por guardarlo).
+  transcription_attempts   SMALLINT NOT NULL DEFAULT 0 CHECK (transcription_attempts >= 0),
+  transcribed_at            TIMESTAMPTZ,
+
+  UNIQUE (match_id, sequence_number)
+);
+
+CREATE INDEX idx_voice_notes_match_id ON voice_notes (match_id, sequence_number);
+-- Cola del job de transcripción (Etapa 5), más antiguo primero.
+CREATE INDEX idx_voice_notes_pending_transcription
+  ON voice_notes (occurred_at)
+  WHERE transcript_status = 'pending';
+
+-- ---------------------------------------------------------------------
 -- Calificaciones / reseñas
 -- ---------------------------------------------------------------------
 CREATE TABLE reviews (
@@ -1805,4 +1847,18 @@ CREATE INDEX idx_push_tokens_user_id ON push_tokens (user_id);
 --     solo para evitar ese nombre no valía la pena. Sin CHECK de largo,
 --     igual que bio/coachObservations — el límite (1000 caracteres) lo
 --     pone Zod en setRateSchema, no la base.
+--
+-- 39. voice_notes es una tabla nueva (no una columna en match_point_events):
+--     una nota de voz no está atada a un punto específico, sino a un
+--     momento del partido (set/juego/tiebreak, congelado al grabar), y
+--     tiene su propio ciclo de vida de transcripción asíncrona que no
+--     tiene sentido en la tabla de puntos. sequence_number lo asigna el
+--     cliente en el momento de grabar (no la posición en la lista, como
+--     sí pasa con match_point_events) porque una nota se puede borrar
+--     desde cualquier posición, no solo la última — ver
+--     lib/matchReducer.ts#nextVoiceNoteSequence. audio_url es nullable
+--     desde el arranque: el archivo en R2 solo vive hasta que termina de
+--     transcribirse (con éxito o agotando reintentos), después se borra
+--     y esta columna vuelve a NULL — el reporte del padre nunca reproduce
+--     el audio, solo lee el texto ya transcrito.
 -- =====================================================================

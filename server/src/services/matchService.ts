@@ -7,6 +7,9 @@ import type { PointInput } from '../repositories/matchPointEventRepository.js';
 import * as matchScoreAdjustmentRepository from '../repositories/matchScoreAdjustmentRepository.js';
 import type { AdjustmentInput } from '../repositories/matchScoreAdjustmentRepository.js';
 import * as matchRepository from '../repositories/matchRepository.js';
+import * as voiceNoteRepository from '../repositories/voiceNoteRepository.js';
+import * as voiceNoteService from './voiceNoteService.js';
+import type { VoiceNoteFields } from './voiceNoteService.js';
 import type { MatchFormatId } from '../lib/matchFormats.js';
 import type {
   CaptureMode,
@@ -17,6 +20,7 @@ import type {
   MatchReportView,
   MatchScoreAdjustment,
   MatchStatus,
+  VoiceNote,
 } from '../types.js';
 import type { StatsPointEvent, StatsScoreAdjustment } from '../lib/matchStatsEngine.js';
 
@@ -89,15 +93,34 @@ export async function addAdjustment(matchId: string, adjustment: AdjustmentInput
   return matchScoreAdjustmentRepository.create(matchId, adjustment);
 }
 
-/** "Nuevo partido": borra todos los puntos y ajustes, y vuelve el partido a in_progress, en vez
- * de crear una segunda fila matches (booking_id es UNIQUE). Todo en una sola transacción — un
- * crash a mitad de camino no debe dejar el partido a medio borrar pero todavía 'completed'. */
+export async function addVoiceNote(
+  matchId: string,
+  buffer: Buffer,
+  mimeType: string,
+  fields: VoiceNoteFields,
+): Promise<VoiceNote> {
+  return voiceNoteService.addVoiceNote(matchId, buffer, mimeType, fields);
+}
+
+export async function removeVoiceNote(matchId: string, sequenceNumber: number): Promise<void> {
+  return voiceNoteService.deleteVoiceNote(matchId, sequenceNumber);
+}
+
+/** "Nuevo partido": borra todos los puntos, ajustes y notas de voz, y vuelve el partido a
+ * in_progress, en vez de crear una segunda fila matches (booking_id es UNIQUE). Todo en una sola
+ * transacción — un crash a mitad de camino no debe dejar el partido a medio borrar pero todavía
+ * 'completed'. La limpieza del audio en R2 de las notas de voz pasa DESPUÉS de que la transacción
+ * confirma — un side effect externo (red) no debe vivir dentro de un BEGIN/COMMIT. */
 export async function restartMatch(matchId: string): Promise<Match> {
-  return withTransaction(async (client) => {
+  const { match, deletedAudioUrls } = await withTransaction(async (client) => {
     await matchPointEventRepository.deleteAllForMatch(matchId, client);
     await matchScoreAdjustmentRepository.deleteAllForMatch(matchId, client);
-    return matchRepository.resetForRestart(matchId, client);
+    const deletedAudioUrls = await voiceNoteRepository.deleteAllForMatch(matchId, client);
+    const match = await matchRepository.resetForRestart(matchId, client);
+    return { match, deletedAudioUrls };
   });
+  await voiceNoteService.deleteAudioObjects(deletedAudioUrls);
+  return match;
 }
 
 export async function setStatus(matchId: string, status: MatchStatus): Promise<Match> {
@@ -140,6 +163,7 @@ export interface MatchReport {
   match: Match;
   points: MatchPointEvent[];
   adjustments: MatchScoreAdjustment[];
+  voiceNotes: VoiceNote[];
   report?: MatchReportView;
 }
 
@@ -152,9 +176,10 @@ export async function getMatchReport(bookingId: string): Promise<MatchReport | n
   if (!match) return null;
   const points = await matchPointEventRepository.listByMatch(match.id);
   const adjustments = await matchScoreAdjustmentRepository.listByMatch(match.id);
+  const voiceNotes = await voiceNoteRepository.listByMatch(match.id);
 
   if (match.status !== 'completed') {
-    return { match, points, adjustments };
+    return { match, points, adjustments, voiceNotes };
   }
 
   const stats = computeMatchReportStats(
@@ -168,7 +193,7 @@ export async function getMatchReport(bookingId: string): Promise<MatchReport | n
     tacticalDiagnosis: buildTacticalDiagnosis(stats),
   };
 
-  return { match, points, adjustments, report };
+  return { match, points, adjustments, voiceNotes, report };
 }
 
 /**
