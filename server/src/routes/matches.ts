@@ -67,10 +67,6 @@ const observationsSchema = z.object({
   coachObservations: z.string().max(4000),
 });
 
-const captureModeSchema = z.object({
-  captureMode: z.enum(CAPTURE_MODE),
-});
-
 const retireSchema = z.object({
   retiredBy: z.enum(PLAYER_SLOT),
 });
@@ -226,15 +222,5 @@ export async function matchRoutes(app: FastifyInstance): Promise<void> {
     const { sub } = req.user as { sub: string };
     await assertOwnsMatch(id, sub);
     return matchService.setObservations(id, parsed.data.coachObservations);
-  });
-
-  // LiveCaptureView: ModeSwitch (rápida/detallada).
-  app.patch('/matches/:id/capture-mode', { preHandler: app.authenticate }, async (req) => {
-    const { id } = req.params as { id: string };
-    const parsed = captureModeSchema.safeParse(req.body);
-    if (!parsed.success) throw new ValidationError(parsed.error.message);
-    const { sub } = req.user as { sub: string };
-    await assertOwnsMatch(id, sub);
-    return matchService.setCaptureMode(id, parsed.data.captureMode);
   });
 }

@@ -771,14 +771,6 @@ console.log('\n=== Escenario 12: captura en vivo de un partido (matches / match_
     'PATCH observations guarda las observaciones del entrenador',
   );
 
-  const modeRes = await app.inject({
-    method: 'PATCH',
-    url: `/matches/${match.id}/capture-mode`,
-    headers: { authorization: `Bearer ${coachAToken}` },
-    payload: { captureMode: 'detallada' },
-  });
-  assertEqual(modeRes.json().captureMode, 'detallada', 'PATCH capture-mode cambia el modo de captura');
-
   const wrongCoachRestartRes = await app.inject({
     method: 'POST',
     url: `/matches/${match.id}/restart`,

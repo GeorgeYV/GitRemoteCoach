@@ -162,15 +162,6 @@ export async function updateObservations(id: string, coachObservations: string, 
   return mapRow(rows[0]);
 }
 
-export async function updateCaptureMode(id: string, captureMode: CaptureMode, db: Queryable = pool): Promise<Match> {
-  const { rows } = await db.query(
-    `UPDATE matches SET capture_mode = $2 WHERE id = $1 RETURNING *`,
-    [id, captureMode],
-  );
-  if (rows.length === 0) throw new NotFoundError('Match', id);
-  return mapRow(rows[0]);
-}
-
 /** Contingencia "Pausa temporal / tiempo médico" — no-op si ya estaba pausado (WHERE paused_at
  * IS NULL), así que reintentar la llamada de red no pisa un paused_at más viejo. */
 export async function pause(id: string, db: Queryable = pool): Promise<Match> {

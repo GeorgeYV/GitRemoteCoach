@@ -111,10 +111,6 @@ export async function setObservations(matchId: string, coachObservations: string
   return matchRepository.updateObservations(matchId, coachObservations);
 }
 
-export async function setCaptureMode(matchId: string, captureMode: CaptureMode): Promise<Match> {
-  return matchRepository.updateCaptureMode(matchId, captureMode);
-}
-
 export interface MatchReport {
   match: Match;
   points: MatchPointEvent[];

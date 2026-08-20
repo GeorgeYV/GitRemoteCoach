@@ -1461,12 +1461,3 @@ export function updateMatchObservations(authToken: string, matchId: string, coac
     body: JSON.stringify({ coachObservations }),
   });
 }
-
-/** PATCH /matches/:id/capture-mode — LiveCaptureView, ModeSwitch (rápida/detallada). */
-export function updateMatchCaptureMode(authToken: string, matchId: string, captureMode: CaptureMode): Promise<Match> {
-  return request(`/matches/${matchId}/capture-mode`, {
-    method: 'PATCH',
-    headers: { Authorization: `Bearer ${authToken}` },
-    body: JSON.stringify({ captureMode }),
-  });
-}
