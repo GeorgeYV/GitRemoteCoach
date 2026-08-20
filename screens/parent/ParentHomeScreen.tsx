@@ -287,7 +287,9 @@ function TournamentRow({ tournament, onPress }: { tournament: TournamentSearchRe
       <View style={styles.tournamentInfo}>
         <Text style={styles.tournamentName}>{tournament.name}</Text>
         <Text style={styles.tournamentMeta}>
-          {tournament.venue} · <Text style={styles.tournamentCity}>{tournament.city}</Text> ·{' '}
+          {tournament.venue} · <Text style={styles.tournamentCity}>{tournament.city}</Text>
+        </Text>
+        <Text style={styles.tournamentDateLine}>
           {dateRangeLabel(tournament.startDate, tournament.endDate)}
           {countdown && <Text style={[styles.countdown, { color: countdown.color }]}> · {countdown.text}</Text>}
         </Text>
@@ -476,6 +478,11 @@ const styles = StyleSheet.create({
     marginBottom: 3,
   },
   tournamentMeta: {
+    color: colors.textDim,
+    fontSize: 12,
+    marginBottom: 2,
+  },
+  tournamentDateLine: {
     color: colors.textDim,
     fontSize: 12,
   },
