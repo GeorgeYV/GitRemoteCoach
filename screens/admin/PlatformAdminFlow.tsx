@@ -4,16 +4,18 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../../lib/theme';
 import PlatformAdminPaymentsScreen from './PlatformAdminPaymentsScreen';
 import PlatformAdminPayoutsScreen from './PlatformAdminPayoutsScreen';
+import PlatformAdminRefundsScreen from './PlatformAdminRefundsScreen';
 import PlatformAdminReviewScreen from './PlatformAdminReviewScreen';
 import PlatformAdminTournamentScreen from './PlatformAdminTournamentScreen';
 
-type Tab = 'documents' | 'payments' | 'payouts' | 'tournaments';
+type Tab = 'documents' | 'payments' | 'payouts' | 'refunds' | 'tournaments';
 
 /** Home del platform_admin: revisión de documentos de coaches (flujo original), verificación de
- * pagos manuales entrantes y reporte de pagos salientes a entrenadores (fase 1 sin Stripe, ver
- * paymentService.submitPaymentProof/verifyPayment y settlementService.settleTournamentCoachPayouts)
- * y sembrar torneos sin club (ver decisión #36 en db/schema.sql). Responsabilidades sin relación
- * entre sí, así que van en pantallas separadas detrás de un selector simple, no mezcladas en una. */
+ * pagos manuales entrantes, reporte de pagos salientes a entrenadores y de reembolsos a padres
+ * (fase 1 sin Stripe, ver paymentService.submitPaymentProof/verifyPayment,
+ * settlementService.settleTournamentCoachPayouts y cancellationService.cancelBooking) y sembrar
+ * torneos sin club (ver decisión #36 en db/schema.sql). Responsabilidades sin relación entre sí,
+ * así que van en pantallas separadas detrás de un selector simple, no mezcladas en una. */
 export default function PlatformAdminFlow() {
   const [tab, setTab] = useState<Tab>('documents');
 
@@ -34,6 +36,9 @@ export default function PlatformAdminFlow() {
         <Pressable style={[styles.tab, tab === 'payouts' && styles.tabActive]} onPress={() => setTab('payouts')}>
           <Text style={[styles.tabLabel, tab === 'payouts' && styles.tabLabelActive]}>Liquidaciones</Text>
         </Pressable>
+        <Pressable style={[styles.tab, tab === 'refunds' && styles.tabActive]} onPress={() => setTab('refunds')}>
+          <Text style={[styles.tabLabel, tab === 'refunds' && styles.tabLabelActive]}>Reembolsos</Text>
+        </Pressable>
         <Pressable style={[styles.tab, tab === 'tournaments' && styles.tabActive]} onPress={() => setTab('tournaments')}>
           <Text style={[styles.tabLabel, tab === 'tournaments' && styles.tabLabelActive]}>Torneos</Text>
         </Pressable>
@@ -46,6 +51,8 @@ export default function PlatformAdminFlow() {
           <PlatformAdminPaymentsScreen />
         ) : tab === 'payouts' ? (
           <PlatformAdminPayoutsScreen />
+        ) : tab === 'refunds' ? (
+          <PlatformAdminRefundsScreen />
         ) : (
           <PlatformAdminTournamentScreen />
         )}

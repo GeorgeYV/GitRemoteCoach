@@ -522,6 +522,28 @@ export async function findPendingPaymentVerification(
   return rows.map(mapRowWithParticipants);
 }
 
+/** PlatformAdminRefundsScreen: reservas canceladas con un reembolso calculado (ver
+ * cancellationService.cancelBooking) — no filtra por paymentProvider a propósito, mismo criterio
+ * que findPendingCoachPayoutsForTournament: en fase 1 todo pago es manual, así que la distinción
+ * no aplica en la práctica, y de haber un reembolso real de Stripe también sirve tenerlo en el
+ * historial. El reembolso ya "ocurrió" (se calculó y se estampó al cancelar, mismo criterio de
+ * "simular el pago real" que club_settlements/coach_payouts) — este reporte es solo para que el
+ * admin sepa cuánto y por qué canal mandarle la plata de vuelta a cada padre por fuera de la app. */
+export async function findRefundsForAdmin(db: Queryable = pool): Promise<BookingWithParticipants[]> {
+  const { rows } = await db.query(
+    `SELECT b.*, p.full_name AS player_name, p.age_category, u.full_name AS parent_name,
+            t.name AS tournament_name, t.venue AS tournament_venue,
+            FALSE AS has_unread_messages
+     FROM bookings b
+     JOIN players p ON p.id = b.player_id
+     JOIN users u ON u.id = p.guardian_user_id
+     JOIN tournaments t ON t.id = b.tournament_id
+     WHERE b.status = 'cancelled' AND b.refund_amount > 0
+     ORDER BY b.cancelled_at DESC`,
+  );
+  return rows.map(mapRowWithParticipants);
+}
+
 /** notificationService: a quién avisar (push) cuando cambia el estado de esta reserva. */
 export async function getParentUserIdForBooking(bookingId: string, db: Queryable = pool): Promise<string> {
   const { rows } = await db.query(

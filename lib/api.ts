@@ -477,6 +477,12 @@ export function listPaymentVerificationQueue(authToken: string): Promise<Booking
   return request('/bookings/payment-verification-queue', { headers: { Authorization: `Bearer ${authToken}` } });
 }
 
+/** GET /bookings/refunds — PlatformAdminRefundsScreen: reservas canceladas con reembolso
+ * calculado, para que el admin sepa cuánto y por qué canal devolverle la plata a cada padre. */
+export function listRefunds(authToken: string): Promise<BookingWithParticipants[]> {
+  return request('/bookings/refunds', { headers: { Authorization: `Bearer ${authToken}` } });
+}
+
 /** PUT /bookings/verify-payment — PlatformAdminPaymentsScreen: confirma o rechaza un lote de
  * pagos manuales enviados juntos (mismo código de referencia). */
 export function verifyPayment(

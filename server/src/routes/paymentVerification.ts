@@ -46,4 +46,14 @@ export async function paymentVerificationRoutes(app: FastifyInstance): Promise<v
     }
     return coachPayoutRepository.listAll();
   });
+
+  // PlatformAdminRefundsScreen: reservas canceladas con reembolso calculado, para que el admin
+  // sepa cuánto y por qué canal devolverle la plata a cada padre por fuera de la app.
+  app.get('/bookings/refunds', { preHandler: app.authenticate }, async (req) => {
+    const { role } = req.user as { role: string };
+    if (role !== 'platform_admin') {
+      throw new ForbiddenError('Solo un administrador de la plataforma puede ver el reporte de reembolsos');
+    }
+    return bookingRepository.findRefundsForAdmin();
+  });
 }
