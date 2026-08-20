@@ -57,7 +57,11 @@ export default function PlatformAdminPaymentsScreen() {
   const [bookings, setBookings] = useState<BookingWithParticipants[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [actingOnKey, setActingOnKey] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
+  // Por grupo (no un solo string): con un valor compartido, dos revisiones en curso a la vez
+  // (una por grupo) podían pisarse — la que respondiera última "ganaba" el mensaje, sin importar
+  // a cuál de los dos grupos correspondía. Los botones de abajo además se deshabilitan por
+  // completo mientras cualquier grupo está en curso, para que nunca haya dos en vuelo a la vez.
+  const [actionErrors, setActionErrors] = useState<Record<string, string>>({});
 
   function load() {
     if (!token) {
@@ -77,13 +81,19 @@ export default function PlatformAdminPaymentsScreen() {
   async function respond(group: PaymentGroup, decision: 'verified' | 'rejected') {
     if (!token) return;
     setActingOnKey(group.key);
-    setActionError(null);
+    setActionErrors((prev) => {
+      const { [group.key]: _cleared, ...rest } = prev;
+      return rest;
+    });
     try {
       const bookingIds = group.bookings.map((b) => b.id);
       await verifyPayment(token, bookingIds, decision);
       setBookings((prev) => prev?.filter((b) => !bookingIds.includes(b.id)) ?? null);
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : 'No se pudo procesar tu revisión. Intenta de nuevo.');
+      setActionErrors((prev) => ({
+        ...prev,
+        [group.key]: err instanceof ApiError ? err.message : 'No se pudo procesar tu revisión. Intenta de nuevo.',
+      }));
     } finally {
       setActingOnKey(null);
     }
@@ -108,8 +118,6 @@ export default function PlatformAdminPaymentsScreen() {
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.content}>
-          {actionError && <Text style={styles.actionErrorText}>{actionError}</Text>}
-
           {groups.length === 0 ? (
             <Text style={styles.emptyText}>No hay pagos pendientes de verificación.</Text>
           ) : (
@@ -139,11 +147,13 @@ export default function PlatformAdminPaymentsScreen() {
                     ))}
                   </View>
 
+                  {actionErrors[group.key] && <Text style={styles.actionErrorText}>{actionErrors[group.key]}</Text>}
+
                   <View style={styles.actionsRow}>
                     <Pressable
                       style={styles.rejectButton}
                       onPress={() => respond(group, 'rejected')}
-                      disabled={acting}
+                      disabled={actingOnKey !== null}
                     >
                       <Ionicons name="close-circle-outline" size={16} color={colors.errorCoral} />
                       <Text style={styles.rejectLabel}>Rechazar</Text>
@@ -151,7 +161,7 @@ export default function PlatformAdminPaymentsScreen() {
                     <Pressable
                       style={styles.approveButton}
                       onPress={() => respond(group, 'verified')}
-                      disabled={acting}
+                      disabled={actingOnKey !== null}
                     >
                       {acting ? (
                         <ActivityIndicator color={colors.courtBlueDeep} size="small" />
