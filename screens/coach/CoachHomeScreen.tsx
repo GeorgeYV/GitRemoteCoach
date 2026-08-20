@@ -38,6 +38,7 @@ export default function CoachHomeScreen({
   onOpenReputation,
   onOpenInvitation,
   onLogout,
+  tabBar,
 }: {
   coachName: string;
   rating: string;
@@ -59,6 +60,7 @@ export default function CoachHomeScreen({
   onOpenReputation?: () => void;
   onOpenInvitation?: () => void;
   onLogout?: () => void;
+  tabBar?: React.ReactNode;
 }) {
   const quickLinkHandlers: Record<(typeof QUICK_LINKS)[number]['key'], (() => void) | undefined> = {
     profile: onOpenProfile,
@@ -174,6 +176,7 @@ export default function CoachHomeScreen({
           )}
         </View>
       </ScrollView>
+      {tabBar}
     </SafeAreaView>
   );
 }

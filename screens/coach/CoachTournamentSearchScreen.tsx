@@ -33,9 +33,11 @@ function daysUntilCountdown(startIso: string): { text: string; color: string } |
 export default function CoachTournamentSearchScreen({
   onSelect,
   onBack,
+  tabBar,
 }: {
   onSelect: (tournament: TournamentSearchResult) => void;
   onBack?: () => void;
+  tabBar?: React.ReactNode;
 }) {
   const { user } = useAuth();
   const [query, setQuery] = useState('');
@@ -162,6 +164,7 @@ export default function CoachTournamentSearchScreen({
           )}
         </ScrollView>
       )}
+      {tabBar}
     </SafeAreaView>
   );
 }

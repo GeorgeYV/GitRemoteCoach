@@ -28,7 +28,15 @@ function toEarningsEntry(booking: BookingWithParticipants): EarningsEntry {
   };
 }
 
-export default function CoachEarningsScreen({ coachId, onBack }: { coachId: string; onBack?: () => void }) {
+export default function CoachEarningsScreen({
+  coachId,
+  onBack,
+  tabBar,
+}: {
+  coachId: string;
+  onBack?: () => void;
+  tabBar?: React.ReactNode;
+}) {
   const { token } = useAuth();
   const [entries, setEntries] = useState<EarningsEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -61,6 +69,7 @@ export default function CoachEarningsScreen({ coachId, onBack }: { coachId: stri
     return (
       <SafeAreaView style={[styles.container, styles.centerState]} edges={['top', 'bottom']}>
         <Text style={styles.headerSubtitle}>{error}</Text>
+        {tabBar}
       </SafeAreaView>
     );
   }
@@ -69,6 +78,7 @@ export default function CoachEarningsScreen({ coachId, onBack }: { coachId: stri
     return (
       <SafeAreaView style={[styles.container, styles.centerState]} edges={['top', 'bottom']}>
         <ActivityIndicator color={colors.courtBlue} />
+        {tabBar}
       </SafeAreaView>
     );
   }
@@ -111,6 +121,7 @@ export default function CoachEarningsScreen({ coachId, onBack }: { coachId: stri
           <EarningsRow key={entry.id} entry={entry} />
         ))}
       </ScrollView>
+      {tabBar}
     </SafeAreaView>
   );
 }

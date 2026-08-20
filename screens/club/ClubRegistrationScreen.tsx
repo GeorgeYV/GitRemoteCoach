@@ -18,11 +18,13 @@ export default function ClubRegistrationScreen({
   club,
   onSuccess,
   onBack,
+  tabBar,
 }: {
   /** Si viene seteado, la pantalla edita este club (PUT) en vez de crear uno nuevo (POST). */
   club?: Club;
   onSuccess?: (club: Club) => void;
   onBack?: () => void;
+  tabBar?: React.ReactNode;
 }) {
   const { token } = useAuth();
   const [name, setName] = useState(club?.name ?? '');
@@ -159,6 +161,7 @@ export default function ClubRegistrationScreen({
           )}
         </Pressable>
       </ScrollView>
+      {tabBar}
     </SafeAreaView>
   );
 }

@@ -46,12 +46,14 @@ export default function CoachRegistrationScreen({
   profile,
   onSubmit,
   onBack,
+  tabBar,
 }: {
   /** Si viene seteado, la pantalla edita este perfil (PUT) en vez de crear uno nuevo (POST) —
    * oculta la sección de documentos, que va por el flujo de verificación aparte. */
   profile?: CoachProfileWithTraining;
   onSubmit?: () => void;
   onBack?: () => void;
+  tabBar?: React.ReactNode;
 }) {
   const { token, user, updateProfile } = useAuth();
   const [name, setName] = useState(profile ? user?.fullName ?? '' : '');
@@ -261,6 +263,7 @@ export default function CoachRegistrationScreen({
           )}
         </Pressable>
       </View>
+      {tabBar}
     </SafeAreaView>
   );
 }

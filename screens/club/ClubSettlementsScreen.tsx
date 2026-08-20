@@ -13,10 +13,12 @@ export default function ClubSettlementsScreen({
   clubId,
   clubName,
   onBack,
+  tabBar,
 }: {
   clubId: string;
   clubName: string;
   onBack?: () => void;
+  tabBar?: React.ReactNode;
 }) {
   const [settlements, setSettlements] = useState<ClubSettlementWithTournamentName[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -41,6 +43,7 @@ export default function ClubSettlementsScreen({
     return (
       <SafeAreaView style={[styles.container, styles.centerState]} edges={['top', 'bottom']}>
         <Text style={styles.headerSubtitle}>{error}</Text>
+        {tabBar}
       </SafeAreaView>
     );
   }
@@ -49,6 +52,7 @@ export default function ClubSettlementsScreen({
     return (
       <SafeAreaView style={[styles.container, styles.centerState]} edges={['top', 'bottom']}>
         <ActivityIndicator color={colors.courtBlue} />
+        {tabBar}
       </SafeAreaView>
     );
   }
@@ -98,6 +102,7 @@ export default function ClubSettlementsScreen({
           ))}
         </ScrollView>
       )}
+      {tabBar}
     </SafeAreaView>
   );
 }

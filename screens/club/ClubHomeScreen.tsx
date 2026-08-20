@@ -24,12 +24,14 @@ export default function ClubHomeScreen({
   onOpenSettlements,
   onOpenProfile,
   onLogout,
+  tabBar,
 }: {
   clubId: string;
   onOpenTournaments: () => void;
   onOpenSettlements: () => void;
   onOpenProfile?: () => void;
   onLogout?: () => void;
+  tabBar?: React.ReactNode;
 }) {
   const [club, setClub] = useState<Club | null>(null);
   const [tournaments, setTournaments] = useState<TournamentSummary[] | null>(null);
@@ -63,6 +65,7 @@ export default function ClubHomeScreen({
     return (
       <SafeAreaView style={[styles.container, styles.centerState]} edges={['top', 'bottom']}>
         <Text style={styles.headerSubtitle}>{error}</Text>
+        {tabBar}
       </SafeAreaView>
     );
   }
@@ -71,6 +74,7 @@ export default function ClubHomeScreen({
     return (
       <SafeAreaView style={[styles.container, styles.centerState]} edges={['top', 'bottom']}>
         <ActivityIndicator color={colors.courtBlue} />
+        {tabBar}
       </SafeAreaView>
     );
   }
@@ -127,6 +131,7 @@ export default function ClubHomeScreen({
           </Pressable>
         )}
       </ScrollView>
+      {tabBar}
     </SafeAreaView>
   );
 }

@@ -38,6 +38,7 @@ import LiveCaptureView from './LiveCaptureView';
 import MatchSummaryView from './MatchSummaryView';
 import PlayerPickerScreen from './parent/PlayerPickerScreen';
 import PlayerRegistrationScreen from './parent/PlayerRegistrationScreen';
+import CoachTabBar from '../components/coach/CoachTabBar';
 import CoachAvailabilityScreen from './coach/CoachAvailabilityScreen';
 import CoachBookingCancelScreen from './coach/CoachBookingCancelScreen';
 import CoachBookingDetailScreen from './coach/CoachBookingDetailScreen';
@@ -65,6 +66,7 @@ import ClubTournamentShareScreen from './club/ClubTournamentShareScreen';
 import ClubInviteCoachScreen from './club/ClubInviteCoachScreen';
 import ClubCreateTournamentScreen from './club/ClubCreateTournamentScreen';
 import ClubRegistrationScreen from './club/ClubRegistrationScreen';
+import ClubTabBar from '../components/club/ClubTabBar';
 
 /** UUID real de Carlos Medina — coincide con coachAUserId en server/test/seed.ts. Toda la previsualización
  * del lado coach opera como este entrenador hasta que exista una sesión/login real. */
@@ -85,11 +87,14 @@ export function CoachFlow({
 }
 
 /** Local two-step flow: pick a tournament, then configure days/rate within it. */
-export function CoachAvailabilityFlow({ onBack }: { onBack?: () => void } = {}) {
+export function CoachAvailabilityFlow({
+  onBack,
+  tabBar,
+}: { onBack?: () => void; tabBar?: React.ReactNode } = {}) {
   const [tournament, setTournament] = useState<TournamentSearchResult | null>(null);
 
   if (!tournament) {
-    return <CoachTournamentSearchScreen onSelect={setTournament} onBack={onBack} />;
+    return <CoachTournamentSearchScreen onSelect={setTournament} onBack={onBack} tabBar={tabBar} />;
   }
 
   return <CoachAvailabilityScreen tournament={tournament} onBack={() => setTournament(null)} />;
@@ -480,7 +485,13 @@ export function CoachHomeFlow({ coachId, coachName }: { coachId: string; coachNa
   }
 
   if (step === 'requests') {
-    return <CoachRequestInboxScreen coachId={coachId} onBack={() => setStep('home')} />;
+    return (
+      <CoachRequestInboxScreen
+        coachId={coachId}
+        onBack={() => setStep('home')}
+        tabBar={<CoachTabBar active="requests" onSelect={setStep} />}
+      />
+    );
   }
 
   if (step === 'profile' && coachProfile) {
@@ -495,12 +506,18 @@ export function CoachHomeFlow({ coachId, coachName }: { coachId: string; coachNa
           });
           setStep('home');
         }}
+        tabBar={<CoachTabBar active="profile" onSelect={setStep} />}
       />
     );
   }
 
   if (step === 'availability') {
-    return <CoachAvailabilityFlow onBack={() => setStep('home')} />;
+    return (
+      <CoachAvailabilityFlow
+        onBack={() => setStep('home')}
+        tabBar={<CoachTabBar active="availability" onSelect={setStep} />}
+      />
+    );
   }
 
   if (step === 'sessions') {
@@ -508,7 +525,13 @@ export function CoachHomeFlow({ coachId, coachName }: { coachId: string; coachNa
   }
 
   if (step === 'earnings') {
-    return <CoachEarningsScreen coachId={coachId} onBack={() => setStep('home')} />;
+    return (
+      <CoachEarningsScreen
+        coachId={coachId}
+        onBack={() => setStep('home')}
+        tabBar={<CoachTabBar active="earnings" onSelect={setStep} />}
+      />
+    );
   }
 
   if (step === 'reputation') {
@@ -566,6 +589,7 @@ export function CoachHomeFlow({ coachId, coachName }: { coachId: string; coachNa
       onOpenReputation={() => setStep('reputation')}
       onOpenInvitation={() => setStep('invitation')}
       onLogout={logout}
+      tabBar={<CoachTabBar active="home" onSelect={setStep} />}
     />
   );
 }
@@ -732,10 +756,12 @@ export function ClubTournamentFlow({
   clubId,
   clubName,
   onBack,
+  tabBar,
 }: {
   clubId: string;
   clubName: string;
   onBack?: () => void;
+  tabBar?: React.ReactNode;
 }) {
   const [tournament, setTournament] = useState<TournamentSummary | null>(null);
   const [inviting, setInviting] = useState(false);
@@ -765,6 +791,7 @@ export function ClubTournamentFlow({
         onSelect={setTournament}
         onCreate={() => setCreating(true)}
         onBack={onBack}
+        tabBar={tabBar}
       />
     );
   }
@@ -844,6 +871,7 @@ export function ClubFlow({ adminUserId }: { adminUserId: string }) {
           setClub(updated);
           setScreen('home');
         }}
+        tabBar={<ClubTabBar active="editProfile" onSelect={setScreen} />}
       />
     );
   }
@@ -865,11 +893,25 @@ export function ClubFlow({ adminUserId }: { adminUserId: string }) {
   }
 
   if (screen === 'tournaments') {
-    return <ClubTournamentFlow clubId={club.id} clubName={club.name} onBack={() => setScreen('home')} />;
+    return (
+      <ClubTournamentFlow
+        clubId={club.id}
+        clubName={club.name}
+        onBack={() => setScreen('home')}
+        tabBar={<ClubTabBar active="tournaments" onSelect={setScreen} />}
+      />
+    );
   }
 
   if (screen === 'settlements') {
-    return <ClubSettlementsScreen clubId={club.id} clubName={club.name} onBack={() => setScreen('home')} />;
+    return (
+      <ClubSettlementsScreen
+        clubId={club.id}
+        clubName={club.name}
+        onBack={() => setScreen('home')}
+        tabBar={<ClubTabBar active="settlements" onSelect={setScreen} />}
+      />
+    );
   }
 
   return (
@@ -879,6 +921,7 @@ export function ClubFlow({ adminUserId }: { adminUserId: string }) {
       onOpenSettlements={() => setScreen('settlements')}
       onOpenProfile={() => setScreen('editProfile')}
       onLogout={logout}
+      tabBar={<ClubTabBar active="home" onSelect={setScreen} />}
     />
   );
 }

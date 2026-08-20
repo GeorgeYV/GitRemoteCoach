@@ -23,7 +23,15 @@ function toBookingRequest(booking: BookingWithParticipants): BookingRequest {
   };
 }
 
-export default function CoachRequestInboxScreen({ coachId, onBack }: { coachId: string; onBack?: () => void }) {
+export default function CoachRequestInboxScreen({
+  coachId,
+  onBack,
+  tabBar,
+}: {
+  coachId: string;
+  onBack?: () => void;
+  tabBar?: React.ReactNode;
+}) {
   const { token } = useAuth();
   const [requests, setRequests] = useState<BookingRequest[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -111,6 +119,7 @@ export default function CoachRequestInboxScreen({ coachId, onBack }: { coachId: 
           )}
         </ScrollView>
       )}
+      {tabBar}
     </SafeAreaView>
   );
 }

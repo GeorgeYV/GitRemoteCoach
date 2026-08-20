@@ -27,6 +27,7 @@ export default function ClubTournamentListScreen({
   onSelect,
   onCreate,
   onBack,
+  tabBar,
 }: {
   clubId: string;
   clubName: string;
@@ -35,6 +36,7 @@ export default function ClubTournamentListScreen({
   onSelect: (tournament: TournamentSummary) => void;
   onCreate: () => void;
   onBack?: () => void;
+  tabBar?: React.ReactNode;
 }) {
   const { token } = useAuth();
   const [tournaments, setTournaments] = useState<TournamentSummary[] | null>(null);
@@ -147,6 +149,7 @@ export default function ClubTournamentListScreen({
           )}
         </ScrollView>
       )}
+      {tabBar}
     </SafeAreaView>
   );
 }
