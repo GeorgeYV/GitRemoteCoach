@@ -116,6 +116,11 @@ export function ParentBookingFlow({ initialTournamentId }: { initialTournamentId
   const [tournamentError, setTournamentError] = useState(false);
   const [coachId, setCoachId] = useState<string | null>(null);
   const [selectedTrainer, setSelectedTrainer] = useState<SelectedTrainer | null>(null);
+  // Fuerza un remount de BookingConfirmScreen cada vez que se entra a 'confirm' — sin esto React
+  // reutiliza la misma instancia (mismo branch del render, sin key) y su estado interno de días ya
+  // creados queda pegado entre un "reservar" y el siguiente, bloqueando la selección de días para
+  // siempre después de la primera reserva exitosa con cualquier entrenador.
+  const [confirmKey, setConfirmKey] = useState(0);
   // Reservas creadas al confirmar (una por día elegido); solo el subconjunto aceptado por el
   // coach (payableBookings) es lo que efectivamente se cobra en BookingPaymentScreen.
   const [createdBookings, setCreatedBookings] = useState<CreatedDayBooking[]>([]);
@@ -212,6 +217,7 @@ export function ParentBookingFlow({ initialTournamentId }: { initialTournamentId
         onBack={() => setStep('list')}
         onReserve={(info) => {
           setSelectedTrainer(info);
+          setConfirmKey((k) => k + 1);
           setStep('confirm');
         }}
       />
@@ -253,6 +259,7 @@ export function ParentBookingFlow({ initialTournamentId }: { initialTournamentId
 
     return (
       <BookingConfirmScreen
+        key={confirmKey}
         playerId={selectedPlayerId}
         playerName={players.find((p) => p.id === selectedPlayerId)?.fullName}
         coachId={selectedTrainer.coachId}
