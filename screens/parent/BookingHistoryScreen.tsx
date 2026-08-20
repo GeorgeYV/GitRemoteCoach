@@ -339,6 +339,9 @@ function BookingRow({
         <Text style={styles.meta} numberOfLines={1}>
           {booking.date} · {booking.time} · {booking.venue}
         </Text>
+        {booking.status === 'cancelled' && !!booking.refundAmount && (
+          <Text style={styles.refundNote}>Te devolvemos ${booking.refundAmount.toFixed(2)}</Text>
+        )}
         <View style={styles.statusRow}>
           <BookingStatusPill status={booking.status} />
           <View style={styles.rowActions}>
@@ -494,6 +497,12 @@ const styles = StyleSheet.create({
     color: colors.textDim,
     fontSize: 12,
     marginBottom: 10,
+  },
+  refundNote: {
+    color: colors.courtBlue,
+    fontSize: 12,
+    fontWeight: '700',
+    marginBottom: 8,
   },
   statusRow: {
     gap: 6,

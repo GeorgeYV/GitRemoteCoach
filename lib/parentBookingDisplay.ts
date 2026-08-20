@@ -33,5 +33,6 @@ export function toBookingHistoryEntry(booking: BookingForParent): BookingHistory
     tournamentCountry: booking.tournamentCountry,
     reviewed: booking.reviewed,
     hasUnreadMessages: booking.hasUnreadMessages,
+    refundAmount: booking.refundAmount != null ? Number(booking.refundAmount) : undefined,
   };
 }

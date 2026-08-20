@@ -118,6 +118,11 @@ export interface BookingHistoryEntry {
   /** Only meaningful once status is 'completed' — whether the parent already left a review. */
   reviewed?: boolean;
   hasUnreadMessages?: boolean;
+  /** Solo presente cuando status es 'cancelled' y hubo un pago real de por medio (ver
+   * cancellationService.cancelBooking) — cuánto le corresponde de vuelta al padre. El pago real
+   * ocurre por fuera de la app (ver PlatformAdminRefundsScreen), esto es solo para que el padre
+   * sepa qué esperar. */
+  refundAmount?: number;
 }
 
 export interface TrainerProfile {
