@@ -8,6 +8,7 @@ import PressureEfficiencyCard from '../../components/parent/report/PressureEffic
 import ScoreSummary from '../../components/parent/report/ScoreSummary';
 import SemaforoCard from '../../components/parent/report/SemaforoCard';
 import TacticalDiagnosisCard from '../../components/parent/report/TacticalDiagnosisCard';
+import VoiceNoteCard from '../../components/parent/report/VoiceNoteCard';
 import ParentTabBar from '../../components/parent/ParentTabBar';
 import { useAuth } from '../../context/AuthContext';
 import { ApiError, getBookingMatch, listParentBookings, MatchReport } from '../../lib/api';
@@ -159,6 +160,17 @@ function ReportDetail({ booking, onBack }: { booking: BookingHistoryEntry; onBac
               </>
             )}
 
+            {report.voiceNotes.length > 0 && (
+              <>
+                <Text style={styles.sectionLabel}>Notas de voz del entrenador</Text>
+                <View style={styles.voiceNotesList}>
+                  {report.voiceNotes.map((note) => (
+                    <VoiceNoteCard key={note.id} note={note} />
+                  ))}
+                </View>
+              </>
+            )}
+
             {report.match.coachObservations && (
               <View style={styles.obsCard}>
                 <Text style={styles.obsLabel}>OBSERVACIONES DEL ENTRENADOR</Text>
@@ -265,6 +277,17 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '800',
     marginBottom: 18,
+  },
+  sectionLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    color: colors.textDim,
+    marginBottom: 12,
+  },
+  voiceNotesList: {
+    gap: 10,
   },
   obsCard: {
     backgroundColor: colors.panel,

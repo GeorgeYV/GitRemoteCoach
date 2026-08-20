@@ -1362,8 +1362,9 @@ export interface MatchReportView {
 
 export type TranscriptStatus = 'pending' | 'completed' | 'failed';
 
-/** Espeja server/src/types.ts#VoiceNote — nota de voz ya subida/persistida (distinto de
- * lib/types.ts#VoiceNote, que es el clip local recién grabado en el dispositivo). */
+/** Espeja server/src/types.ts#VoiceNoteWithDatoDuro — nota de voz ya subida/persistida (distinto
+ * de lib/types.ts#VoiceNote, que es el clip local recién grabado en el dispositivo). datoDuro es
+ * null mientras el partido sigue en curso (el servidor solo lo arma para partidos completed). */
 export interface MatchVoiceNote {
   id: string;
   matchId: string;
@@ -1379,6 +1380,7 @@ export interface MatchVoiceNote {
   transcriptStatus: TranscriptStatus;
   transcriptionAttempts: number;
   transcribedAt: string | null;
+  datoDuro: string | null;
 }
 
 export interface MatchReport {

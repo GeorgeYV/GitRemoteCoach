@@ -2225,6 +2225,58 @@ console.log('\n=== Escenario 26: reporte enriquecido de partido (semáforo, pres
     },
   });
 
+  // 3 notas de voz etiquetadas a juegos ya jugados arriba, para probar "dato duro" (Etapa 4)
+  // contra puntos conocidos: G0 (gana su saque, con highlights), G6 (pierde su saque, sin
+  // highlights — solo "winner" genérico del rival) y G3 (quiebra el saque rival, sin highlights).
+  function reportVoiceNoteForm(fields: Record<string, string>): FormData_ {
+    const form = new FormData_();
+    form.append('file', Buffer.from([9, 9, 9]), { filename: 'note.m4a', contentType: 'audio/m4a' });
+    for (const [key, value] of Object.entries(fields)) form.append(key, value);
+    return form;
+  }
+  const g0NoteForm = reportVoiceNoteForm({
+    sequenceNumber: '1',
+    durationMs: '2000',
+    scoreLabel: 'Juego 1 · Primer set',
+    setIndex: '0',
+    gameIndex: '0',
+    isTiebreak: 'false',
+  });
+  await app.inject({
+    method: 'POST',
+    url: `/matches/${reportMatch.id}/voice-notes`,
+    headers: { authorization: `Bearer ${reportCoachToken}`, ...g0NoteForm.getHeaders() },
+    payload: g0NoteForm.getBuffer(),
+  });
+  const g6NoteForm = reportVoiceNoteForm({
+    sequenceNumber: '2',
+    durationMs: '1500',
+    scoreLabel: 'Juego 7 · Primer set',
+    setIndex: '0',
+    gameIndex: '6',
+    isTiebreak: 'false',
+  });
+  await app.inject({
+    method: 'POST',
+    url: `/matches/${reportMatch.id}/voice-notes`,
+    headers: { authorization: `Bearer ${reportCoachToken}`, ...g6NoteForm.getHeaders() },
+    payload: g6NoteForm.getBuffer(),
+  });
+  const g3NoteForm = reportVoiceNoteForm({
+    sequenceNumber: '3',
+    durationMs: '1800',
+    scoreLabel: 'Juego 4 · Primer set',
+    setIndex: '0',
+    gameIndex: '3',
+    isTiebreak: 'false',
+  });
+  await app.inject({
+    method: 'POST',
+    url: `/matches/${reportMatch.id}/voice-notes`,
+    headers: { authorization: `Bearer ${reportCoachToken}`, ...g3NoteForm.getHeaders() },
+    payload: g3NoteForm.getBuffer(),
+  });
+
   await app.inject({
     method: 'PATCH',
     url: `/matches/${reportMatch.id}/status`,
@@ -2238,8 +2290,25 @@ console.log('\n=== Escenario 26: reporte enriquecido de partido (semáforo, pres
     headers: { authorization: `Bearer ${parentToken}` },
   });
   assertEqual(reportRes.statusCode, 200, 'GET /bookings/:id/match (padre) devuelve 200');
-  const { report } = reportRes.json();
+  const { report, voiceNotes: reportVoiceNotes } = reportRes.json();
   assertTrue(!!report, 'con el partido completed, la respuesta trae "report"');
+
+  assertEqual(reportVoiceNotes.length, 3, 'las 3 notas de voz llegan en el reporte');
+  assertEqual(
+    reportVoiceNotes[0].datoDuro,
+    'Gana su saque con un ace, un winner de derecha, un winner de revés y una volea ganadora en la red.',
+    'dato duro del juego 1 (G0): gana su saque de remontada, con sus 4 winners/ace',
+  );
+  assertEqual(
+    reportVoiceNotes[1].datoDuro,
+    'Pierde el juego.',
+    'dato duro del juego 7 (G6): pierde su propio saque 0-4 sin ningún highlight capturado (solo "winner" genérico del rival)',
+  );
+  assertEqual(
+    reportVoiceNotes[2].datoDuro,
+    'Rompe el saque rival.',
+    'dato duro del juego 4 (G3): quiebra el saque rival, sin highlights (solo "winner" genérico propio)',
+  );
 
   assertEqual(report.sets, [{ setIndex: 0, won: true, score: '6-3', unforcedErrors: 3 }], 'un solo set, 6-3, con sus 3 errores no forzados');
   assertEqual(report.totalUnforcedErrors, 3, 'total de errores no forzados de player1 en el partido');
@@ -2303,6 +2372,10 @@ console.log('\n=== Escenario 26: reporte enriquecido de partido (semáforo, pres
 
 console.log('\n=== Escenario 27: notas de voz (subida, borrado, "Nuevo partido") ===');
 {
+  // r2State es compartido por todo el archivo (Escenario 26 ya subió notas propias que nunca se
+  // borran) — se compara contra este baseline en vez de un tamaño absoluto.
+  const r2ObjectsBaseline = r2State.objects.size;
+
   const registerRes = await app.inject({
     method: 'POST',
     url: '/auth/register',
@@ -2378,7 +2451,7 @@ console.log('\n=== Escenario 27: notas de voz (subida, borrado, "Nuevo partido")
   assertEqual(note1.isTiebreak, false, 'guarda isTiebreak enviado');
   assertEqual(note1.scoreLabel, 'Set 1 · 2-1', 'guarda el scoreLabel enviado');
   assertTrue(typeof note1.audioUrl === 'string' && note1.audioUrl.length > 0, 'devuelve una audioUrl real');
-  assertEqual(r2State.objects.size, 1, 'el audio quedó "subido" en R2 (fake)');
+  assertEqual(r2State.objects.size, r2ObjectsBaseline + 1, 'el audio quedó "subido" en R2 (fake)');
 
   const note2Form = voiceNoteForm(
     { sequenceNumber: '2', durationMs: '1800', scoreLabel: 'Set 1 · 4-2', setIndex: '0', gameIndex: '6', isTiebreak: 'true' },
@@ -2423,7 +2496,7 @@ console.log('\n=== Escenario 27: notas de voz (subida, borrado, "Nuevo partido")
   });
   assertEqual(deleteRes.statusCode, 204, 'DELETE voice-notes/:sequenceNumber devuelve 204');
   assertEqual(r2State.deletedKeys.length, 1, 'borrar la nota también borra su audio en R2 (fake)');
-  assertEqual(r2State.objects.size, 1, 'solo queda el audio de la nota 2 en R2 (fake)');
+  assertEqual(r2State.objects.size, r2ObjectsBaseline + 1, 'solo queda el audio de la nota 2 en R2 (fake)');
 
   const deleteAgainRes = await app.inject({
     method: 'DELETE',
@@ -2446,7 +2519,7 @@ console.log('\n=== Escenario 27: notas de voz (subida, borrado, "Nuevo partido")
     headers: { authorization: `Bearer ${vnCoachToken}` },
   });
   assertEqual(r2State.deletedKeys.length, 2, '"Nuevo partido" también limpia el audio de las notas que quedaban');
-  assertEqual(r2State.objects.size, 0, 'no queda ningún audio de este partido en R2 (fake)');
+  assertEqual(r2State.objects.size, r2ObjectsBaseline, 'no queda ningún audio de este partido en R2 (fake)');
 
   const afterRestartRes = await app.inject({
     method: 'GET',

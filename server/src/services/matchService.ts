@@ -1,6 +1,6 @@
 import { withTransaction } from '../lib/db.js';
-import { computeMatchReportStats, computePlayer1MatchStats } from '../lib/matchStatsEngine.js';
-import { buildSemaforo, buildTacticalDiagnosis } from '../lib/matchReportNarratives.js';
+import { computeGamePointHistory, computeMatchReportStats, computePlayer1MatchStats } from '../lib/matchStatsEngine.js';
+import { buildDatoDuro, buildSemaforo, buildTacticalDiagnosis } from '../lib/matchReportNarratives.js';
 import * as bookingRepository from '../repositories/bookingRepository.js';
 import * as matchPointEventRepository from '../repositories/matchPointEventRepository.js';
 import type { PointInput } from '../repositories/matchPointEventRepository.js';
@@ -21,6 +21,7 @@ import type {
   MatchScoreAdjustment,
   MatchStatus,
   VoiceNote,
+  VoiceNoteWithDatoDuro,
 } from '../types.js';
 import type { StatsPointEvent, StatsScoreAdjustment } from '../lib/matchStatsEngine.js';
 
@@ -163,14 +164,15 @@ export interface MatchReport {
   match: Match;
   points: MatchPointEvent[];
   adjustments: MatchScoreAdjustment[];
-  voiceNotes: VoiceNote[];
+  voiceNotes: VoiceNoteWithDatoDuro[];
   report?: MatchReportView;
 }
 
 /** ParentReportsScreen: null cuando la reserva nunca tuvo una captura en vivo (no es un error —
- * la mayoría de las reservas quedan así hasta que el entrenador arranca el partido). `report` solo
- * se calcula para partidos ya terminados — mientras está en curso, el marcador puede seguir
- * moviéndose y las stats enriquecidas todavía no cuentan una historia estable. */
+ * la mayoría de las reservas quedan así hasta que el entrenador arranca el partido). `report` y el
+ * "dato duro" de cada nota solo se calculan para partidos ya terminados — mientras está en curso,
+ * el marcador puede seguir moviéndose y las stats enriquecidas todavía no cuentan una historia
+ * estable. */
 export async function getMatchReport(bookingId: string): Promise<MatchReport | null> {
   const match = await matchRepository.findByBookingId(bookingId);
   if (!match) return null;
@@ -179,21 +181,29 @@ export async function getMatchReport(bookingId: string): Promise<MatchReport | n
   const voiceNotes = await voiceNoteRepository.listByMatch(match.id);
 
   if (match.status !== 'completed') {
-    return { match, points, adjustments, voiceNotes };
+    return { match, points, adjustments, voiceNotes: voiceNotes.map((note) => ({ ...note, datoDuro: null })) };
   }
 
-  const stats = computeMatchReportStats(
-    toStatsPointEvents(points),
-    { format: match.format, noAd: match.noAd, initialServer: match.initialServer },
-    toStatsAdjustments(adjustments),
-  );
+  const config = { format: match.format, noAd: match.noAd, initialServer: match.initialServer };
+  const statsEvents = toStatsPointEvents(points);
+  const statsAdjustments = toStatsAdjustments(adjustments);
+
+  const stats = computeMatchReportStats(statsEvents, config, statsAdjustments);
   const report: MatchReportView = {
     ...stats,
     semaforo: buildSemaforo(stats),
     tacticalDiagnosis: buildTacticalDiagnosis(stats),
   };
 
-  return { match, points, adjustments, voiceNotes, report };
+  const gamePointHistory = computeGamePointHistory(statsEvents, config, statsAdjustments);
+  const voiceNotesWithDatoDuro = voiceNotes.map((note) => {
+    const gamePoints = gamePointHistory.filter(
+      (p) => p.setIndex === note.setIndex && p.gameIndex === note.gameIndex && p.isTiebreak === note.isTiebreak,
+    );
+    return { ...note, datoDuro: buildDatoDuro(gamePoints) };
+  });
+
+  return { match, points, adjustments, voiceNotes: voiceNotesWithDatoDuro, report };
 }
 
 /**

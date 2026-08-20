@@ -600,3 +600,35 @@ export function computeMatchReportStats(
     winnerSlot: state.winner,
   };
 }
+
+export interface GamePointSummary {
+  setIndex: number;
+  gameIndex: number;
+  isTiebreak: boolean;
+  wonBy: MatchPlayerSlot;
+  server: MatchPlayerSlot;
+  detail: PointDetail | null;
+  errorDirection: ErrorDirection | null;
+}
+
+/** Reetiqueta pointHistory con la misma clave (setIndex, gameIndex, isTiebreak) que las notas de
+ * voz congelan al grabar (ver lib/scoringEngine.ts#getSetGameIndex del cliente) — insumo de
+ * matchReportNarratives#buildDatoDuro, que filtra esta lista por esa clave para saber qué pasó en
+ * el juego puntual de cada nota. Se computa una sola vez por partido (no por nota) porque
+ * reconstruir el estado no es gratis. */
+export function computeGamePointHistory(
+  events: StatsPointEvent[],
+  config: StatsMatchConfig,
+  adjustments: StatsScoreAdjustment[] = [],
+): GamePointSummary[] {
+  const state = computeMatchState(events, config, adjustments);
+  return state.pointHistory.map((p) => ({
+    setIndex: p.setIndex,
+    gameIndex: p.gameIndexInSet,
+    isTiebreak: p.isTiebreak,
+    wonBy: p.event.wonBy,
+    server: p.server,
+    detail: p.event.detail,
+    errorDirection: p.event.errorDirection,
+  }));
+}

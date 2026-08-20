@@ -497,6 +497,14 @@ export interface VoiceNote {
   transcribedAt: string | null;
 }
 
+/** ParentReportsScreen: una nota de voz con su "dato duro" ya armado — derivado de los puntos del
+ * juego que la nota etiqueta (matchStatsEngine#computeGamePointHistory +
+ * matchReportNarratives#buildDatoDuro), no una columna de voice_notes. null solo mientras el
+ * partido sigue en curso (VoiceNoteCard.tsx no lo necesita hasta que hay report). */
+export interface VoiceNoteWithDatoDuro extends VoiceNote {
+  datoDuro: string | null;
+}
+
 /** ParentReportsScreen: reporte enriquecido de un partido completado — matchService.getMatchReport
  * lo calcula solo cuando el partido ya terminó (null mientras está en curso, ver MatchReport). */
 export interface MatchReportView {
