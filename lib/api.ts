@@ -447,23 +447,10 @@ export function getPaymentInstructions(authToken: string): Promise<PaymentInstru
   return request('/payment-instructions', { headers: { Authorization: `Bearer ${authToken}` } });
 }
 
-/** POST /bookings/:id/submit-payment-proof — BookingPaymentScreen (fase 1 sin Stripe): el padre
- * ya pagó por fuera de la app (Deuna/Yape/Plin) y manda el código de operación. Reserva pasa a
- * 'payment_submitted' hasta que platform_admin la confirme (ver verifyPayment). */
-export function submitPaymentProof(
-  authToken: string,
-  bookingId: string,
-  params: { provider: PaymentProvider; referenceCode: string },
-): Promise<Booking[]> {
-  return request(`/bookings/${bookingId}/submit-payment-proof`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${authToken}` },
-    body: JSON.stringify(params),
-  });
-}
-
 /** POST /bookings/submit-payment-proof-batch — mismo criterio que payBookingsBatch: un solo
- * comprobante cubre varias reservas pagadas juntas en un solo envío por Deuna/Yape/Plin. */
+ * comprobante cubre varias reservas pagadas juntas en un solo envío por Deuna/Yape/Plin.
+ * BookingPaymentScreen la usa incluso para una sola reserva (un arreglo de un elemento funciona
+ * igual) — no existe una variante singular en el cliente por eso mismo. */
 export function submitPaymentProofBatch(
   authToken: string,
   bookingIds: string[],
