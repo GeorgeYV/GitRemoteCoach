@@ -114,3 +114,12 @@ export const r2Config = {
   bucketName: process.env.R2_BUCKET_NAME,
   publicUrl: process.env.R2_PUBLIC_URL,
 };
+
+/**
+ * Transcripción de notas de voz vía Whisper (OpenAI), ver lib/transcription.ts — mismo criterio
+ * que r2Config: sin required(), porque es una feature opcional. Sin esto configurado,
+ * jobs/transcribeVoiceNotes.ts simplemente no hace nada en vez de tumbar el job entero.
+ */
+export const transcriptionConfig = {
+  apiKey: process.env.OPENAI_API_KEY,
+};

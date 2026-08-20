@@ -19,5 +19,9 @@ process.env.R2_ACCESS_KEY_ID = 'r2-access-key-fake';
 process.env.R2_SECRET_ACCESS_KEY = 'r2-secret-fake';
 process.env.R2_BUCKET_NAME = 'remote-coach-photos-test';
 process.env.R2_PUBLIC_URL = 'https://fake-r2.example.com';
+// isTranscriptionConfigured() lo lee directo (tampoco es required()) — sin esto,
+// runTranscribeVoiceNotesJob se saltaría (skipped: true) antes de llegar al fake que reemplaza
+// setTranscribeAudioForTesting.
+process.env.OPENAI_API_KEY = 'sk-fake-test-key';
 
 await import('./smokeTestBody.js');

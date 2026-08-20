@@ -90,3 +90,42 @@ export async function deleteAllForMatch(matchId: string, db: Queryable = pool): 
   const { rows } = await db.query(`DELETE FROM voice_notes WHERE match_id = $1 RETURNING audio_url`, [matchId]);
   return rows.map((row) => row.audio_url).filter((url): url is string => url !== null);
 }
+
+/** jobs/transcribeVoiceNotes.ts: cola de transcripción, más antigua primero — mismo orden que
+ * idx_voice_notes_pending_transcription (índice parcial WHERE transcript_status = 'pending'). */
+export async function listPendingTranscription(limit: number, db: Queryable = pool): Promise<VoiceNote[]> {
+  const { rows } = await db.query(
+    `SELECT * FROM voice_notes WHERE transcript_status = 'pending' ORDER BY occurred_at ASC LIMIT $1`,
+    [limit],
+  );
+  return rows.map(mapRow);
+}
+
+/** Transcripción exitosa — audio_url se limpia acá mismo (no en un query aparte): el caller ya
+ * borró el objeto de R2 en este punto, dejar la URL colgando apuntaría a un archivo que no existe. */
+export async function markTranscriptionCompleted(id: string, transcript: string, db: Queryable = pool): Promise<void> {
+  await db.query(
+    `UPDATE voice_notes
+     SET transcript = $2, transcript_status = 'completed', transcribed_at = now(), audio_url = NULL
+     WHERE id = $1`,
+    [id, transcript],
+  );
+}
+
+/** Intento fallido con reintentos todavía disponibles — solo suma al contador, la nota sigue
+ * 'pending' para que el próximo corrido del job la vuelva a tomar. Devuelve el contador ya
+ * actualizado para que el caller decida si ya se agotaron los reintentos. */
+export async function incrementTranscriptionAttempts(id: string, db: Queryable = pool): Promise<number> {
+  const { rows } = await db.query(
+    `UPDATE voice_notes SET transcription_attempts = transcription_attempts + 1 WHERE id = $1 RETURNING transcription_attempts`,
+    [id],
+  );
+  return rows[0].transcription_attempts;
+}
+
+/** Reintentos agotados: se da por vencido. audio_url se limpia acá también, mismo motivo que
+ * markTranscriptionCompleted — ni éxito ni más reintentos posibles, no vale la pena seguir
+ * pagando por guardar el audio (ver decisión #39 en db/schema.sql). */
+export async function markTranscriptionFailed(id: string, db: Queryable = pool): Promise<void> {
+  await db.query(`UPDATE voice_notes SET transcript_status = 'failed', audio_url = NULL WHERE id = $1`, [id]);
+}

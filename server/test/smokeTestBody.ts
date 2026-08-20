@@ -12,8 +12,10 @@ import { setPushSenderForTesting } from '../src/lib/pushNotifications.js';
 import { setEmailSenderForTesting } from '../src/lib/emailClient.js';
 import { setGoogleAuthenticatorForTesting } from '../src/lib/googleAuth.js';
 import { setR2ClientForTesting } from '../src/lib/r2.js';
+import { setTranscribeAudioForTesting } from '../src/lib/transcription.js';
 import { buildApp } from '../src/app.js';
 import { runExpireBookingsJob } from '../src/jobs/expireBookings.js';
+import { MAX_TRANSCRIPTION_ATTEMPTS, runTranscribeVoiceNotesJob } from '../src/jobs/transcribeVoiceNotes.js';
 import { findTournamentsReadyForSettlement } from '../src/services/settlementService.js';
 
 let passed = 0;
@@ -2529,7 +2531,126 @@ console.log('\n=== Escenario 27: notas de voz (subida, borrado, "Nuevo partido")
   assertEqual(afterRestartRes.json().voiceNotes.length, 0, '"Nuevo partido" borró todas las notas de voz');
 }
 
-console.log('\n=== Escenario 28: Google sign-in (cuenta nueva, re-login, vinculación, correo sin verificar) ===');
+console.log('\n=== Escenario 28: transcripción de notas de voz (job asíncrono, reintentos, borrado de R2) ===');
+{
+  const registerRes = await app.inject({
+    method: 'POST',
+    url: '/auth/register',
+    payload: {
+      email: 'coach.transcribe.e2e@example.com',
+      password: 'super-secreta-123',
+      fullName: 'Coach Transcribe E2E',
+      primaryRole: 'coach',
+    },
+  });
+  const { token: tCoachToken, user: tCoach } = registerRes.json();
+  await app.inject({
+    method: 'POST',
+    url: '/coaches',
+    headers: { authorization: `Bearer ${tCoachToken}` },
+    payload: { city: 'CDMX', country: 'EC', yearsExperience: 4, hourlyRate: 30, ageCategories: ['U14'], levels: ['competitivo'] },
+  });
+
+  const bookingRes = await requestBooking(tCoach.id, inFuture(48));
+  const tBooking = bookingRes.json();
+  const matchRes = await app.inject({
+    method: 'POST',
+    url: '/matches',
+    headers: { authorization: `Bearer ${tCoachToken}` },
+    payload: {
+      bookingId: tBooking.id,
+      player2Label: 'Rival de práctica',
+      format: 'single_set',
+      noAd: true,
+      initialServer: 'player1',
+      captureMode: 'detallada',
+    },
+  });
+  const tMatch = matchRes.json();
+
+  function tVoiceNoteForm(fields: Record<string, string>, audioByte: number): FormData_ {
+    const form = new FormData_();
+    form.append('file', Buffer.from([audioByte]), { filename: 'note.m4a', contentType: 'audio/m4a' });
+    for (const [key, value] of Object.entries(fields)) form.append(key, value);
+    return form;
+  }
+  const note1Form = tVoiceNoteForm(
+    { sequenceNumber: '1', durationMs: '2000', scoreLabel: 'Set 1 · 1-0', setIndex: '0', gameIndex: '0', isTiebreak: 'false' },
+    1,
+  );
+  const note1 = (
+    await app.inject({
+      method: 'POST',
+      url: `/matches/${tMatch.id}/voice-notes`,
+      headers: { authorization: `Bearer ${tCoachToken}`, ...note1Form.getHeaders() },
+      payload: note1Form.getBuffer(),
+    })
+  ).json();
+  const note2Form = tVoiceNoteForm(
+    { sequenceNumber: '2', durationMs: '1500', scoreLabel: 'Set 1 · 2-0', setIndex: '0', gameIndex: '1', isTiebreak: 'false' },
+    2,
+  );
+  const note2 = (
+    await app.inject({
+      method: 'POST',
+      url: `/matches/${tMatch.id}/voice-notes`,
+      headers: { authorization: `Bearer ${tCoachToken}`, ...note2Form.getHeaders() },
+      payload: note2Form.getBuffer(),
+    })
+  ).json();
+
+  const TRANSCRIPT_TEXT = 'Buen primer saque, atacó bien la red.';
+  setTranscribeAudioForTesting(async (audioUrl: string) => {
+    if (audioUrl.includes(`/${tMatch.id}/1.`)) return TRANSCRIPT_TEXT;
+    if (audioUrl.includes(`/${tMatch.id}/2.`)) throw new Error('fake provider failure');
+    throw new Error('audioUrl inesperada en el test: ' + audioUrl);
+  });
+
+  // El job procesa TODA la cola global de notas pending (no solo las de este partido) — otros
+  // escenarios de este archivo ya dejaron notas propias sin transcribir, así que se chequea
+  // "incluye" en vez de igualdad exacta de array.
+  const run1 = await runTranscribeVoiceNotesJob();
+  assertEqual(run1.skipped, false, 'con OPENAI_API_KEY fake configurada, el job no se salta');
+  assertTrue(run1.completedIds.includes(note1.id), 'nota 1 (fake resuelve texto) queda completed en la 1º pasada');
+  assertTrue(run1.retriedIds.includes(note2.id), 'nota 2 (fake rechaza) queda pending para reintentar');
+
+  const afterRun1 = (
+    await app.inject({ method: 'GET', url: `/bookings/${tBooking.id}/match`, headers: { authorization: `Bearer ${tCoachToken}` } })
+  ).json();
+  const [n1AfterRun1, n2AfterRun1] = afterRun1.voiceNotes;
+  assertEqual(n1AfterRun1.transcriptStatus, 'completed', 'nota 1: transcript_status completed');
+  assertEqual(n1AfterRun1.transcript, TRANSCRIPT_TEXT, 'nota 1: transcript exacto del fake');
+  assertEqual(n1AfterRun1.audioUrl, null, 'nota 1: audio_url se limpia al completar');
+  assertTrue(!!n1AfterRun1.transcribedAt, 'nota 1: transcribed_at queda fijado');
+  assertEqual(n2AfterRun1.transcriptStatus, 'pending', 'nota 2: sigue pending tras 1 falla (le quedan reintentos)');
+  assertEqual(n2AfterRun1.transcriptionAttempts, 1, 'nota 2: transcription_attempts = 1');
+  assertTrue(!!n2AfterRun1.audioUrl, 'nota 2: audio_url todavía existe (no se agotaron los reintentos)');
+  assertEqual(r2State.deletedKeys.includes(`voice-notes/${tMatch.id}/1.m4a`), true, 'nota 1: su audio se borró de R2 (fake)');
+  assertEqual(r2State.objects.has(`voice-notes/${tMatch.id}/2.m4a`), true, 'nota 2: su audio sigue en R2 (fake) — todavía no se agotaron los reintentos');
+
+  // 2º y 3º intento de la nota 2 — el 3º agota MAX_TRANSCRIPTION_ATTEMPTS.
+  const run2 = await runTranscribeVoiceNotesJob();
+  assertTrue(run2.retriedIds.includes(note2.id), 'nota 2: 2º intento también falla, todavía le queda 1 reintento');
+  const run3 = await runTranscribeVoiceNotesJob();
+  assertTrue(
+    run3.failedIds.includes(note2.id),
+    `nota 2: 3º intento agota MAX_TRANSCRIPTION_ATTEMPTS (${MAX_TRANSCRIPTION_ATTEMPTS}) y pasa a failed`,
+  );
+
+  const afterRun3 = (
+    await app.inject({ method: 'GET', url: `/bookings/${tBooking.id}/match`, headers: { authorization: `Bearer ${tCoachToken}` } })
+  ).json();
+  const n2Final = afterRun3.voiceNotes[1];
+  assertEqual(n2Final.transcriptStatus, 'failed', 'nota 2: transcript_status failed tras agotar reintentos');
+  assertEqual(n2Final.transcript, null, 'nota 2: nunca llegó a tener transcript');
+  assertEqual(n2Final.transcriptionAttempts, MAX_TRANSCRIPTION_ATTEMPTS, `nota 2: transcription_attempts = ${MAX_TRANSCRIPTION_ATTEMPTS}`);
+  assertEqual(n2Final.audioUrl, null, 'nota 2: audio_url se limpia igual al agotar reintentos (no hay más intentos posibles)');
+  assertEqual(r2State.objects.has(`voice-notes/${tMatch.id}/2.m4a`), false, 'nota 2: su audio también se terminó borrando de R2 (fake)');
+
+  setTranscribeAudioForTesting(null);
+}
+
+console.log('\n=== Escenario 29: Google sign-in (cuenta nueva, re-login, vinculación, correo sin verificar) ===');
 {
   const newIdentity = {
     googleId: 'google-sub-nueva-mama',
