@@ -1,6 +1,7 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import jwt from '@fastify/jwt';
+import multipart from '@fastify/multipart';
 import { env } from './config.js';
 import { AppError } from './lib/errors.js';
 import { authRoutes } from './routes/auth.js';
@@ -40,6 +41,11 @@ export function buildApp() {
   app.register(cors, { origin: true, methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'] });
 
   app.register(jwt, { secret: env.jwtSecret });
+
+  // POST /coaches/:id/photo (routes/coaches.ts) — límite de tamaño acá, no solo en
+  // coachProfileService.updateCoachPhoto: sin esto Fastify bufferiza el archivo entero en memoria
+  // antes de que el service tenga la chance de rechazarlo.
+  app.register(multipart, { limits: { fileSize: 5 * 1024 * 1024 } });
 
   // Fundamento de auth (login/register en routes/auth.ts): la mayoría de las rutas de negocio
   // (bookings, matches, etc.) todavía no exigen este token — eso llega junto con

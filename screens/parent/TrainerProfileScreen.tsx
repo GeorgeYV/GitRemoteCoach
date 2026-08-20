@@ -203,7 +203,7 @@ export default function TrainerProfileScreen({
         <Pressable style={styles.backButton} onPress={onBack}>
           <Text style={styles.backIcon}>←</Text>
         </Pressable>
-        <TrainerAvatarPlaceholder size={64} />
+        <TrainerAvatarPlaceholder size={64} photoUrl={profile.profile.photoUrl} />
         <View style={styles.headerInfo}>
           <Text style={styles.trainerName}>{name}</Text>
           <Text style={styles.trainerMeta}>

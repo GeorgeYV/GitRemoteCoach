@@ -1,10 +1,20 @@
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Image, StyleSheet, View } from 'react-native';
 import { colors } from '../../lib/theme';
 
-/** Circular placeholder with a diagonal-stripe pattern, used wherever a trainer
- * doesn't have a real profile photo yet. */
-export default function TrainerAvatarPlaceholder({ size = 60 }: { size?: number }) {
+/** Foto real del entrenador si ya subió una (coach_profiles.photo_url, ver
+ * CoachRegistrationScreen "Agregar foto de perfil"); si no, el placeholder de rayas de
+ * siempre. Mismo componente en ambos casos para no tener que tocar cada call site. */
+export default function TrainerAvatarPlaceholder({ size = 60, photoUrl }: { size?: number; photoUrl?: string | null }) {
+  if (photoUrl) {
+    return (
+      <Image
+        source={{ uri: photoUrl }}
+        style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: colors.panelLight }}
+      />
+    );
+  }
+
   const stripeWidth = size * 0.26;
   const stripeCount = 6;
   const stripes = Array.from({ length: stripeCount });

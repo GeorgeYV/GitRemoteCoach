@@ -134,6 +134,19 @@ export async function coachRoutes(app: FastifyInstance): Promise<void> {
     return bookingService.listBookingsForCoach(id);
   });
 
+  // CoachRegistrationScreen "Agregar foto de perfil" — multipart de un solo archivo (límite de
+  // tamaño ya aplicado por el plugin @fastify/multipart, ver app.ts).
+  app.post('/coaches/:id/photo', { preHandler: app.authenticate }, async (req) => {
+    const { id } = req.params as { id: string };
+    const { sub } = req.user as { sub: string };
+    if (sub !== id) throw new ForbiddenError('No puedes cambiar la foto de otro entrenador');
+
+    const data = await req.file();
+    if (!data) throw new ValidationError('Falta el archivo de la foto');
+    const buffer = await data.toBuffer();
+    return coachProfileService.updateCoachPhoto(id, buffer, data.mimetype);
+  });
+
   // CoachVerificationPendingScreen: checklist real, documentos de identidad — no público.
   app.get('/coaches/:id/verification-documents', { preHandler: app.authenticate }, async (req) => {
     const { id } = req.params as { id: string };

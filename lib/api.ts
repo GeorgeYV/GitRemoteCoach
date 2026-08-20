@@ -24,8 +24,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       // Solo se manda Content-Type cuando de verdad hay body — Fastify rechaza con
       // 400 (que este error handler no distingue de un 500) un body vacío con
       // Content-Type: application/json, y varios POST (accept/reject/pay sin
-      // requiresAction) no llevan body.
-      headers: init?.body ? { 'Content-Type': 'application/json', ...init?.headers } : init?.headers,
+      // requiresAction) no llevan body. FormData (uploadCoachPhoto) es la excepción: fetch
+      // necesita fijar su propio Content-Type con el boundary del multipart, forzar
+      // application/json ahí rompe el parseo en el servidor.
+      headers:
+        init?.body && !(init.body instanceof FormData)
+          ? { 'Content-Type': 'application/json', ...init?.headers }
+          : init?.headers,
     });
   } catch {
     throw new ApiError(0, 'network_error', 'No se pudo conectar con el servidor');
@@ -682,6 +687,29 @@ export function updateCoachProfileDetails(
     method: 'PUT',
     headers: { Authorization: `Bearer ${authToken}` },
     body: JSON.stringify(params),
+  });
+}
+
+/** POST /coaches/:id/photo — CoachRegistrationScreen "Agregar foto de perfil". `photo.file` es un
+ * File real (solo lo trae expo-image-picker en target web); en nativo, FormData usa en cambio el
+ * shape {uri, name, type} que su polyfill de fetch sabe interpretar como un archivo a streamear. */
+export function uploadCoachPhoto(
+  authToken: string,
+  coachId: string,
+  photo: { uri: string; name: string; type: string; file?: File },
+): Promise<CoachProfile> {
+  const formData = new FormData();
+  if (photo.file) {
+    formData.append('file', photo.file, photo.name);
+  } else {
+    // React Native's FormData acepta este shape (no es un File real) para subir un archivo local
+    // por su uri — no está tipado así en lib.dom.d.ts, de ahí el `as any`.
+    formData.append('file', { uri: photo.uri, name: photo.name, type: photo.type } as any);
+  }
+  return request(`/coaches/${coachId}/photo`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${authToken}` },
+    body: formData,
   });
 }
 

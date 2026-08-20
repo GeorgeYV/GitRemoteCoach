@@ -100,3 +100,17 @@ export const paymentCollectionAccounts: Record<'EC' | 'PE', PaymentAccount[]> = 
     bankTransferAccount('PAYMENT_BANK_PE'),
   ],
 };
+
+/**
+ * Cloudflare R2 (foto de perfil del entrenador, ver lib/r2.ts) — a diferencia de env arriba, no
+ * usa required(): sin esto configurado, la subida de fotos responde 503 en vez de tumbar el
+ * arranque de todo el servidor por una feature opcional (mismo criterio que las cuentas de cobro
+ * de pagos, que también son operativas y no bloquean el arranque).
+ */
+export const r2Config = {
+  accountId: process.env.R2_ACCOUNT_ID,
+  accessKeyId: process.env.R2_ACCESS_KEY_ID,
+  secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+  bucketName: process.env.R2_BUCKET_NAME,
+  publicUrl: process.env.R2_PUBLIC_URL,
+};

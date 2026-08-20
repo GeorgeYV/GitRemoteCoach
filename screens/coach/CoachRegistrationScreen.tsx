@@ -1,4 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import * as ImagePicker from 'expo-image-picker';
 import React, { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -15,6 +16,7 @@ import {
   registerCoachProfile,
   updateCoachProfileDetails,
   updateCoachTraining,
+  uploadCoachPhoto,
 } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
 import {
@@ -65,6 +67,9 @@ export default function CoachRegistrationScreen({
   const [categories, setCategories] = useState<string[]>(profile?.ageCategories ?? []);
   const [levels, setLevels] = useState<string[]>(profile?.levels.map((l) => LEVEL_VALUE_TO_LABEL[l]) ?? []);
   const [documents, setDocuments] = useState<DocumentItem[]>(VERIFICATION_DOC_CHECKLIST);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(profile?.profile.photoUrl ?? null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -74,6 +79,50 @@ export default function CoachRegistrationScreen({
 
   function markUploaded(id: string) {
     setDocuments((prev) => prev.map((d) => (d.id === id ? { ...d, status: 'uploaded' } : d)));
+  }
+
+  /** Solo disponible en modo edición: durante el registro inicial todavía no existe una fila en
+   * coach_profiles a la que subirle la foto (recién se crea al enviar el formulario). */
+  async function handlePickPhoto() {
+    if (!profile) {
+      Alert.alert(
+        'Foto de perfil',
+        'Termina tu registro primero — vas a poder agregar tu foto después, desde "Editar perfil".',
+      );
+      return;
+    }
+    if (!token) return;
+
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Permiso necesario', 'Activa el acceso a tus fotos para elegir una foto de perfil.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+    if (result.canceled || result.assets.length === 0) return;
+    const asset = result.assets[0];
+
+    setPhotoError(null);
+    setUploadingPhoto(true);
+    try {
+      const updated = await uploadCoachPhoto(token, profile.profile.userId, {
+        uri: asset.uri,
+        name: asset.fileName ?? 'photo.jpg',
+        type: asset.mimeType ?? 'image/jpeg',
+        file: asset.file,
+      });
+      setPhotoUrl(updated.photoUrl);
+    } catch (err) {
+      setPhotoError(err instanceof ApiError ? err.message : 'No se pudo subir la foto. Intenta de nuevo.');
+    } finally {
+      setUploadingPhoto(false);
+    }
   }
 
   async function handleSubmit() {
@@ -154,15 +203,17 @@ export default function CoachRegistrationScreen({
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.photoBlock}>
           <View style={styles.photoWrap}>
-            <TrainerAvatarPlaceholder size={88} />
-            <Pressable
-              style={styles.photoAddButton}
-              onPress={() => Alert.alert('Foto de perfil', 'Próximamente: sube una foto de perfil real.')}
-            >
-              <Text style={styles.photoAddIcon}>+</Text>
+            <TrainerAvatarPlaceholder size={88} photoUrl={photoUrl} />
+            <Pressable style={styles.photoAddButton} onPress={handlePickPhoto} disabled={uploadingPhoto}>
+              {uploadingPhoto ? (
+                <ActivityIndicator size="small" color={colors.courtBlueDeep} />
+              ) : (
+                <Text style={styles.photoAddIcon}>+</Text>
+              )}
             </Pressable>
           </View>
-          <Text style={styles.photoHint}>Agregar foto de perfil</Text>
+          <Text style={styles.photoHint}>{photoUrl ? 'Cambiar foto de perfil' : 'Agregar foto de perfil'}</Text>
+          {photoError && <Text style={styles.errorText}>{photoError}</Text>}
         </View>
 
         <Section label="Datos personales">

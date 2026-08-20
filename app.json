@@ -40,6 +40,12 @@
           "recordAudioAndroid": true
         }
       ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Permití el acceso a tus fotos para elegir una foto de perfil."
+        }
+      ],
       "expo-localization"
     ],
     "extra": {

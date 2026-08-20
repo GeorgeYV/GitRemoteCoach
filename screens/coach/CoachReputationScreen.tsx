@@ -122,7 +122,7 @@ export default function CoachReputationScreen({
 
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.profileHeader}>
-          <TrainerAvatarPlaceholder size={72} />
+          <TrainerAvatarPlaceholder size={72} photoUrl={profile.photoUrl} />
           <Text style={styles.name}>{coachName}</Text>
           <View style={styles.ratingRow}>
             <Text style={styles.ratingValue}>★ {profile.ratingAvg}</Text>

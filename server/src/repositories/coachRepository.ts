@@ -147,6 +147,16 @@ export async function update(
   return getCoachProfile(userId, db);
 }
 
+/** CoachRegistrationScreen "Agregar foto de perfil" — sube a R2 (ver lib/r2.ts) primero, esto
+ * solo guarda la URL resultante. */
+export async function updatePhotoUrl(coachId: string, photoUrl: string, db: Queryable = pool): Promise<CoachProfile> {
+  await db.query(`UPDATE coach_profiles SET photo_url = $2, updated_at = now() WHERE user_id = $1`, [
+    coachId,
+    photoUrl,
+  ]);
+  return getCoachProfile(coachId, db);
+}
+
 export async function getCoachProfile(coachId: string, db: Queryable = pool): Promise<CoachProfile> {
   const { rows } = await db.query(
     `SELECT cp.*, u.full_name

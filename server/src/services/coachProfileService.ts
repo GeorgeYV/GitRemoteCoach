@@ -1,4 +1,6 @@
 import { withTransaction } from '../lib/db.js';
+import { AppError, ValidationError } from '../lib/errors.js';
+import { isR2Configured, uploadObject } from '../lib/r2.js';
 import * as coachRepository from '../repositories/coachRepository.js';
 import * as coachVerificationDocumentRepository from '../repositories/coachVerificationDocumentRepository.js';
 import type {
@@ -93,6 +95,33 @@ export async function updateCoachProfileDetails(
   },
 ): Promise<CoachProfile> {
   return coachRepository.update(coachId, params);
+}
+
+const ALLOWED_PHOTO_MIME_TYPES: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+};
+const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
+
+/** CoachRegistrationScreen "Agregar foto de perfil" — misma key por coach (coach-photos/<id>.<ext>)
+ * a propósito: una foto nueva reemplaza a la anterior en R2 en vez de acumular huérfanas. Si el
+ * tipo cambia (ej. png → jpg) queda un archivo viejo huérfano con extensión distinta; aceptable
+ * para esta primera versión, no vale la pena trackear/limpiar la extensión anterior todavía. */
+export async function updateCoachPhoto(coachId: string, buffer: Buffer, mimeType: string): Promise<CoachProfile> {
+  if (!isR2Configured()) {
+    throw new AppError(
+      'La subida de fotos todavía no está configurada en el servidor.',
+      503,
+      'photo_upload_unavailable',
+    );
+  }
+  const ext = ALLOWED_PHOTO_MIME_TYPES[mimeType];
+  if (!ext) throw new ValidationError('Formato de imagen no soportado (usa JPG, PNG o WEBP)');
+  if (buffer.byteLength > MAX_PHOTO_BYTES) throw new ValidationError('La imagen no puede pesar más de 5MB');
+
+  const photoUrl = await uploadObject(`coach-photos/${coachId}.${ext}`, buffer, mimeType);
+  return coachRepository.updatePhotoUrl(coachId, photoUrl);
 }
 
 /**
