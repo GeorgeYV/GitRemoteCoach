@@ -1303,10 +1303,68 @@ export interface MatchScoreAdjustmentInput {
   server: MatchPlayerSlot;
 }
 
+export interface PlayerMatchStats {
+  winners: number;
+  unforcedErrors: number;
+  firstServePct: number | null;
+  breaksConverted: number;
+  returnGamesPlayed: number;
+}
+
+export type ErrorZoneKey = 'red_derecha' | 'red_reves' | 'larga_derecha' | 'larga_reves' | 'ancha_derecha' | 'ancha_reves';
+export type ErrorZoneCounts = Record<ErrorZoneKey, number>;
+
+export interface PressureServeBucket {
+  attempts: number;
+  firstServeIn: number;
+  pct: number | null;
+}
+
+export interface PressureEfficiency {
+  normal: PressureServeBucket;
+  breakPoint: PressureServeBucket;
+}
+
+export interface RallyErrorBucket {
+  rallyLength: RallyLength;
+  pointsPlayed: number;
+  pointsLost: number;
+  unforcedErrors: number;
+}
+
+export interface SetOutcome {
+  setIndex: number;
+  won: boolean;
+  score: string;
+  unforcedErrors: number;
+}
+
+export type SemaforoTone = 'green' | 'amber' | 'red';
+
+export interface SemaforoItem {
+  tone: SemaforoTone;
+  label: string;
+  text: string;
+}
+
+/** Espeja server/src/types.ts#MatchReportView. */
+export interface MatchReportView {
+  player1: PlayerMatchStats;
+  pressureEfficiency: PressureEfficiency;
+  errorZones: ErrorZoneCounts;
+  rallyErrorBuckets: RallyErrorBucket[];
+  sets: SetOutcome[];
+  totalUnforcedErrors: number;
+  winnerSlot: MatchPlayerSlot | null;
+  semaforo: SemaforoItem[];
+  tacticalDiagnosis: string | null;
+}
+
 export interface MatchReport {
   match: Match;
   points: MatchPointEvent[];
   adjustments: MatchScoreAdjustment[];
+  report?: MatchReportView;
 }
 
 /** GET /bookings/:id/match — ParentReportsScreen. El padre o el entrenador de la reserva pueden

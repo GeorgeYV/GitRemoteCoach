@@ -2,52 +2,18 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import ErrorScatterCourt from '../../components/parent/report/ErrorScatterCourt';
+import KeyStatsCard from '../../components/parent/report/KeyStatsCard';
+import PressureEfficiencyCard from '../../components/parent/report/PressureEfficiencyCard';
+import ScoreSummary from '../../components/parent/report/ScoreSummary';
+import SemaforoCard from '../../components/parent/report/SemaforoCard';
+import TacticalDiagnosisCard from '../../components/parent/report/TacticalDiagnosisCard';
 import ParentTabBar from '../../components/parent/ParentTabBar';
 import { useAuth } from '../../context/AuthContext';
 import { ApiError, getBookingMatch, listParentBookings, MatchReport } from '../../lib/api';
 import { toBookingHistoryEntry } from '../../lib/parentBookingDisplay';
-import { computeMatchState } from '../../lib/scoringEngine';
-import { computeMatchStats, MatchStats } from '../../lib/statsEngine';
 import { colors, radius, withOpacity } from '../../lib/theme';
-import { MatchConfig, PointEvent, ScoreAdjustment } from '../../lib/types';
 import { BookingHistoryEntry } from '../../mock/parentFlow';
-
-function toReportConfig(report: MatchReport, playerName: string): MatchConfig {
-  return {
-    format: report.match.format,
-    noAd: report.match.noAd,
-    player1Name: playerName,
-    player2Name: report.match.player2Label,
-    initialServer: report.match.initialServer,
-  };
-}
-
-function toReportEvents(report: MatchReport): PointEvent[] {
-  return report.points.map((p) => ({
-    id: p.id,
-    timestamp: new Date(p.occurredAt).getTime(),
-    wonBy: p.wonBy,
-    detail: p.detail,
-    firstServeIn: p.firstServeIn,
-    serveDirection: p.serveDirection,
-    errorDirection: p.errorDirection,
-    rallyLength: p.rallyLength,
-    netApproach: p.netApproach,
-    isReturnError: p.isReturnError,
-  }));
-}
-
-function toReportAdjustments(report: MatchReport): ScoreAdjustment[] {
-  return report.adjustments.map((a) => ({
-    id: a.id,
-    timestamp: new Date(a.occurredAt).getTime(),
-    gamesPlayer1: a.gamesPlayer1,
-    gamesPlayer2: a.gamesPlayer2,
-    pointsPlayer1: a.pointsPlayer1,
-    pointsPlayer2: a.pointsPlayer2,
-    server: a.server,
-  }));
-}
 
 export default function ParentReportsScreen() {
   const { user, token } = useAuth();
@@ -147,15 +113,6 @@ function ReportDetail({ booking, onBack }: { booking: BookingHistoryEntry; onBac
     };
   }, [token, booking.id]);
 
-  let stats: MatchStats | null = null;
-  let scoreLine = '';
-  if (report && report.match.status === 'completed') {
-    const config = toReportConfig(report, booking.playerName);
-    const matchState = computeMatchState(toReportEvents(report), config, toReportAdjustments(report));
-    stats = computeMatchStats(matchState);
-    scoreLine = matchState.completedSets.map((s) => `${s.gamesPlayer1}-${s.gamesPlayer2}`).join(', ');
-  }
-
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.detailHeader}>
@@ -189,18 +146,18 @@ function ReportDetail({ booking, onBack }: { booking: BookingHistoryEntry; onBac
           <>
             <Text style={styles.scoreLine}>
               {booking.playerName} vs {report.match.player2Label}
-              {scoreLine ? ` · ${scoreLine}` : ''}
             </Text>
 
-            <View style={styles.statsGrid}>
-              <StatCard bigNum={stats!.player1.winners} cap="Winners" />
-              <StatCard bigNum={stats!.player1.unforcedErrors} cap="Errores no forzados" />
-              <StatCard
-                bigNum={stats!.player1.firstServePct === null ? '—' : `${stats!.player1.firstServePct}%`}
-                cap="1er saque adentro"
-              />
-              <StatCard bigNum={`${stats!.player1.breaksConverted}/${stats!.player1.returnGamesPlayed}`} cap="Quiebres convertidos" />
-            </View>
+            {report.report && (
+              <>
+                <ScoreSummary sets={report.report.sets} won={report.report.winnerSlot === 'player1'} />
+                <SemaforoCard items={report.report.semaforo} />
+                <KeyStatsCard player1={report.report.player1} />
+                <PressureEfficiencyCard pressureEfficiency={report.report.pressureEfficiency} />
+                <ErrorScatterCourt errorZones={report.report.errorZones} />
+                <TacticalDiagnosisCard text={report.report.tacticalDiagnosis} />
+              </>
+            )}
 
             {report.match.coachObservations && (
               <View style={styles.obsCard}>
@@ -212,15 +169,6 @@ function ReportDetail({ booking, onBack }: { booking: BookingHistoryEntry; onBac
         )}
       </ScrollView>
     </SafeAreaView>
-  );
-}
-
-function StatCard({ bigNum, cap }: { bigNum: string | number; cap: string }) {
-  return (
-    <View style={styles.statCard}>
-      <Text style={styles.statBigNum}>{bigNum}</Text>
-      <Text style={styles.statCap}>{cap}</Text>
-    </View>
   );
 }
 
@@ -317,32 +265,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '800',
     marginBottom: 18,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  statCard: {
-    width: '48.5%',
-    backgroundColor: colors.panel,
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  statBigNum: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: colors.courtBlue,
-  },
-  statCap: {
-    fontSize: 11,
-    color: colors.textDim,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginTop: 2,
   },
   obsCard: {
     backgroundColor: colors.panel,
