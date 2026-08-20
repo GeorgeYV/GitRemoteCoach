@@ -9,12 +9,12 @@ import {
 import { Stack, useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import * as Notifications from 'expo-notifications';
 import * as WebBrowser from 'expo-web-browser';
 import React, { useEffect } from 'react';
 import { ActivityIndicator, Platform, Text, TextInput, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from '../context/AuthContext';
+import { isExpoGo } from '../lib/notifications';
 import { colors } from '../lib/theme';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -35,19 +35,31 @@ TextInputWithProps.defaultProps = TextInputWithProps.defaultProps || {};
 TextInputWithProps.defaultProps.style = [{ fontFamily: 'Roboto_400Regular' }, TextInputWithProps.defaultProps.style];
 
 /**
- * Tap en una notificación → home. Sin deep-link al contenido específico todavía
- * (ej. la reserva del data payload) porque esas rutas no existen aún — ver plan
- * de navegación, foundation-only.
+ * Tap en una notificación → la sección más relevante para el rol. Todas las notificaciones
+ * (notificationService.notifyUser) llevan `data: { bookingId }`, pero coach/club_admin todavía no
+ * tienen rutas propias bajo app/ (ver components/coach/CoachTabBar.tsx — sus secciones viven en
+ * step state, no en expo-router) así que para ellos "/" (su home) sigue siendo el mejor destino
+ * posible. El padre sí tiene "/bookings" real — aterrizarlo ahí en vez del home de torneos es la
+ * mejora real que se puede hacer sin deep-link a la reserva puntual todavía.
  */
 function useNotificationTapHandler() {
   const router = useRouter();
+  const { user } = useAuth();
   useEffect(() => {
-    if (Platform.OS === 'web') return;
-    const sub = Notifications.addNotificationResponseReceivedListener(() => {
-      router.push('/');
+    if (Platform.OS === 'web' || isExpoGo) return;
+    let sub: { remove: () => void } | undefined;
+    let cancelled = false;
+    import('expo-notifications').then((Notifications) => {
+      if (cancelled) return;
+      sub = Notifications.addNotificationResponseReceivedListener(() => {
+        router.push(user?.primaryRole === 'parent' ? '/bookings' : '/');
+      });
     });
-    return () => sub.remove();
-  }, [router]);
+    return () => {
+      cancelled = true;
+      sub?.remove();
+    };
+  }, [router, user]);
 }
 
 function RootNavigator() {
