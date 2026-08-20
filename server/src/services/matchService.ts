@@ -1,5 +1,6 @@
 import { withTransaction } from '../lib/db.js';
-import { computePlayer1MatchStats } from '../lib/matchStatsEngine.js';
+import { computeMatchReportStats, computePlayer1MatchStats } from '../lib/matchStatsEngine.js';
+import { buildSemaforo, buildTacticalDiagnosis } from '../lib/matchReportNarratives.js';
 import * as bookingRepository from '../repositories/bookingRepository.js';
 import * as matchPointEventRepository from '../repositories/matchPointEventRepository.js';
 import type { PointInput } from '../repositories/matchPointEventRepository.js';
@@ -13,9 +14,33 @@ import type {
   Match,
   MatchPlayerSlot,
   MatchPointEvent,
+  MatchReportView,
   MatchScoreAdjustment,
   MatchStatus,
 } from '../types.js';
+import type { StatsPointEvent, StatsScoreAdjustment } from '../lib/matchStatsEngine.js';
+
+function toStatsPointEvents(points: MatchPointEvent[]): StatsPointEvent[] {
+  return points.map((p) => ({
+    timestamp: new Date(p.occurredAt).getTime(),
+    wonBy: p.wonBy,
+    detail: p.detail,
+    firstServeIn: p.firstServeIn,
+    errorDirection: p.errorDirection,
+    rallyLength: p.rallyLength,
+  }));
+}
+
+function toStatsAdjustments(adjustments: MatchScoreAdjustment[]): StatsScoreAdjustment[] {
+  return adjustments.map((a) => ({
+    timestamp: new Date(a.occurredAt).getTime(),
+    gamesPlayer1: a.gamesPlayer1,
+    gamesPlayer2: a.gamesPlayer2,
+    pointsPlayer1: a.pointsPlayer1,
+    pointsPlayer2: a.pointsPlayer2,
+    server: a.server,
+  }));
+}
 
 export interface GetOrCreateMatchParams {
   bookingId: string;
@@ -115,16 +140,35 @@ export interface MatchReport {
   match: Match;
   points: MatchPointEvent[];
   adjustments: MatchScoreAdjustment[];
+  report?: MatchReportView;
 }
 
 /** ParentReportsScreen: null cuando la reserva nunca tuvo una captura en vivo (no es un error —
- * la mayoría de las reservas quedan así hasta que el entrenador arranca el partido). */
+ * la mayoría de las reservas quedan así hasta que el entrenador arranca el partido). `report` solo
+ * se calcula para partidos ya terminados — mientras está en curso, el marcador puede seguir
+ * moviéndose y las stats enriquecidas todavía no cuentan una historia estable. */
 export async function getMatchReport(bookingId: string): Promise<MatchReport | null> {
   const match = await matchRepository.findByBookingId(bookingId);
   if (!match) return null;
   const points = await matchPointEventRepository.listByMatch(match.id);
   const adjustments = await matchScoreAdjustmentRepository.listByMatch(match.id);
-  return { match, points, adjustments };
+
+  if (match.status !== 'completed') {
+    return { match, points, adjustments };
+  }
+
+  const stats = computeMatchReportStats(
+    toStatsPointEvents(points),
+    { format: match.format, noAd: match.noAd, initialServer: match.initialServer },
+    toStatsAdjustments(adjustments),
+  );
+  const report: MatchReportView = {
+    ...stats,
+    semaforo: buildSemaforo(stats),
+    tacticalDiagnosis: buildTacticalDiagnosis(stats),
+  };
+
+  return { match, points, adjustments, report };
 }
 
 /**
@@ -147,21 +191,9 @@ export async function getCoachReportSummary(coachId: string): Promise<CoachRepor
     const points = await matchPointEventRepository.listByMatch(match.id);
     const adjustments = await matchScoreAdjustmentRepository.listByMatch(match.id);
     const stats = computePlayer1MatchStats(
-      points.map((p) => ({
-        timestamp: new Date(p.occurredAt).getTime(),
-        wonBy: p.wonBy,
-        detail: p.detail,
-        firstServeIn: p.firstServeIn,
-      })),
+      toStatsPointEvents(points),
       { format: match.format, noAd: match.noAd, initialServer: match.initialServer },
-      adjustments.map((a) => ({
-        timestamp: new Date(a.occurredAt).getTime(),
-        gamesPlayer1: a.gamesPlayer1,
-        gamesPlayer2: a.gamesPlayer2,
-        pointsPlayer1: a.pointsPlayer1,
-        pointsPlayer2: a.pointsPlayer2,
-        server: a.server,
-      })),
+      toStatsAdjustments(adjustments),
     );
     winners += stats.winners;
     unforcedErrors += stats.unforcedErrors;

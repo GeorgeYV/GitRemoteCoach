@@ -1,4 +1,12 @@
 import type { MatchFormatId } from './lib/matchFormats.js';
+import type {
+  ErrorZoneCounts,
+  PlayerMatchStats,
+  PressureEfficiency,
+  RallyErrorBucket,
+  SetOutcome,
+} from './lib/matchStatsEngine.js';
+import type { SemaforoItem } from './lib/matchReportNarratives.js';
 
 export type BookingStatus =
   | 'requested'
@@ -466,6 +474,20 @@ export interface MatchScoreAdjustment {
   pointsPlayer1: number;
   pointsPlayer2: number;
   server: MatchPlayerSlot;
+}
+
+/** ParentReportsScreen: reporte enriquecido de un partido completado — matchService.getMatchReport
+ * lo calcula solo cuando el partido ya terminó (null mientras está en curso, ver MatchReport). */
+export interface MatchReportView {
+  player1: PlayerMatchStats;
+  pressureEfficiency: PressureEfficiency;
+  errorZones: ErrorZoneCounts;
+  rallyErrorBuckets: RallyErrorBucket[];
+  sets: SetOutcome[];
+  totalUnforcedErrors: number;
+  winnerSlot: MatchPlayerSlot | null;
+  semaforo: SemaforoItem[];
+  tacticalDiagnosis: string | null;
 }
 
 /** TrainerProfileScreen: stats agregadas de todos los partidos completados de un coach —

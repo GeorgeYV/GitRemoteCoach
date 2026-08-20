@@ -932,7 +932,7 @@ console.log('\n=== Escenario 12: captura en vivo de un partido (matches / match_
     method: 'POST',
     url: `/matches/${match.id}/points`,
     headers: { authorization: `Bearer ${coachBToken}` },
-    payload: { sequenceNumber: 1, wonBy: 'player1', detail: 'ace', firstServeIn: true },
+    payload: { sequenceNumber: 1, wonBy: 'player1', detail: 'ace', firstServeIn: true, serveDirection: null, errorDirection: null, rallyLength: null, netApproach: false, isReturnError: false },
   });
   assertEqual(wrongCoachPointRes.statusCode, 403, 'anotar un punto con el token de otro entrenador devuelve 403');
 
@@ -940,7 +940,7 @@ console.log('\n=== Escenario 12: captura en vivo de un partido (matches / match_
     method: 'POST',
     url: `/matches/${match.id}/points`,
     headers: { authorization: `Bearer ${coachAToken}` },
-    payload: { sequenceNumber: 1, wonBy: 'player1', detail: 'ace', firstServeIn: true },
+    payload: { sequenceNumber: 1, wonBy: 'player1', detail: 'ace', firstServeIn: true, serveDirection: null, errorDirection: null, rallyLength: null, netApproach: false, isReturnError: false },
   });
   assertEqual(point1Res.statusCode, 201, 'POST points devuelve 201');
   const point1 = point1Res.json();
@@ -949,7 +949,7 @@ console.log('\n=== Escenario 12: captura en vivo de un partido (matches / match_
     method: 'POST',
     url: `/matches/${match.id}/points`,
     headers: { authorization: `Bearer ${coachAToken}` },
-    payload: { sequenceNumber: 2, wonBy: 'player2', detail: null, firstServeIn: true },
+    payload: { sequenceNumber: 2, wonBy: 'player2', detail: null, firstServeIn: true, serveDirection: null, errorDirection: null, rallyLength: null, netApproach: false, isReturnError: false },
   });
   const point2 = point2Res.json();
 
@@ -966,8 +966,8 @@ console.log('\n=== Escenario 12: captura en vivo de un partido (matches / match_
     headers: { authorization: `Bearer ${coachAToken}` },
     payload: {
       points: [
-        { sequenceNumber: 1, wonBy: 'player1', detail: 'ace', firstServeIn: true },
-        { sequenceNumber: 2, wonBy: 'player2', detail: null, firstServeIn: true },
+        { sequenceNumber: 1, wonBy: 'player1', detail: 'ace', firstServeIn: true, serveDirection: null, errorDirection: null, rallyLength: null, netApproach: false, isReturnError: false },
+        { sequenceNumber: 2, wonBy: 'player2', detail: null, firstServeIn: true, serveDirection: null, errorDirection: null, rallyLength: null, netApproach: false, isReturnError: false },
       ],
     },
   });
@@ -1018,7 +1018,19 @@ console.log('\n=== Escenario 12: captura en vivo de un partido (matches / match_
       url: `/matches/${match.id}/points/bulk`,
       headers: { authorization: `Bearer ${coachAToken}` },
       payload: {
-        points: [{ sequenceNumber: 1, wonBy: 'player1', detail: 'ace', firstServeIn: true }],
+        points: [
+          {
+            sequenceNumber: 1,
+            wonBy: 'player1',
+            detail: 'ace',
+            firstServeIn: true,
+            serveDirection: null,
+            errorDirection: null,
+            rallyLength: null,
+            netApproach: false,
+            isReturnError: false,
+          },
+        ],
       },
     })
   ).json();
@@ -2014,16 +2026,16 @@ console.log('\n=== Escenario 25: estadísticas agregadas de partidos de un coach
     headers: { authorization: `Bearer ${statsCoachToken}` },
     payload: {
       points: [
-        { sequenceNumber: 1, wonBy: 'player1', detail: 'ace', firstServeIn: true },
-        { sequenceNumber: 2, wonBy: 'player1', detail: 'winner_derecha', firstServeIn: true },
-        { sequenceNumber: 3, wonBy: 'player2', detail: 'error_no_forzado', firstServeIn: true },
-        { sequenceNumber: 4, wonBy: 'player1', detail: 'winner_reves', firstServeIn: true },
-        { sequenceNumber: 5, wonBy: 'player1', detail: 'winner_volea', firstServeIn: true },
-        { sequenceNumber: 6, wonBy: 'player2', detail: 'ace', firstServeIn: true },
-        { sequenceNumber: 7, wonBy: 'player1', detail: 'winner_derecha', firstServeIn: true },
-        { sequenceNumber: 8, wonBy: 'player1', detail: 'error_no_forzado', firstServeIn: true },
-        { sequenceNumber: 9, wonBy: 'player1', detail: 'winner_reves', firstServeIn: true },
-        { sequenceNumber: 10, wonBy: 'player1', detail: 'winner_volea', firstServeIn: true },
+        { sequenceNumber: 1, wonBy: 'player1', detail: 'ace', firstServeIn: true, serveDirection: null, errorDirection: null, rallyLength: null, netApproach: false, isReturnError: false },
+        { sequenceNumber: 2, wonBy: 'player1', detail: 'winner_derecha', firstServeIn: true, serveDirection: null, errorDirection: null, rallyLength: null, netApproach: false, isReturnError: false },
+        { sequenceNumber: 3, wonBy: 'player2', detail: 'error_no_forzado', firstServeIn: true, serveDirection: null, errorDirection: null, rallyLength: null, netApproach: false, isReturnError: false },
+        { sequenceNumber: 4, wonBy: 'player1', detail: 'winner_reves', firstServeIn: true, serveDirection: null, errorDirection: null, rallyLength: null, netApproach: false, isReturnError: false },
+        { sequenceNumber: 5, wonBy: 'player1', detail: 'winner_volea', firstServeIn: true, serveDirection: null, errorDirection: null, rallyLength: null, netApproach: false, isReturnError: false },
+        { sequenceNumber: 6, wonBy: 'player2', detail: 'ace', firstServeIn: true, serveDirection: null, errorDirection: null, rallyLength: null, netApproach: false, isReturnError: false },
+        { sequenceNumber: 7, wonBy: 'player1', detail: 'winner_derecha', firstServeIn: true, serveDirection: null, errorDirection: null, rallyLength: null, netApproach: false, isReturnError: false },
+        { sequenceNumber: 8, wonBy: 'player1', detail: 'error_no_forzado', firstServeIn: true, serveDirection: null, errorDirection: null, rallyLength: null, netApproach: false, isReturnError: false },
+        { sequenceNumber: 9, wonBy: 'player1', detail: 'winner_reves', firstServeIn: true, serveDirection: null, errorDirection: null, rallyLength: null, netApproach: false, isReturnError: false },
+        { sequenceNumber: 10, wonBy: 'player1', detail: 'winner_volea', firstServeIn: true, serveDirection: null, errorDirection: null, rallyLength: null, netApproach: false, isReturnError: false },
       ],
     },
   });
@@ -2046,7 +2058,244 @@ console.log('\n=== Escenario 25: estadísticas agregadas de partidos de un coach
   assertEqual(summary.returnGamesPlayed, 1, 'player1 solo devolvió el saque en el juego 2');
 }
 
-console.log('\n=== Escenario 26: Google sign-in (cuenta nueva, re-login, vinculación, correo sin verificar) ===');
+console.log('\n=== Escenario 26: reporte enriquecido de partido (semáforo, presión, zonas de error, diagnóstico táctico) ===');
+{
+  const registerRes = await app.inject({
+    method: 'POST',
+    url: '/auth/register',
+    payload: {
+      email: 'coach.report.e2e@example.com',
+      password: 'super-secreta-123',
+      fullName: 'Coach Report E2E',
+      primaryRole: 'coach',
+    },
+  });
+  const { token: reportCoachToken, user: reportCoach } = registerRes.json();
+
+  await app.inject({
+    method: 'POST',
+    url: '/coaches',
+    headers: { authorization: `Bearer ${reportCoachToken}` },
+    payload: { city: 'CDMX', country: 'EC', yearsExperience: 4, hourlyRate: 30, ageCategories: ['U14'], levels: ['competitivo'] },
+  });
+
+  const bookingRes = await requestBooking(reportCoach.id, inFuture(48));
+  const reportBooking = bookingRes.json();
+
+  const matchRes = await app.inject({
+    method: 'POST',
+    url: '/matches',
+    headers: { authorization: `Bearer ${reportCoachToken}` },
+    payload: {
+      bookingId: reportBooking.id,
+      player2Label: 'Rival de práctica',
+      format: 'single_set',
+      noAd: true,
+      initialServer: 'player1',
+      captureMode: 'detallada',
+    },
+  });
+  const reportMatch = matchRes.json();
+
+  const inProgressReportRes = await app.inject({
+    method: 'GET',
+    url: `/bookings/${reportBooking.id}/match`,
+    headers: { authorization: `Bearer ${parentToken}` },
+  });
+  assertEqual(
+    inProgressReportRes.json().report,
+    undefined,
+    'con el partido todavía in_progress, la respuesta no trae "report" (evita mostrar stats a medio partido)',
+  );
+
+  type PointPayload = {
+    sequenceNumber: number;
+    wonBy: 'player1' | 'player2';
+    detail: string;
+    firstServeIn: boolean;
+    rallyLength?: 'corto' | 'medio' | 'largo';
+    errorDirection?: 'red' | 'larga' | 'ancha';
+  };
+
+  // 9 juegos (server player1: G0,G2,G4,G6,G8 — server player2: G1,G3,G5,G7), terminan 6-3 para
+  // player1. G0 y G4 son la misma remontada 0-3 → 4-3 (guarda 4 break points cada una) para
+  // generar una muestra real de "primer saque bajo presión de quiebre" vs. "normal". G4 además
+  // carga 3 errores no forzados con lado/dirección conocidos (para las zonas de error) dentro de
+  // un intercambio "largo", más 1 punto "largo" ganado y otro "largo" perdido sin ser error, para
+  // llegar a 5 puntos "largo" con una derrota del 80% (dispara el diagnóstico táctico). G6 es el
+  // único juego de saque que player1 pierde (para que el set tenga sus 3 errores no forzados
+  // concentrados en su único set, disparando la alerta roja del semáforo).
+  const points: PointPayload[] = [
+    // Juego 1 (sirve player1) — remontada 0-3 → 4-3.
+    { sequenceNumber: 1, wonBy: 'player2', detail: 'winner', firstServeIn: true },
+    { sequenceNumber: 2, wonBy: 'player2', detail: 'winner', firstServeIn: true, rallyLength: 'largo' },
+    { sequenceNumber: 3, wonBy: 'player2', detail: 'winner', firstServeIn: true },
+    { sequenceNumber: 4, wonBy: 'player1', detail: 'winner_derecha', firstServeIn: false },
+    { sequenceNumber: 5, wonBy: 'player1', detail: 'winner_reves', firstServeIn: false },
+    { sequenceNumber: 6, wonBy: 'player1', detail: 'ace', firstServeIn: true },
+    { sequenceNumber: 7, wonBy: 'player1', detail: 'winner_volea', firstServeIn: true },
+    // Juego 2 (sirve player2, player2 sostiene su saque).
+    { sequenceNumber: 8, wonBy: 'player2', detail: 'ace', firstServeIn: true },
+    { sequenceNumber: 9, wonBy: 'player2', detail: 'ace', firstServeIn: true },
+    { sequenceNumber: 10, wonBy: 'player2', detail: 'ace', firstServeIn: true },
+    { sequenceNumber: 11, wonBy: 'player2', detail: 'ace', firstServeIn: true },
+    // Juego 3 (sirve player1, sencillo 4-0).
+    { sequenceNumber: 12, wonBy: 'player1', detail: 'ace', firstServeIn: true },
+    { sequenceNumber: 13, wonBy: 'player1', detail: 'winner_derecha', firstServeIn: true },
+    { sequenceNumber: 14, wonBy: 'player1', detail: 'ace', firstServeIn: false },
+    { sequenceNumber: 15, wonBy: 'player1', detail: 'winner_reves', firstServeIn: true },
+    // Juego 4 (sirve player2, player1 quiebra — break #1).
+    { sequenceNumber: 16, wonBy: 'player1', detail: 'winner', firstServeIn: true },
+    { sequenceNumber: 17, wonBy: 'player1', detail: 'winner', firstServeIn: true },
+    { sequenceNumber: 18, wonBy: 'player1', detail: 'winner', firstServeIn: true },
+    { sequenceNumber: 19, wonBy: 'player1', detail: 'winner', firstServeIn: true },
+    // Juego 5 (sirve player1) — remontada 0-3 → 4-3, con los 3 errores no forzados "largo".
+    {
+      sequenceNumber: 20,
+      wonBy: 'player2',
+      detail: 'error_no_forzado_derecha',
+      firstServeIn: true,
+      rallyLength: 'largo',
+      errorDirection: 'red',
+    },
+    {
+      sequenceNumber: 21,
+      wonBy: 'player2',
+      detail: 'error_no_forzado_reves',
+      firstServeIn: true,
+      rallyLength: 'largo',
+      errorDirection: 'ancha',
+    },
+    {
+      sequenceNumber: 22,
+      wonBy: 'player2',
+      detail: 'error_no_forzado_derecha',
+      firstServeIn: true,
+      rallyLength: 'largo',
+      errorDirection: 'larga',
+    },
+    { sequenceNumber: 23, wonBy: 'player1', detail: 'winner_derecha', firstServeIn: true, rallyLength: 'largo' },
+    { sequenceNumber: 24, wonBy: 'player1', detail: 'winner_reves', firstServeIn: true },
+    { sequenceNumber: 25, wonBy: 'player1', detail: 'ace', firstServeIn: true },
+    { sequenceNumber: 26, wonBy: 'player1', detail: 'winner_volea', firstServeIn: true },
+    // Juego 6 (sirve player2, player2 sostiene su saque).
+    { sequenceNumber: 27, wonBy: 'player2', detail: 'ace', firstServeIn: true },
+    { sequenceNumber: 28, wonBy: 'player2', detail: 'ace', firstServeIn: true },
+    { sequenceNumber: 29, wonBy: 'player2', detail: 'ace', firstServeIn: true },
+    { sequenceNumber: 30, wonBy: 'player2', detail: 'ace', firstServeIn: true },
+    // Juego 7 (sirve player1, player1 pierde su propio saque 0-4 — único quiebre en contra).
+    { sequenceNumber: 31, wonBy: 'player2', detail: 'winner', firstServeIn: true },
+    { sequenceNumber: 32, wonBy: 'player2', detail: 'winner', firstServeIn: true },
+    { sequenceNumber: 33, wonBy: 'player2', detail: 'winner', firstServeIn: false },
+    { sequenceNumber: 34, wonBy: 'player2', detail: 'winner', firstServeIn: true },
+    // Juego 8 (sirve player2, player1 quiebra — break #2).
+    { sequenceNumber: 35, wonBy: 'player1', detail: 'winner', firstServeIn: true },
+    { sequenceNumber: 36, wonBy: 'player1', detail: 'winner', firstServeIn: true },
+    { sequenceNumber: 37, wonBy: 'player1', detail: 'winner', firstServeIn: true },
+    { sequenceNumber: 38, wonBy: 'player1', detail: 'winner', firstServeIn: true },
+    // Juego 9 (sirve player1, sencillo 4-0 — cierra el set 6-3).
+    { sequenceNumber: 39, wonBy: 'player1', detail: 'ace', firstServeIn: true },
+    { sequenceNumber: 40, wonBy: 'player1', detail: 'winner_derecha', firstServeIn: true },
+    { sequenceNumber: 41, wonBy: 'player1', detail: 'winner_reves', firstServeIn: false },
+    { sequenceNumber: 42, wonBy: 'player1', detail: 'ace', firstServeIn: true },
+  ];
+
+  await app.inject({
+    method: 'POST',
+    url: `/matches/${reportMatch.id}/points/bulk`,
+    headers: { authorization: `Bearer ${reportCoachToken}` },
+    payload: {
+      points: points.map((p) => ({
+        sequenceNumber: p.sequenceNumber,
+        wonBy: p.wonBy,
+        detail: p.detail,
+        firstServeIn: p.firstServeIn,
+        serveDirection: null,
+        errorDirection: p.errorDirection ?? null,
+        rallyLength: p.rallyLength ?? null,
+        netApproach: false,
+        isReturnError: false,
+      })),
+    },
+  });
+
+  await app.inject({
+    method: 'PATCH',
+    url: `/matches/${reportMatch.id}/status`,
+    headers: { authorization: `Bearer ${reportCoachToken}` },
+    payload: { status: 'completed' },
+  });
+
+  const reportRes = await app.inject({
+    method: 'GET',
+    url: `/bookings/${reportBooking.id}/match`,
+    headers: { authorization: `Bearer ${parentToken}` },
+  });
+  assertEqual(reportRes.statusCode, 200, 'GET /bookings/:id/match (padre) devuelve 200');
+  const { report } = reportRes.json();
+  assertTrue(!!report, 'con el partido completed, la respuesta trae "report"');
+
+  assertEqual(report.sets, [{ setIndex: 0, won: true, score: '6-3', unforcedErrors: 3 }], 'un solo set, 6-3, con sus 3 errores no forzados');
+  assertEqual(report.totalUnforcedErrors, 3, 'total de errores no forzados de player1 en el partido');
+  assertEqual(report.winnerSlot, 'player1', 'player1 ganó el partido');
+
+  assertEqual(
+    report.pressureEfficiency.normal,
+    { attempts: 17, firstServeIn: 14, pct: 82 },
+    'primer saque en situación normal: 14/17 = 82%',
+  );
+  assertEqual(
+    report.pressureEfficiency.breakPoint,
+    { attempts: 9, firstServeIn: 7, pct: 78 },
+    'primer saque bajo presión de quiebre: 7/9 = 78%',
+  );
+
+  assertEqual(
+    report.errorZones,
+    { red_derecha: 1, red_reves: 0, larga_derecha: 1, larga_reves: 0, ancha_derecha: 0, ancha_reves: 1 },
+    'las 3 zonas de error caen exactamente donde se cargaron (red/larga/ancha × derecha/revés)',
+  );
+
+  assertEqual(report.rallyErrorBuckets.length, 1, 'solo el bucket "largo" tiene puntos jugados (corto/medio quedan filtrados)');
+  assertEqual(
+    report.rallyErrorBuckets[0],
+    { rallyLength: 'largo', pointsPlayed: 5, pointsLost: 4, unforcedErrors: 3 },
+    'rallies largos: pierde 4 de 5, 3 de esas pérdidas son error no forzado',
+  );
+
+  assertEqual(
+    report.tacticalDiagnosis,
+    'Pierde el 80% de los puntos (4/5) cuando el intercambio se estira a 9 golpes o más — la mayoría de esos errores son de derecha.',
+    'diagnóstico táctico exacto sobre rallies largos, con el lado dominante de error',
+  );
+
+  assertEqual(report.semaforo.length, 3, 'el semáforo trae sus 3 bloques (fortaleza, zona de cuidado, alerta crítica)');
+  assertEqual(
+    report.semaforo[0],
+    {
+      tone: 'green',
+      label: 'Fortaleza',
+      text: 'Primer saque cuando no hay presión de quiebre: 82% adentro (14/17).',
+    },
+    'fortaleza = el % más alto entre las 3 métricas candidatas (saque normal 82% > saque general 81% > quiebres 50%)',
+  );
+  assertEqual(
+    report.semaforo[1],
+    { tone: 'amber', label: 'Zona de cuidado', text: 'Quiebres convertidos: 2 de 4.' },
+    'zona de cuidado = el % más bajo del mismo grupo de candidatas',
+  );
+  assertEqual(
+    report.semaforo[2],
+    {
+      tone: 'red',
+      label: 'Alerta crítica',
+      text: '3 de sus 3 errores no forzados pasaron en el 1º set (6-3) — el que ganó.',
+    },
+    'alerta crítica = concentración de errores no forzados en el único set del partido',
+  );
+}
+
+console.log('\n=== Escenario 27: Google sign-in (cuenta nueva, re-login, vinculación, correo sin verificar) ===');
 {
   const newIdentity = {
     googleId: 'google-sub-nueva-mama',

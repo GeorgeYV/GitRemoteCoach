@@ -1,4 +1,4 @@
-import type { MatchPlayerSlot, PointDetail } from '../types.js';
+import type { ErrorDirection, MatchPlayerSlot, PointDetail, RallyLength } from '../types.js';
 import {
   MATCH_FORMAT_RULES,
   MATCH_TIEBREAK_TARGET,
@@ -24,6 +24,8 @@ export interface StatsPointEvent {
   wonBy: MatchPlayerSlot;
   detail: PointDetail | null;
   firstServeIn: boolean;
+  errorDirection: ErrorDirection | null;
+  rallyLength: RallyLength | null;
 }
 
 export interface StatsScoreAdjustment {
@@ -57,6 +59,16 @@ interface SetRecord {
 interface PointSnapshot {
   event: StatsPointEvent;
   server: MatchPlayerSlot;
+  /** Índice del set (0-based) donde ocurrió este punto — completedSets.length en el momento de
+   * jugarlo, antes de que este punto pudiera cerrar el set. */
+  setIndex: number;
+  /** Índice del game dentro del set (0-based), o del tiebreak si isTiebreak — currentSetGames.length
+   * en el momento de jugarlo. */
+  gameIndexInSet: number;
+  isTiebreak: boolean;
+  /** true si, de ganar este punto el resto (no quien sacaba), el server perdería su game — no
+   * aplica dentro de un tiebreak (ahí no hay "quiebre" en el sentido tradicional). */
+  isBreakPointAgainstServer: boolean;
 }
 
 interface MatchState {
@@ -123,6 +135,15 @@ function gameWinner(points: { player1: number; player2: number }, noAd: boolean)
   return null;
 }
 
+/** Mismo criterio que lib/scoringEngine.ts#getPressureLevel del cliente (su rama "afterReturnerPoint"),
+ * pero re-aplicable a cualquier punto histórico, no solo al punto que se está por jugar en vivo:
+ * ¿ganaría el resto (returner) el game si ganara este punto? */
+function isBreakPoint(currentGamePoints: { player1: number; player2: number }, server: MatchPlayerSlot, noAd: boolean): boolean {
+  const returner = otherPlayer(server);
+  const hypothetical = { ...currentGamePoints, [returner]: currentGamePoints[returner] + 1 };
+  return gameWinner(hypothetical, noAd) === returner;
+}
+
 function tiebreakWinner(points: { player1: number; player2: number }, target: number): MatchPlayerSlot | null {
   const { player1: a, player2: b } = points;
   if (a >= target && a - b >= 2) return 'player1';
@@ -148,6 +169,14 @@ function processPoint(state: MatchState, event: StatsPointEvent, config: StatsMa
       )
     : state.server;
 
+  // Etiquetas de este punto, calculadas una sola vez contra el estado *previo* a jugarlo (antes
+  // de que pueda cerrar un game/set) — se reusan en cada rama de abajo en vez de recalcularlas.
+  const setIndex = state.completedSets.length;
+  const gameIndexInSet = state.currentSetGames.length;
+  const isTiebreak = state.inTiebreak;
+  const isBreakPointAgainstServer = !isTiebreak && isBreakPoint(state.currentGamePoints, server, config.noAd);
+  const pointTag = { setIndex, gameIndexInSet, isTiebreak, isBreakPointAgainstServer };
+
   if (state.inTiebreak) {
     const tiebreakPoints = {
       ...state.tiebreakPoints,
@@ -156,7 +185,7 @@ function processPoint(state: MatchState, event: StatsPointEvent, config: StatsMa
     const tbWinner = tiebreakWinner(tiebreakPoints, currentTiebreakTarget(state, rules));
 
     if (!tbWinner) {
-      return { ...state, tiebreakPoints, pointHistory: [...state.pointHistory, { event, server }] };
+      return { ...state, tiebreakPoints, pointHistory: [...state.pointHistory, { event, server, ...pointTag }] };
     }
 
     const game: GameRecord = { server, winner: tbWinner, isTiebreak: true };
@@ -186,7 +215,7 @@ function processPoint(state: MatchState, event: StatsPointEvent, config: StatsMa
       setsWon,
       matchEnded,
       winner: matchEnded ? tbWinner : null,
-      pointHistory: [...state.pointHistory, { event, server }],
+      pointHistory: [...state.pointHistory, { event, server, ...pointTag }],
     };
   }
 
@@ -197,7 +226,7 @@ function processPoint(state: MatchState, event: StatsPointEvent, config: StatsMa
   const gWinner = gameWinner(currentGamePoints, config.noAd);
 
   if (!gWinner) {
-    return { ...state, currentGamePoints, pointHistory: [...state.pointHistory, { event, server }] };
+    return { ...state, currentGamePoints, pointHistory: [...state.pointHistory, { event, server, ...pointTag }] };
   }
 
   const game: GameRecord = { server, winner: gWinner, isTiebreak: false };
@@ -212,7 +241,7 @@ function processPoint(state: MatchState, event: StatsPointEvent, config: StatsMa
       currentGamePoints: { player1: 0, player2: 0 },
       inTiebreak: true,
       tiebreakInitialServer: nextGameServer,
-      pointHistory: [...state.pointHistory, { event, server }],
+      pointHistory: [...state.pointHistory, { event, server, ...pointTag }],
     };
   }
 
@@ -224,7 +253,7 @@ function processPoint(state: MatchState, event: StatsPointEvent, config: StatsMa
       currentSetGames,
       currentGamePoints: { player1: 0, player2: 0 },
       server: nextGameServer,
-      pointHistory: [...state.pointHistory, { event, server }],
+      pointHistory: [...state.pointHistory, { event, server, ...pointTag }],
     };
   }
 
@@ -250,7 +279,7 @@ function processPoint(state: MatchState, event: StatsPointEvent, config: StatsMa
     setsWon,
     matchEnded,
     winner: matchEnded ? stWinner : null,
-    pointHistory: [...state.pointHistory, { event, server }],
+    pointHistory: [...state.pointHistory, { event, server, ...pointTag }],
   };
 }
 
@@ -379,14 +408,7 @@ function emptyStats(): PlayerMatchStats {
   return { winners: 0, unforcedErrors: 0, firstServePct: null, breaksConverted: 0, returnGamesPlayed: 0 };
 }
 
-/** Reconstruye el partido a partir de sus puntos crudos + ajustes manuales y devuelve las stats
- * del jugador seguido por el coach (player1 — player2 es el rival, un texto libre sin cuenta propia). */
-export function computePlayer1MatchStats(
-  events: StatsPointEvent[],
-  config: StatsMatchConfig,
-  adjustments: StatsScoreAdjustment[] = [],
-): PlayerMatchStats {
-  const state = computeMatchState(events, config, adjustments);
+function statsFromState(state: MatchState): PlayerMatchStats {
   const stats: Record<MatchPlayerSlot, PlayerMatchStats> = { player1: emptyStats(), player2: emptyStats() };
   const firstServeAttempts: Record<MatchPlayerSlot, number> = { player1: 0, player2: 0 };
   const firstServesIn: Record<MatchPlayerSlot, number> = { player1: 0, player2: 0 };
@@ -428,4 +450,153 @@ export function computePlayer1MatchStats(
   }
 
   return stats.player1;
+}
+
+/** Reconstruye el partido a partir de sus puntos crudos + ajustes manuales y devuelve las stats
+ * del jugador seguido por el coach (player1 — player2 es el rival, un texto libre sin cuenta propia). */
+export function computePlayer1MatchStats(
+  events: StatsPointEvent[],
+  config: StatsMatchConfig,
+  adjustments: StatsScoreAdjustment[] = [],
+): PlayerMatchStats {
+  return statsFromState(computeMatchState(events, config, adjustments));
+}
+
+/** Seis zonas de error: dirección de la falla (red/larga/ancha) × lado del golpe (derecha/revés).
+ * error_no_forzado (sin lado capturado) no entra acá a propósito — no hay que inventarle un lado. */
+export type ErrorZoneKey =
+  | 'red_derecha'
+  | 'red_reves'
+  | 'larga_derecha'
+  | 'larga_reves'
+  | 'ancha_derecha'
+  | 'ancha_reves';
+export type ErrorZoneCounts = Record<ErrorZoneKey, number>;
+
+export interface PressureServeBucket {
+  attempts: number;
+  firstServeIn: number;
+  pct: number | null;
+}
+
+export interface PressureEfficiency {
+  normal: PressureServeBucket;
+  breakPoint: PressureServeBucket;
+}
+
+export interface RallyErrorBucket {
+  rallyLength: RallyLength;
+  pointsPlayed: number;
+  pointsLost: number;
+  unforcedErrors: number;
+}
+
+export interface SetOutcome {
+  setIndex: number;
+  won: boolean;
+  score: string;
+  unforcedErrors: number;
+}
+
+export interface MatchReportStats {
+  player1: PlayerMatchStats;
+  pressureEfficiency: PressureEfficiency;
+  errorZones: ErrorZoneCounts;
+  rallyErrorBuckets: RallyErrorBucket[];
+  sets: SetOutcome[];
+  totalUnforcedErrors: number;
+  winnerSlot: MatchPlayerSlot | null;
+}
+
+function emptyErrorZones(): ErrorZoneCounts {
+  return { red_derecha: 0, red_reves: 0, larga_derecha: 0, larga_reves: 0, ancha_derecha: 0, ancha_reves: 0 };
+}
+
+function pct(numerator: number, denominator: number): number | null {
+  return denominator > 0 ? Math.round((numerator / denominator) * 100) : null;
+}
+
+/** Igual que computePlayer1MatchStats, pero para el reporte enriquecido del padre: agrega
+ * eficiencia de saque bajo presión, zonas de error, cruce de errores por largo de rally, y
+ * errores no forzados por set — todo derivado de datos que ya se capturan hoy (nada nuevo del
+ * lado de la captura en vivo), reconstruyendo el partido una sola vez. */
+export function computeMatchReportStats(
+  events: StatsPointEvent[],
+  config: StatsMatchConfig,
+  adjustments: StatsScoreAdjustment[] = [],
+): MatchReportStats {
+  const state = computeMatchState(events, config, adjustments);
+  const player1 = statsFromState(state);
+
+  const pressureEfficiency: PressureEfficiency = {
+    normal: { attempts: 0, firstServeIn: 0, pct: null },
+    breakPoint: { attempts: 0, firstServeIn: 0, pct: null },
+  };
+  const errorZones = emptyErrorZones();
+  const rallyTotals: Record<RallyLength, { pointsPlayed: number; pointsLost: number; unforcedErrors: number }> = {
+    corto: { pointsPlayed: 0, pointsLost: 0, unforcedErrors: 0 },
+    medio: { pointsPlayed: 0, pointsLost: 0, unforcedErrors: 0 },
+    largo: { pointsPlayed: 0, pointsLost: 0, unforcedErrors: 0 },
+  };
+  const unforcedErrorsBySet: number[] = [];
+  let totalUnforcedErrors = 0;
+
+  for (const point of state.pointHistory) {
+    const { event, server, setIndex, isBreakPointAgainstServer } = point;
+
+    // Eficiencia bajo presión: solo tiene sentido para los puntos donde player1 saca — el saque
+    // del rival no se captura con el mismo detalle (ver PointFlow#ServeStep, firstServeIn queda
+    // en un valor de relleno cuando sirve player2).
+    if (server === 'player1' && event.detail !== 'dato_no_capturado') {
+      const bucket = isBreakPointAgainstServer ? pressureEfficiency.breakPoint : pressureEfficiency.normal;
+      bucket.attempts += 1;
+      if (event.firstServeIn) bucket.firstServeIn += 1;
+    }
+
+    const isUnforcedByPlayer1 =
+      (event.detail === 'error_no_forzado' ||
+        event.detail === 'error_no_forzado_derecha' ||
+        event.detail === 'error_no_forzado_reves') &&
+      otherPlayer(event.wonBy) === 'player1';
+
+    if (isUnforcedByPlayer1) {
+      totalUnforcedErrors += 1;
+      unforcedErrorsBySet[setIndex] = (unforcedErrorsBySet[setIndex] ?? 0) + 1;
+      if (event.errorDirection && event.detail !== 'error_no_forzado') {
+        const side = event.detail === 'error_no_forzado_reves' ? 'reves' : 'derecha';
+        errorZones[`${event.errorDirection}_${side}` as ErrorZoneKey] += 1;
+      }
+    }
+
+    if (event.rallyLength) {
+      const bucket = rallyTotals[event.rallyLength];
+      bucket.pointsPlayed += 1;
+      if (event.wonBy !== 'player1') bucket.pointsLost += 1;
+      if (isUnforcedByPlayer1) bucket.unforcedErrors += 1;
+    }
+  }
+
+  pressureEfficiency.normal.pct = pct(pressureEfficiency.normal.firstServeIn, pressureEfficiency.normal.attempts);
+  pressureEfficiency.breakPoint.pct = pct(pressureEfficiency.breakPoint.firstServeIn, pressureEfficiency.breakPoint.attempts);
+
+  const rallyErrorBuckets: RallyErrorBucket[] = (['corto', 'medio', 'largo'] as RallyLength[])
+    .map((rallyLength) => ({ rallyLength, ...rallyTotals[rallyLength] }))
+    .filter((b) => b.pointsPlayed > 0);
+
+  const sets: SetOutcome[] = state.completedSets.map((set, setIndex) => ({
+    setIndex,
+    won: set.winner === 'player1',
+    score: `${set.gamesPlayer1}-${set.gamesPlayer2}`,
+    unforcedErrors: unforcedErrorsBySet[setIndex] ?? 0,
+  }));
+
+  return {
+    player1,
+    pressureEfficiency,
+    errorZones,
+    rallyErrorBuckets,
+    sets,
+    totalUnforcedErrors,
+    winnerSlot: state.winner,
+  };
 }
