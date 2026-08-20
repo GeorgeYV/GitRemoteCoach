@@ -582,8 +582,6 @@ export function CoachHomeFlow({ coachId, coachName }: { coachId: string; coachNa
         setStep('detail');
       }}
       onOpenRequests={() => setStep('requests')}
-      onOpenProfile={() => setStep('profile')}
-      onOpenAvailability={() => setStep('availability')}
       onOpenSessions={() => setStep('sessions')}
       onOpenEarnings={() => setStep('earnings')}
       onOpenReputation={() => setStep('reputation')}

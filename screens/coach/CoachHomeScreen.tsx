@@ -7,11 +7,10 @@ import { ClubCoachInvitationWithNames } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
 import { CoachBooking } from '../../mock/coachFlow';
 
+// "Mi perfil"/"Disponibilidad"/"Ingresos" ya viven en CoachTabBar (barra de abajo) — solo quedan
+// acá los accesos que la barra no cubre, para no duplicar el mismo destino en dos lugares.
 const QUICK_LINKS = [
-  { key: 'profile', label: 'Mi perfil', hint: 'Edita tus datos, tarifa, categorías y niveles' },
-  { key: 'availability', label: 'Disponibilidad', hint: 'Ajusta tus días y tarifa por torneo' },
   { key: 'sessions', label: 'Historial de sesiones', hint: 'Revisa partidos pasados y en curso' },
-  { key: 'earnings', label: 'Ingresos', hint: 'Ve lo liberado y lo pendiente de pago' },
   { key: 'reputation', label: 'Reputación', hint: 'Reseñas y estadísticas de actividad' },
 ] as const;
 
@@ -31,8 +30,6 @@ export default function CoachHomeScreen({
   onOpenSuspendedMatch,
   onOpenBooking,
   onOpenRequests,
-  onOpenProfile,
-  onOpenAvailability,
   onOpenSessions,
   onOpenEarnings,
   onOpenReputation,
@@ -53,8 +50,6 @@ export default function CoachHomeScreen({
   onOpenSuspendedMatch?: () => void;
   onOpenBooking?: (bookingId: string) => void;
   onOpenRequests?: () => void;
-  onOpenProfile?: () => void;
-  onOpenAvailability?: () => void;
   onOpenSessions?: () => void;
   onOpenEarnings?: () => void;
   onOpenReputation?: () => void;
@@ -63,10 +58,7 @@ export default function CoachHomeScreen({
   tabBar?: React.ReactNode;
 }) {
   const quickLinkHandlers: Record<(typeof QUICK_LINKS)[number]['key'], (() => void) | undefined> = {
-    profile: onOpenProfile,
-    availability: onOpenAvailability,
     sessions: onOpenSessions,
-    earnings: onOpenEarnings,
     reputation: onOpenReputation,
   };
   const firstName = coachName.split(' ')[0];
