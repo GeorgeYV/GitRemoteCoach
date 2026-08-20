@@ -352,6 +352,232 @@ console.log('\n=== Escenario 8: liquidación batch a clubes ===');
   assertTrue(!readyAfter.includes(fixtures.tournamentId), 'torneo ya no aparece pendiente tras liquidar');
 }
 
+console.log('\n=== Escenario 8b: pago manual (Deuna/Yape/Plin) — comprobante, rechazo y verificación ===');
+let manualBookingAId: string;
+{
+  // coachB a propósito (no coachA): booking1 del Escenario 1 ya dejó a coachA con un net_amount
+  // 'completed' en el mismo torneo — usar coachA acá contaminaría el total agregado del Escenario 8d.
+  const reqRes = await requestBooking(fixtures.coachBUserId, inFuture(3), 2000);
+  const booking = reqRes.json();
+  await app.inject({
+    method: 'POST',
+    url: `/bookings/${booking.id}/accept`,
+    headers: { authorization: `Bearer ${coachBToken}` },
+  });
+
+  const noAuthQueueRes = await app.inject({ method: 'GET', url: '/bookings/payment-verification-queue' });
+  assertEqual(noAuthQueueRes.statusCode, 401, 'cola de verificación sin Bearer token devuelve 401');
+
+  const wrongRoleQueueRes = await app.inject({
+    method: 'GET',
+    url: '/bookings/payment-verification-queue',
+    headers: { authorization: `Bearer ${parentToken}` },
+  });
+  assertEqual(wrongRoleQueueRes.statusCode, 403, 'cola de verificación con token de padre devuelve 403');
+
+  const submitRes = await app.inject({
+    method: 'POST',
+    url: '/bookings/submit-payment-proof-batch',
+    headers: { authorization: `Bearer ${parentToken}` },
+    payload: { bookingIds: [booking.id], provider: 'deuna', referenceCode: 'REF-A-001' },
+  });
+  assertEqual(submitRes.statusCode, 200, 'submit-payment-proof-batch devuelve 200');
+  assertEqual(submitRes.json()[0].status, 'payment_submitted', 'estado tras enviar comprobante = payment_submitted');
+
+  const queueRes = await app.inject({
+    method: 'GET',
+    url: '/bookings/payment-verification-queue',
+    headers: { authorization: `Bearer ${platformAdminToken}` },
+  });
+  assertTrue(
+    queueRes.json().some((b: any) => b.id === booking.id),
+    'reserva aparece en la cola de verificación',
+  );
+
+  const wrongRoleVerifyRes = await app.inject({
+    method: 'PUT',
+    url: '/bookings/verify-payment',
+    headers: { authorization: `Bearer ${coachBToken}` },
+    payload: { bookingIds: [booking.id], decision: 'verified' },
+  });
+  assertEqual(wrongRoleVerifyRes.statusCode, 403, 'verify-payment con token de entrenador devuelve 403');
+
+  const rejectRes = await app.inject({
+    method: 'PUT',
+    url: '/bookings/verify-payment',
+    headers: { authorization: `Bearer ${platformAdminToken}` },
+    payload: { bookingIds: [booking.id], decision: 'rejected' },
+  });
+  assertEqual(rejectRes.statusCode, 200, 'verify-payment (rechazo) devuelve 200');
+  const rejected = rejectRes.json()[0];
+  assertEqual(rejected.status, 'accepted', 'rechazo vuelve la reserva a accepted');
+  assertEqual(rejected.paymentProvider, null, 'rechazo limpia payment_provider');
+  assertTrue(
+    new Date(rejected.paymentDeadline).getTime() > Date.now(),
+    'rechazo re-arma el plazo de pago para que el padre pueda reintentar',
+  );
+
+  await app.inject({
+    method: 'POST',
+    url: '/bookings/submit-payment-proof-batch',
+    headers: { authorization: `Bearer ${parentToken}` },
+    payload: { bookingIds: [booking.id], provider: 'deuna', referenceCode: 'REF-A-002' },
+  });
+  const verifyRes = await app.inject({
+    method: 'PUT',
+    url: '/bookings/verify-payment',
+    headers: { authorization: `Bearer ${platformAdminToken}` },
+    payload: { bookingIds: [booking.id], decision: 'verified' },
+  });
+  assertEqual(verifyRes.statusCode, 200, 'verify-payment (verificado) devuelve 200');
+  const verified = verifyRes.json()[0];
+  assertEqual(verified.status, 'paid', 'verificación pasa la reserva a paid');
+  assertEqual(Number(verified.totalAmountPaid), 2000, 'total_amount_paid = tarifa completa');
+  assertEqual(Number(verified.platformCommissionAmount), 300, 'platform_commission_amount = 15% de 2000');
+  assertEqual(Number(verified.clubCommissionAmount), 200, 'club_commission_amount = 10% de 2000');
+  assertEqual(Number(verified.coachNetAmount), 1500, 'coach_net_amount = 2000 - 300 - 200');
+  assertEqual(verified.paymentProvider, 'deuna', 'payment_provider queda en deuna');
+  assertEqual(verified.paymentVerifiedBy, fixtures.platformAdminUserId, 'payment_verified_by = admin que verificó');
+
+  manualBookingAId = booking.id;
+}
+
+console.log('\n=== Escenario 8c: reembolso al cancelar una reserva pagada manualmente ===');
+{
+  const reqRes = await requestBooking(fixtures.coachAUserId, inFuture(48), 1000);
+  const bookingId = reqRes.json().id;
+  await app.inject({
+    method: 'POST',
+    url: `/bookings/${bookingId}/accept`,
+    headers: { authorization: `Bearer ${coachAToken}` },
+  });
+  await app.inject({
+    method: 'POST',
+    url: '/bookings/submit-payment-proof-batch',
+    headers: { authorization: `Bearer ${parentToken}` },
+    payload: { bookingIds: [bookingId], provider: 'yape', referenceCode: 'REF-B-001' },
+  });
+  await app.inject({
+    method: 'PUT',
+    url: '/bookings/verify-payment',
+    headers: { authorization: `Bearer ${platformAdminToken}` },
+    payload: { bookingIds: [bookingId], decision: 'verified' },
+  });
+
+  const noAuthRefundsRes = await app.inject({ method: 'GET', url: '/bookings/refunds' });
+  assertEqual(noAuthRefundsRes.statusCode, 401, 'reporte de reembolsos sin Bearer token devuelve 401');
+
+  const wrongRoleRefundsRes = await app.inject({
+    method: 'GET',
+    url: '/bookings/refunds',
+    headers: { authorization: `Bearer ${coachAToken}` },
+  });
+  assertEqual(wrongRoleRefundsRes.statusCode, 403, 'reporte de reembolsos con token de entrenador devuelve 403');
+
+  // Cancelación del padre con más de 24h de anticipación (matchDatetime a 48h) → reembolso completo.
+  const cancelRes = await app.inject({
+    method: 'POST',
+    url: `/bookings/${bookingId}/cancel`,
+    headers: { authorization: `Bearer ${parentToken}` },
+    payload: { reason: 'Ya no puede asistir' },
+  });
+  assertEqual(cancelRes.statusCode, 200, 'cancel devuelve 200');
+  const cancelled = cancelRes.json();
+  assertEqual(cancelled.status, 'cancelled', 'estado tras cancelar = cancelled');
+  assertEqual(Number(cancelled.refundAmount), 1000, 'reembolso completo (cancelación con más de 24h de anticipación)');
+
+  const refundsRes = await app.inject({
+    method: 'GET',
+    url: '/bookings/refunds',
+    headers: { authorization: `Bearer ${platformAdminToken}` },
+  });
+  assertEqual(refundsRes.statusCode, 200, 'reporte de reembolsos devuelve 200');
+  const refundEntry = refundsRes.json().find((b: any) => b.id === bookingId);
+  assertTrue(!!refundEntry, 'reserva cancelada con reembolso aparece en el reporte');
+  assertEqual(Number(refundEntry.refundAmount), 1000, 'monto del reembolso en el reporte coincide');
+  assertEqual(refundEntry.paymentProvider, 'yape', 'canal de devolución en el reporte coincide');
+}
+
+console.log('\n=== Escenario 8d: liquidación de pagos a entrenadores (settle-coach-payouts) ===');
+{
+  await app.inject({
+    method: 'POST',
+    url: `/bookings/${manualBookingAId}/complete`,
+    headers: { authorization: `Bearer ${coachBToken}` },
+  });
+
+  const noAuthReadyRes = await app.inject({ method: 'GET', url: '/tournaments/ready-for-coach-payout' });
+  assertEqual(noAuthReadyRes.statusCode, 401, 'torneos listos para liquidar sin Bearer token devuelve 401');
+
+  const wrongRoleReadyRes = await app.inject({
+    method: 'GET',
+    url: '/tournaments/ready-for-coach-payout',
+    headers: { authorization: `Bearer ${clubAdminToken}` },
+  });
+  assertEqual(wrongRoleReadyRes.statusCode, 403, 'torneos listos para liquidar con token de club_admin devuelve 403');
+
+  const readyRes = await app.inject({
+    method: 'GET',
+    url: '/tournaments/ready-for-coach-payout',
+    headers: { authorization: `Bearer ${platformAdminToken}` },
+  });
+  assertTrue(
+    readyRes.json().some((t: any) => t.id === fixtures.tournamentId),
+    'torneo aparece listo para liquidar pagos a entrenadores',
+  );
+
+  const wrongRoleSettleRes = await app.inject({
+    method: 'POST',
+    url: `/tournaments/${fixtures.tournamentId}/settle-coach-payouts`,
+    headers: { authorization: `Bearer ${clubAdminToken}` },
+  });
+  assertEqual(wrongRoleSettleRes.statusCode, 403, 'settle-coach-payouts con token de club_admin devuelve 403');
+
+  const settleRes = await app.inject({
+    method: 'POST',
+    url: `/tournaments/${fixtures.tournamentId}/settle-coach-payouts`,
+    headers: { authorization: `Bearer ${platformAdminToken}` },
+  });
+  assertEqual(settleRes.statusCode, 201, 'settle-coach-payouts devuelve 201');
+  const payoutForCoachB = settleRes.json().payouts.find((p: any) => p.coachId === fixtures.coachBUserId);
+  assertTrue(!!payoutForCoachB, 'se generó un payout para el entrenador B');
+  assertEqual(
+    Number(payoutForCoachB.totalNetAmount),
+    1500,
+    'total del payout = coach_net_amount de la única reserva completada de coachB (Escenario 8b)',
+  );
+  assertEqual(payoutForCoachB.status, 'paid', 'payout queda marcado paid (simulado, sin transferencia real)');
+
+  const payoutsListRes = await app.inject({
+    method: 'GET',
+    url: '/coaches/payouts',
+    headers: { authorization: `Bearer ${platformAdminToken}` },
+  });
+  assertTrue(
+    payoutsListRes.json().some((p: any) => p.id === payoutForCoachB.id),
+    'payout recién creado aparece en el listado general de pagos a entrenadores',
+  );
+
+  const bookingAfter = await (
+    await app.inject({
+      method: 'GET',
+      url: `/bookings/${manualBookingAId}`,
+      headers: { authorization: `Bearer ${parentToken}` },
+    })
+  ).json();
+  assertEqual(bookingAfter.coachPayoutId, payoutForCoachB.id, 'la reserva queda enlazada al payout creado');
+
+  const readyAfterRes = await app.inject({
+    method: 'GET',
+    url: '/tournaments/ready-for-coach-payout',
+    headers: { authorization: `Bearer ${platformAdminToken}` },
+  });
+  assertTrue(
+    !readyAfterRes.json().some((t: any) => t.id === fixtures.tournamentId),
+    'torneo ya no aparece pendiente tras liquidar pagos a entrenadores',
+  );
+}
+
 console.log('\n=== Escenario 9: reseña del padre tras un partido completado ===');
 {
   const reviewRes = await app.inject({
