@@ -4,28 +4,31 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import IconTextInput from '../../components/shared/IconTextInput';
 import { MATCH_FORMAT_IDS, MATCH_FORMAT_LABELS, MatchFormatId } from '../../lib/matchFormats';
+import { ROUND_LABELS } from '../../lib/matchRounds';
 import { colors, radius, withOpacity } from '../../lib/theme';
 import { MatchConfig, PlayerId } from '../../lib/types';
 
 export default function CoachMatchSetupScreen({
   playerName,
   category,
+  onBack,
   onStart,
 }: {
   playerName: string;
   category: string;
+  onBack?: () => void;
   onStart: (config: MatchConfig, roundLabel: string) => void;
 }) {
   const [opponentName, setOpponentName] = useState('');
   const [roundLabel, setRoundLabel] = useState('');
-  const [format, setFormat] = useState<MatchFormatId>('best_of_3');
+  const [format, setFormat] = useState<MatchFormatId | null>(null);
   const [noAd, setNoAd] = useState(false);
   const [initialServer, setInitialServer] = useState<PlayerId>('player1');
 
-  const canStart = opponentName.trim().length > 0;
+  const canStart = opponentName.trim().length > 0 && format !== null;
 
   function handleStart() {
-    if (!canStart) return;
+    if (!canStart || !format) return;
     onStart(
       {
         format,
@@ -34,36 +37,41 @@ export default function CoachMatchSetupScreen({
         player2Name: opponentName.trim(),
         initialServer,
       },
-      roundLabel.trim() || category
+      roundLabel || category
     );
   }
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Antes de capturar</Text>
+        <View style={styles.headerTitleRow}>
+          {onBack && (
+            <Pressable style={styles.backButton} onPress={onBack}>
+              <Text style={styles.backIcon}>←</Text>
+            </Pressable>
+          )}
+          <Text style={styles.headerTitle}>Antes de capturar</Text>
+        </View>
         <Text style={styles.headerSubtitle}>Confirma los datos del partido para empezar a registrar los puntos.</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        <Section label="Tu jugadora">
-          <View style={styles.playerBadge}>
-            <Text style={styles.playerBadgeName}>{playerName}</Text>
-            <Text style={styles.playerBadgeMeta}>{category}</Text>
-          </View>
-        </Section>
-
         <Section label="Rival">
           <IconTextInput icon="person-outline" placeholder="Nombre de la rival" value={opponentName} onChangeText={setOpponentName} />
         </Section>
 
         <Section label="Ronda (opcional)">
-          <IconTextInput
-            icon="flag-outline"
-            placeholder={`Ej. ${category}`}
-            value={roundLabel}
-            onChangeText={setRoundLabel}
-          />
+          <View style={styles.formatChipRow}>
+            {ROUND_LABELS.map((value) => (
+              <Pressable
+                key={value}
+                style={[styles.formatChip, roundLabel === value && styles.chipActive]}
+                onPress={() => setRoundLabel((current) => (current === value ? '' : value))}
+              >
+                <Text style={[styles.chipLabel, roundLabel === value && styles.chipLabelActive]}>{value}</Text>
+              </Pressable>
+            ))}
+          </View>
         </Section>
 
         <Section label="Formato">
@@ -160,11 +168,22 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.borderSoft,
   },
+  headerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  backButton: {
+    paddingRight: 10,
+  },
+  backIcon: {
+    color: colors.lineWhite,
+    fontSize: 20,
+  },
   headerTitle: {
     color: colors.lineWhite,
     fontSize: 20,
     fontWeight: '800',
-    marginBottom: 6,
   },
   headerSubtitle: {
     color: colors.textSoft,
@@ -185,25 +204,6 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.8,
     marginBottom: 12,
-  },
-  playerBadge: {
-    backgroundColor: withOpacity(colors.ballLime, 0.1),
-    borderRadius: radius,
-    borderWidth: 1,
-    borderColor: withOpacity(colors.ballLime, 0.35),
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-  },
-  playerBadgeName: {
-    color: colors.lineWhite,
-    fontSize: 15,
-    fontWeight: '800',
-    marginBottom: 2,
-  },
-  playerBadgeMeta: {
-    color: colors.courtBlue,
-    fontSize: 12,
-    fontWeight: '600',
   },
   chipRow: {
     flexDirection: 'row',

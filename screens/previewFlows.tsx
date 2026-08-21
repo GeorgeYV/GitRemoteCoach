@@ -683,6 +683,7 @@ export function CoachMatchDayFlow({
       <CoachMatchSetupScreen
         playerName={booking.playerName}
         category={booking.ageCategory}
+        onBack={() => setStep('reminder')}
         onStart={(config, roundLabel) => {
           setSession({ config, roundLabel });
           setStep('loadingMatch');

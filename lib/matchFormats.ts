@@ -23,22 +23,22 @@ export interface MatchFormatRules {
 export const MATCH_TIEBREAK_TARGET = 10;
 
 export const MATCH_FORMAT_LABELS: Record<MatchFormatId, string> = {
-  single_set: '1 set',
-  best_of_3: 'Mejor de 3',
-  best_of_3_short: 'Mejor de 3 corto',
-  match_tiebreak: 'Tercer set Match tiebreak',
-  match_tiebreak_short: 'Corto Tercer set Match tiebreak',
-  super_tiebreak_only: 'Super tie-break',
+  best_of_3: 'Mejor de 3 sets (6 games) completos',
+  match_tiebreak: 'Mejor de 3 sets (6 games) tercero Match tiebreak',
+  best_of_3_short: 'Mejor de 3 sets (4 games) completos',
+  match_tiebreak_short: 'Mejor de 3 sets (4 games) tercero Match tiebreak',
+  super_tiebreak_only: 'Super tiebreak (solo 10 puntos)',
+  single_set: '1 set (6 games)',
 };
 
 export const MATCH_FORMAT_RULES: Record<MatchFormatId, MatchFormatRules> = {
-  single_set: { gamesPerSet: 6, setsToWin: 1, deciderIsMatchTiebreak: false },
   best_of_3: { gamesPerSet: 6, setsToWin: 2, deciderIsMatchTiebreak: false },
-  best_of_3_short: { gamesPerSet: 4, setsToWin: 2, deciderIsMatchTiebreak: false },
   match_tiebreak: { gamesPerSet: 6, setsToWin: 2, deciderIsMatchTiebreak: true },
+  best_of_3_short: { gamesPerSet: 4, setsToWin: 2, deciderIsMatchTiebreak: false },
   match_tiebreak_short: { gamesPerSet: 4, setsToWin: 2, deciderIsMatchTiebreak: true },
   // Sin sets: el "set" decisivo (índice 0, ver deciderSetIndex) es el partido entero.
   super_tiebreak_only: { gamesPerSet: 6, setsToWin: 1, deciderIsMatchTiebreak: true },
+  single_set: { gamesPerSet: 6, setsToWin: 1, deciderIsMatchTiebreak: false },
 };
 
 export const MATCH_FORMAT_IDS = Object.keys(MATCH_FORMAT_LABELS) as MatchFormatId[];
