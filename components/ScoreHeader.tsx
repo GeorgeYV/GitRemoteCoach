@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Match } from '../lib/api';
 import { useMatch } from '../context/MatchContext';
-import { deciderSetIndex, MATCH_FORMAT_RULES, MatchFormatId } from '../lib/matchFormats';
+import { deciderSetIndex, MATCH_FORMAT_LABELS, MATCH_FORMAT_RULES, MatchFormatId } from '../lib/matchFormats';
 import { getCurrentServer, getGamePointLabels, MatchState } from '../lib/scoringEngine';
 import { colors, radius } from '../lib/theme';
 import { MatchConfig, PlayerId } from '../lib/types';
@@ -137,9 +137,16 @@ export default function ScoreHeader({ roundLabel }: { roundLabel: string }) {
   return (
     <View style={styles.header}>
       <View style={styles.headerTop}>
-        <Text style={styles.matchTag} numberOfLines={1}>
-          {matchState.matchEnded ? 'PARTIDO FINALIZADO' : roundLabel}
-        </Text>
+        <View style={styles.headerTitleRow}>
+          <Text style={styles.matchTag} numberOfLines={1}>
+            {matchState.matchEnded ? 'PARTIDO FINALIZADO' : roundLabel}
+          </Text>
+          {!matchState.matchEnded && (
+            <Text style={styles.formatTag} numberOfLines={1}>
+              {MATCH_FORMAT_LABELS[config.format]}
+            </Text>
+          )}
+        </View>
         {!matchState.matchEnded && <MatchTimerLabel match={match} />}
       </View>
 
@@ -185,11 +192,27 @@ const styles = StyleSheet.create({
   headerTop: {
     marginBottom: 12,
   },
+  headerTitleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+  },
   matchTag: {
+    flexShrink: 1,
+    marginRight: 10,
     fontSize: 11,
     letterSpacing: 1.4,
     textTransform: 'uppercase',
     color: colors.courtBlue,
+    fontWeight: '700',
+  },
+  formatTag: {
+    flexShrink: 1,
+    textAlign: 'right',
+    fontSize: 11,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    color: colors.textDim,
     fontWeight: '700',
   },
   timerLabel: {
