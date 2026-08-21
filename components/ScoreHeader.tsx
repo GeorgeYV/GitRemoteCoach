@@ -2,9 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Match } from '../lib/api';
 import { useMatch } from '../context/MatchContext';
-import { getCurrentServer, getGamePointLabels } from '../lib/scoringEngine';
-import { colors } from '../lib/theme';
-import { PlayerId } from '../lib/types';
+import { deciderSetIndex, MATCH_FORMAT_RULES, MatchFormatId } from '../lib/matchFormats';
+import { getCurrentServer, getGamePointLabels, MatchState } from '../lib/scoringEngine';
+import { colors, radius } from '../lib/theme';
+import { MatchConfig, PlayerId } from '../lib/types';
 
 function elapsedSeconds(match: Match): number {
   const startedMs = new Date(match.startedAt).getTime();
@@ -44,70 +45,130 @@ function currentSetGames(games: { winner: PlayerId }[], player: PlayerId): numbe
   return games.filter((g) => g.winner === player).length;
 }
 
-function SetScoresLine({ player }: { player: PlayerId }) {
-  const { matchState } = useMatch();
-  const completed = matchState.completedSets.map((s) => (player === 'player1' ? s.gamesPlayer1 : s.gamesPlayer2));
-  const inProgress = matchState.matchEnded ? [] : [currentSetGames(matchState.currentSetGames, player)];
-  const values = [...completed, ...inProgress];
+/** "SET 2 · JUEGO 4 · SAQUE SOFÍA" (o "TIEBREAK"/"MATCH TIEBREAK"/"SÚPER TIEBREAK" en vez de
+ * "JUEGO n" cuando corresponde) — una sola línea que dice todo lo que antes vivía repartido
+ * entre una insignia de set separada y el puntito de saque junto al nombre. */
+function getStatusLine(matchState: MatchState, config: MatchConfig, currentServer: PlayerId | null): string {
+  const rules = MATCH_FORMAT_RULES[config.format];
+  const setsPlayed = matchState.completedSets.length;
+  const serverName = currentServer === 'player1' ? config.player1Name : currentServer === 'player2' ? config.player2Name : '';
+  const saque = serverName ? ` · SAQUE ${serverName.toUpperCase()}` : '';
 
-  return (
-    <Text style={[styles.setScores, player === 'player1' && styles.setScoresYou]}>{values.join('  ')}</Text>
-  );
+  if (rules.setsToWin === 1 && rules.deciderIsMatchTiebreak) {
+    return `SÚPER TIEBREAK${saque}`;
+  }
+
+  const setPart = rules.setsToWin === 1 ? 'SET ÚNICO' : `SET ${setsPlayed + 1}`;
+  const isDeciderSet = rules.deciderIsMatchTiebreak && setsPlayed === deciderSetIndex(rules);
+
+  if (isDeciderSet) return `${setPart} · MATCH TIEBREAK${saque}`;
+  if (matchState.inTiebreak) return `${setPart} · TIEBREAK${saque}`;
+
+  const gameNumber = matchState.currentSetGames.length + 1;
+  return `${setPart} · JUEGO ${gameNumber}${saque}`;
 }
 
-function PointScore({ player }: { player: PlayerId }) {
-  const { config, matchState } = useMatch();
+function getPointValue(matchState: MatchState, config: MatchConfig, player: PlayerId): string | null {
   if (matchState.matchEnded) return null;
-
+  if (matchState.inTiebreak) return String(matchState.tiebreakPoints[player]);
   const gameLabels = getGamePointLabels(matchState.currentGamePoints, config.noAd);
-  const value = matchState.inTiebreak
-    ? String(matchState.tiebreakPoints[player])
-    : player === 'player1'
-    ? gameLabels.player1
-    : gameLabels.player2;
+  return player === 'player1' ? gameLabels.player1 : gameLabels.player2;
+}
 
-  return <Text style={styles.pointScore}>{value}</Text>;
+/** Fondo + color de texto de la píldora de puntos — los mismos pares que ya usa PointButtons
+ * para el botón "PUNTO PARA" de cada jugadora, para que la cabecera y los botones se lean como
+ * la misma identidad de color (lima con tinta oscura para la jugadora, coral con texto blanco
+ * para la rival) en vez de inventar un azul nuevo acá. */
+const PLAYER_ACCENT: Record<PlayerId, { background: string; text: string }> = {
+  player1: { background: colors.ballLimeDim, text: colors.courtBlueDeep },
+  player2: { background: colors.errorCoralDeep, text: '#FFFFFF' },
+};
+
+function PlayerScoreRow({
+  name,
+  player,
+  isServing,
+  sets,
+  games,
+  points,
+}: {
+  name: string;
+  player: PlayerId;
+  isServing: boolean;
+  sets: number;
+  games: number;
+  points: string | null;
+}) {
+  const accent = PLAYER_ACCENT[player];
+  return (
+    <View style={styles.playerRow}>
+      <View style={styles.playerRowLeft}>
+        {/* Solo quien está sacando ahora mismo lleva el punto de color — no es una identidad fija
+            por jugadora, es "esta es la que está sirviendo" (el resto lo dice el status bar).
+            El slot del punto siempre ocupa su lugar (visible u oculto) para que el nombre arranque
+            en la misma posición en las dos filas — si no, la fila sin punto se corre a la
+            izquierda y los nombres quedan desalineados entre sí. */}
+        <View style={[styles.identityDot, isServing ? { backgroundColor: accent.background } : styles.identityDotHidden]} />
+        <Text style={styles.playerRowName} numberOfLines={1}>
+          {name}
+        </Text>
+      </View>
+      <View style={styles.playerRowRight}>
+        <Text style={styles.setsValue}>{sets > 0 ? sets : '—'}</Text>
+        <Text style={styles.gamesValue}>{games}</Text>
+        {points !== null &&
+          (isServing ? (
+            <View style={[styles.pointsPill, { backgroundColor: accent.background }]}>
+              <Text style={[styles.pointsPillText, { color: accent.text }]}>{points}</Text>
+            </View>
+          ) : (
+            <Text style={styles.pointsPlain}>{points}</Text>
+          ))}
+      </View>
+    </View>
+  );
 }
 
 export default function ScoreHeader({ roundLabel }: { roundLabel: string }) {
   const { config, matchState, match } = useMatch();
   const currentServer = matchState.matchEnded ? null : getCurrentServer(matchState);
+  const statusLine = matchState.matchEnded ? null : getStatusLine(matchState, config, currentServer);
 
   return (
     <View style={styles.header}>
       <View style={styles.headerTop}>
-        <View style={styles.headerTitleColumn}>
-          <Text style={styles.matchTag} numberOfLines={1}>
-            {matchState.matchEnded ? 'PARTIDO FINALIZADO' : roundLabel}
-          </Text>
-          {!matchState.matchEnded && <MatchTimerLabel match={match} />}
-        </View>
+        <Text style={styles.matchTag} numberOfLines={1}>
+          {matchState.matchEnded ? 'PARTIDO FINALIZADO' : roundLabel}
+        </Text>
+        {!matchState.matchEnded && <MatchTimerLabel match={match} />}
       </View>
 
-      <View style={styles.playersRow}>
-        <View style={styles.playerYou}>
-          <Text style={[styles.playerName, styles.playerNameYou]} numberOfLines={1}>
-            {config.player1Name} {currentServer === 'player1' ? '●' : ''}
-          </Text>
-          <View style={styles.scoreBlockYou}>
-            <SetScoresLine player="player1" />
-            <PointScore player="player1" />
+      <View style={styles.card}>
+        <PlayerScoreRow
+          name={config.player1Name}
+          player="player1"
+          isServing={currentServer === 'player1'}
+          sets={matchState.setsWon.player1}
+          games={currentSetGames(matchState.currentSetGames, 'player1')}
+          points={getPointValue(matchState, config, 'player1')}
+        />
+        <View style={styles.rowDivider} />
+        <PlayerScoreRow
+          name={config.player2Name}
+          player="player2"
+          isServing={currentServer === 'player2'}
+          sets={matchState.setsWon.player2}
+          games={currentSetGames(matchState.currentSetGames, 'player2')}
+          points={getPointValue(matchState, config, 'player2')}
+        />
+        {statusLine && (
+          <View style={styles.statusBar}>
+            <Text style={styles.statusBarText} numberOfLines={1}>
+              {statusLine}
+            </Text>
           </View>
-        </View>
-
-        <View style={styles.playerRival}>
-          <Text style={styles.playerName} numberOfLines={1}>
-            {currentServer === 'player2' ? '● ' : ''}
-            {config.player2Name}
-          </Text>
-          <View style={styles.scoreBlockRival}>
-            <PointScore player="player2" />
-            <SetScoresLine player="player2" />
-          </View>
-        </View>
+        )}
       </View>
-
-      {matchState.inTiebreak && <Text style={styles.tiebreakBadge}>TIE-BREAK</Text>}
     </View>
   );
 }
@@ -116,20 +177,13 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: colors.panel,
     paddingTop: 14,
-    paddingBottom: 10,
+    paddingBottom: 14,
     paddingHorizontal: 18,
     borderBottomWidth: 1,
     borderBottomColor: colors.borderSoft,
   },
   headerTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 14,
-  },
-  headerTitleColumn: {
-    flexShrink: 1,
-    marginRight: 10,
+    marginBottom: 12,
   },
   matchTag: {
     fontSize: 11,
@@ -144,56 +198,94 @@ const styles = StyleSheet.create({
     marginTop: 2,
     fontVariant: ['tabular-nums'],
   },
-  playersRow: {
+  card: {
+    backgroundColor: colors.panelLight,
+    borderRadius: radius,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: 'hidden',
+  },
+  playerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
   },
-  playerYou: {
-    flex: 1,
-  },
-  playerRival: {
-    flex: 1,
-    alignItems: 'flex-end',
-  },
-  playerName: {
-    fontSize: 13,
-    color: colors.textDim,
-    marginBottom: 2,
-  },
-  playerNameYou: {
-    color: colors.courtBlue,
-  },
-  scoreBlockYou: {
+  playerRowLeft: {
     flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 10,
+    alignItems: 'center',
+    flexShrink: 1,
+    gap: 8,
   },
-  scoreBlockRival: {
+  identityDot: {
+    width: 9,
+    height: 9,
+    borderRadius: 4.5,
+  },
+  identityDotHidden: {
+    backgroundColor: 'transparent',
+  },
+  playerRowName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.lineWhite,
+    flexShrink: 1,
+  },
+  playerRowRight: {
     flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 10,
+    alignItems: 'center',
+    gap: 14,
   },
-  setScores: {
+  setsValue: {
     fontSize: 15,
     color: colors.textDim,
-    letterSpacing: 0.5,
+    minWidth: 14,
+    textAlign: 'center',
   },
-  setScoresYou: {
-    color: colors.textSoft,
-  },
-  pointScore: {
-    fontSize: 40,
+  gamesValue: {
+    fontSize: 22,
     fontWeight: '800',
-    letterSpacing: -0.5,
     color: colors.lineWhite,
+    minWidth: 22,
+    textAlign: 'center',
   },
-  tiebreakBadge: {
-    alignSelf: 'center',
-    marginTop: 8,
-    color: colors.courtBlue,
+  pointsPill: {
+    minWidth: 34,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    alignItems: 'center',
+  },
+  pointsPillText: {
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  /** Puntos de quien está recibiendo — mismo tamaño que la píldora del que saca, pero sin
+   * fondo de color, así el ancho de la fila no salta al cambiar el saque de lado. */
+  pointsPlain: {
+    minWidth: 34,
+    fontSize: 15,
+    fontWeight: '800',
+    color: colors.textDim,
+    textAlign: 'center',
+  },
+  rowDivider: {
+    height: 1,
+    backgroundColor: colors.borderSoft,
+    marginHorizontal: 14,
+  },
+  statusBar: {
+    backgroundColor: colors.panel,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+  },
+  statusBarText: {
+    fontSize: 11,
     fontWeight: '700',
-    fontSize: 12,
-    letterSpacing: 1,
+    letterSpacing: 0.6,
+    color: colors.textDim,
   },
 });

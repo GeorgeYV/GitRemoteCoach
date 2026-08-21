@@ -281,6 +281,10 @@ export function MatchProvider({
       // events, not a flag REOPEN_MATCH alone can clear).
       if (matchState.matchEnded) forceUndo();
       dispatch({ type: 'REOPEN_MATCH' });
+      // CoachFlow#showSummary trusts match.status === 'completed' as the authoritative signal
+      // (ver comentario ahí) además de reducerState/matchState — sin este setMatch, "Volver a
+      // capturar" nunca lograba salir del resumen, porque el status local seguía 'completed'.
+      setMatch((m) => ({ ...m, status: 'in_progress', retiredBy: null }));
       enqueue((authToken) => updateMatchStatus(authToken, matchId, 'in_progress'));
     },
     pauseMatch: () => {

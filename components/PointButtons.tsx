@@ -10,11 +10,14 @@ export default function PointButtons({
   onPoint,
   player1Name,
   player2Name,
+  servingPlayer,
 }: {
   disabled: boolean;
   onPoint: (wonBy: PlayerId) => void;
   player1Name: string;
   player2Name: string;
+  /** null cuando el partido ya terminó (sin saque en curso) — ver LiveCaptureView/PointFlow. */
+  servingPlayer?: PlayerId | null;
 }) {
   return (
     <View style={styles.wrapper}>
@@ -24,6 +27,7 @@ export default function PointButtons({
           name={player1Name}
           colorsRange={[colors.ballLime, colors.ballLimeDim]}
           textColor={colors.courtBlueDeep}
+          isServing={servingPlayer === 'player1'}
           disabled={disabled}
           onPress={() => onPoint('player1')}
         />
@@ -33,6 +37,7 @@ export default function PointButtons({
           // lineWhite es ahora tinta oscura (tema claro) — este botón sigue con gradiente rojo
           // oscuro de fondo, así que su texto necesita quedarse claro, no lineWhite.
           textColor="#FFFFFF"
+          isServing={servingPlayer === 'player2'}
           disabled={disabled}
           onPress={() => onPoint('player2')}
         />
@@ -45,12 +50,14 @@ function PointButton({
   name,
   colorsRange,
   textColor,
+  isServing,
   disabled,
   onPress,
 }: {
   name: string;
   colorsRange: [string, string];
   textColor: string;
+  isServing: boolean;
   disabled: boolean;
   onPress: () => void;
 }) {
@@ -73,6 +80,11 @@ function PointButton({
       style={[styles.buttonWrap, pressed && styles.buttonPressed, disabled && styles.buttonDisabled]}
     >
       <LinearGradient colors={colorsRange} start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }} style={styles.gradient}>
+        {isServing && (
+          <View style={styles.servingBadge}>
+            <Text style={styles.servingBadgeText}>🎾 Sirviendo</Text>
+          </View>
+        )}
         <Text style={[styles.caption, { color: textColor }]}>PUNTO PARA</Text>
         <Text style={[styles.name, { color: textColor }]} numberOfLines={2}>
           {name}
@@ -114,6 +126,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 8,
+  },
+  servingBadge: {
+    position: 'absolute',
+    top: 14,
+    // Fondo oscuro semitransparente en vez de sólido — necesita leerse bien sobre los dos
+    // gradientes (lima Y rojo), así que el texto siempre es blanco y este fondo se oscurece lo
+    // suficiente para darle contraste incluso sobre el lado lima (el más claro de los dos).
+    backgroundColor: 'rgba(14,32,56,0.55)',
+    borderRadius: 999,
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+  },
+  servingBadgeText: {
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.4,
+    color: '#FFFFFF',
   },
   caption: {
     fontSize: 11,

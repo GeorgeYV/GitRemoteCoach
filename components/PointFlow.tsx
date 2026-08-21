@@ -72,7 +72,13 @@ export default function PointFlow({ onOpenMenu }: { onOpenMenu: () => void }) {
   if (!pending) {
     return (
       <View style={styles.baseContainer}>
-        <PointButtons disabled={false} onPoint={startPoint} player1Name={config.player1Name} player2Name={config.player2Name} />
+        <PointButtons
+          disabled={false}
+          onPoint={startPoint}
+          player1Name={config.player1Name}
+          player2Name={config.player2Name}
+          servingPlayer={getCurrentServer(matchState)}
+        />
         <VoiceNoteRecorder onOpenMenu={onOpenMenu} />
       </View>
     );
