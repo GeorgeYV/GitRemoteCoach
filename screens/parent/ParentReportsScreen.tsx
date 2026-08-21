@@ -1,7 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import * as Sharing from 'expo-sharing';
+import React, { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { captureRef } from 'react-native-view-shot';
 import ErrorScatterCourt from '../../components/parent/report/ErrorScatterCourt';
 import KeyStatsCard from '../../components/parent/report/KeyStatsCard';
 import PressureEfficiencyCard from '../../components/parent/report/PressureEfficiencyCard';
@@ -93,6 +95,8 @@ function ReportDetail({ booking, onBack }: { booking: BookingHistoryEntry; onBac
   const { token } = useAuth();
   const [report, setReport] = useState<MatchReport | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
+  const [sharing, setSharing] = useState(false);
+  const shareableRef = useRef<View>(null);
 
   useEffect(() => {
     if (!token) {
@@ -114,6 +118,37 @@ function ReportDetail({ booking, onBack }: { booking: BookingHistoryEntry; onBac
     };
   }, [token, booking.id]);
 
+  const canShare = !!report?.report;
+
+  // Para que un padre lo pueda mandar por WhatsApp a quien no tiene la app (ej. el entrenador de
+  // cabecera del jugador) — exporta el reporte como imagen en vez de un link, porque no hay
+  // sesión ni cuenta que crear del otro lado. En nativo usa el share sheet real; en web (sin
+  // share de archivos locales, ver expo-sharing) cae a una descarga directa del navegador.
+  async function handleShare() {
+    if (!shareableRef.current || sharing) return;
+    setSharing(true);
+    try {
+      if (Platform.OS === 'web') {
+        const dataUri = await captureRef(shareableRef, { format: 'png', quality: 0.92, result: 'data-uri' });
+        const link = document.createElement('a');
+        link.href = dataUri;
+        link.download = `reporte-${booking.playerName.replace(/\s+/g, '-').toLowerCase()}.png`;
+        link.click();
+        return;
+      }
+      const uri = await captureRef(shareableRef, { format: 'png', quality: 0.92, result: 'tmpfile' });
+      if (!(await Sharing.isAvailableAsync())) {
+        Alert.alert('No disponible', 'Este dispositivo no puede compartir archivos.');
+        return;
+      }
+      await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: 'Compartir reporte' });
+    } catch {
+      Alert.alert('No se pudo compartir', 'Intenta de nuevo en un momento.');
+    } finally {
+      setSharing(false);
+    }
+  }
+
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.detailHeader}>
@@ -128,6 +163,15 @@ function ReportDetail({ booking, onBack }: { booking: BookingHistoryEntry; onBac
             {booking.tournamentName} · {booking.date}
           </Text>
         </View>
+        {canShare && (
+          <Pressable style={styles.shareButton} onPress={handleShare} disabled={sharing} hitSlop={6}>
+            {sharing ? (
+              <ActivityIndicator size="small" color={colors.courtBlue} />
+            ) : (
+              <Ionicons name="share-outline" size={20} color={colors.courtBlue} />
+            )}
+          </Pressable>
+        )}
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
@@ -144,7 +188,7 @@ function ReportDetail({ booking, onBack }: { booking: BookingHistoryEntry; onBac
         ) : report.match.status === 'in_progress' ? (
           <Text style={styles.emptyText}>El entrenador todavía no terminó de capturar este partido.</Text>
         ) : (
-          <>
+          <View ref={shareableRef} collapsable={false} style={styles.shareableArea}>
             <Text style={styles.scoreLine}>
               {booking.playerName} vs {report.match.player2Label}
             </Text>
@@ -177,7 +221,7 @@ function ReportDetail({ booking, onBack }: { booking: BookingHistoryEntry; onBac
                 <Text style={styles.obsText}>{report.match.coachObservations}</Text>
               </View>
             )}
-          </>
+          </View>
         )}
       </ScrollView>
     </SafeAreaView>
@@ -229,9 +273,21 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '800',
   },
+  shareButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   content: {
     padding: 20,
     paddingBottom: 24,
+  },
+  // Fondo propio (no transparente): la captura de react-native-view-shot necesita un color de
+  // fondo real detrás de todo el contenido, o el PNG exportado sale con el área vacía en negro.
+  shareableArea: {
+    backgroundColor: colors.bg,
   },
   list: {
     gap: 12,

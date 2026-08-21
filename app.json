@@ -46,7 +46,8 @@
           "photosPermission": "Permití el acceso a tus fotos para elegir una foto de perfil."
         }
       ],
-      "expo-localization"
+      "expo-localization",
+      "expo-sharing"
     ],
     "extra": {
       "router": {},
