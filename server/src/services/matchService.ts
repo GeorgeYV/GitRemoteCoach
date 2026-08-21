@@ -10,6 +10,7 @@ import * as matchRepository from '../repositories/matchRepository.js';
 import * as voiceNoteRepository from '../repositories/voiceNoteRepository.js';
 import * as voiceNoteService from './voiceNoteService.js';
 import type { VoiceNoteFields } from './voiceNoteService.js';
+import * as paymentService from './paymentService.js';
 import type { MatchFormatId } from '../lib/matchFormats.js';
 import type {
   CaptureMode,
@@ -124,8 +125,29 @@ export async function restartMatch(matchId: string): Promise<Match> {
   return match;
 }
 
+/** Terminar el partido (fin natural, "Finalizar partido" antes de tiempo, o retiro) ya no debería
+ * dejar la reserva "pagada para siempre" — si el padre ya pagó, libera el pago al entrenador y
+ * marca la reserva completada en el mismo momento, sin depender de que el entrenador se acuerde
+ * de ir a tocar "Marcar sesión como completada" aparte. Si el pago todavía no se verificó, no hay
+ * nada que hacer acá — paymentService.verifyPayment cubre el orden inverso (pago verificado
+ * después de que el partido ya terminó). Nunca tira: completar la reserva es una consecuencia del
+ * partido, no debe romper la respuesta de "terminar partido" si algo sale mal acá. */
+async function maybeCompleteBookingForFinishedMatch(match: Match): Promise<void> {
+  if (match.status !== 'completed') return;
+  try {
+    const booking = await bookingRepository.getBookingById(match.bookingId);
+    if (booking.status === 'paid') {
+      await paymentService.completeBooking(match.bookingId);
+    }
+  } catch (err) {
+    console.error(`No se pudo completar automáticamente la reserva ${match.bookingId} al terminar el partido:`, err);
+  }
+}
+
 export async function setStatus(matchId: string, status: MatchStatus): Promise<Match> {
-  return matchRepository.updateStatus(matchId, status);
+  const match = await matchRepository.updateStatus(matchId, status);
+  await maybeCompleteBookingForFinishedMatch(match);
+  return match;
 }
 
 export async function pauseMatch(matchId: string): Promise<Match> {
@@ -145,7 +167,9 @@ export async function resumeSuspendedMatch(matchId: string): Promise<Match> {
 }
 
 export async function retireMatch(matchId: string, retiredBy: MatchPlayerSlot): Promise<Match> {
-  return matchRepository.retire(matchId, retiredBy);
+  const match = await matchRepository.retire(matchId, retiredBy);
+  await maybeCompleteBookingForFinishedMatch(match);
+  return match;
 }
 
 export async function getSuspendedMatchForCoach(coachId: string) {

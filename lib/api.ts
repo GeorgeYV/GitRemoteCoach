@@ -283,6 +283,8 @@ export interface BookingForParent extends Booking {
   tournamentEndDate: string;
   reviewed: boolean;
   hasUnreadMessages: boolean;
+  /** null si el entrenador nunca inició la captura en vivo. */
+  matchStatus: MatchStatus | null;
 }
 
 /** GET /parents/:id/bookings — BookingHistoryScreen. */

@@ -435,11 +435,21 @@ export function CoachHomeFlow({ coachId, coachName }: { coachId: string; coachNa
     setStep('home');
   }
 
-  // "Ir al inicio" desde el resumen final del partido — a diferencia de handleBookingCompleted
-  // (atado a nextBookingRaw), acá el booking relevante puede ser el de un partido reanudado.
-  function completeBookingAndGoHome(id: string) {
-    setBookings((prev) => prev?.map((b) => (b.id === id ? { ...b, status: 'completed' } : b)) ?? null);
+  // "Ir al inicio" desde el resumen final del partido — el servidor ya completó la reserva sola
+  // si ya estaba pagada (matchService#maybeCompleteBookingForFinishedMatch, disparado al terminar
+  // el partido); si el pago todavía no se verificó, sigue como estaba. No hay forma honesta de
+  // adivinar cuál de las dos pasó desde acá, así que se refresca la lista real en vez de simular
+  // un estado local — a diferencia de handleBookingCompleted, que sí sabe con certeza que
+  // completeBooking ya corrió porque lo esperó él mismo.
+  function completeBookingAndGoHome() {
     setStep('home');
+    if (!token) return;
+    listCoachBookings(token, coachId)
+      .then(setBookings)
+      .catch(() => {
+        // silencioso: si falla el refetch, el próximo montaje del panel va a traer el estado
+        // real igual — no vale la pena bloquear la navegación por esto.
+      });
   }
 
   if (step === 'detail' && selectedBooking) {
@@ -469,19 +479,14 @@ export function CoachHomeFlow({ coachId, coachName }: { coachId: string; coachNa
     // Mismo flujo que "Iniciar partido" — createOrGetMatch es idempotente por booking_id, así
     // que devuelve la misma fila 'suspended' y LiveCaptureView muestra la pantalla de reanudar.
     return (
-      <CoachMatchDayFlow
-        booking={suspendedBookingRaw}
-        onExit={() => completeBookingAndGoHome(suspendedBookingRaw.id)}
-      />
+      <CoachMatchDayFlow booking={suspendedBookingRaw} onExit={completeBookingAndGoHome} />
     );
   }
 
   if (step === 'match' && selectedBookingRaw) {
     // Sin onBack durante la captura activa (a propósito, igual que CoachCapturePreview en
     // /dev-preview) — onExit solo habilita "Ir al inicio" desde la pantalla de resumen final.
-    return (
-      <CoachMatchDayFlow booking={selectedBookingRaw} onExit={() => completeBookingAndGoHome(selectedBookingRaw.id)} />
-    );
+    return <CoachMatchDayFlow booking={selectedBookingRaw} onExit={completeBookingAndGoHome} />;
   }
 
   if (step === 'requests') {

@@ -123,6 +123,10 @@ export interface BookingForParent extends Booking {
   tournamentEndDate: string;
   reviewed: boolean;
   hasUnreadMessages: boolean;
+  /** null si el entrenador nunca inició la captura en vivo. ParentReportsScreen: una vez
+   * 'completed', muestra la sesión en "Reportes" aunque booking.status todavía no llegue a
+   * 'completed' (pago sin verificar) — con un aviso de pendiente en vez del reporte. */
+  matchStatus: MatchStatus | null;
 }
 
 export interface PaymentTransaction {

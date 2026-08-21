@@ -31,6 +31,7 @@ export function toBookingHistoryEntry(booking: BookingForParent): BookingHistory
     price: Number(booking.agreedRate),
     status: STATUS_MAP[booking.status],
     tournamentCountry: booking.tournamentCountry,
+    matchStatus: booking.matchStatus,
     reviewed: booking.reviewed,
     hasUnreadMessages: booking.hasUnreadMessages,
     refundAmount: booking.refundAmount != null ? Number(booking.refundAmount) : undefined,

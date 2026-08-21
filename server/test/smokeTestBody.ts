@@ -2717,6 +2717,121 @@ console.log('\n=== Escenario 29: Google sign-in (cuenta nueva, re-login, vincula
   assertEqual(unverifiedRes.json().error, 'google_email_unverified', 'código de error correcto');
 }
 
+console.log('\n=== Escenario 30: terminar el partido completa la reserva sola (en cualquier orden con el pago) ===');
+{
+  const registerRes = await app.inject({
+    method: 'POST',
+    url: '/auth/register',
+    payload: {
+      email: 'coach.autocomplete.e2e@example.com',
+      password: 'super-secreta-123',
+      fullName: 'Coach Autocomplete E2E',
+      primaryRole: 'coach',
+    },
+  });
+  const { token: acCoachToken, user: acCoach } = registerRes.json();
+  await app.inject({
+    method: 'POST',
+    url: '/coaches',
+    headers: { authorization: `Bearer ${acCoachToken}` },
+    payload: { city: 'CDMX', country: 'EC', yearsExperience: 4, hourlyRate: 30, ageCategories: ['U14'], levels: ['competitivo'] },
+  });
+
+  // --- Caso A: paga primero (rail manual P2P, el activo en fase 1), el partido termina después ---
+  const bookingARes = await requestBooking(acCoach.id, inFuture(48));
+  const bookingA = bookingARes.json();
+  await app.inject({ method: 'POST', url: `/bookings/${bookingA.id}/accept`, headers: { authorization: `Bearer ${acCoachToken}` } });
+  await app.inject({
+    method: 'POST',
+    url: '/bookings/submit-payment-proof-batch',
+    headers: { authorization: `Bearer ${parentToken}` },
+    payload: { bookingIds: [bookingA.id], provider: 'deuna', referenceCode: 'AUTOCOMPLETE-A' },
+  });
+  await app.inject({
+    method: 'PUT',
+    url: '/bookings/verify-payment',
+    headers: { authorization: `Bearer ${platformAdminToken}` },
+    payload: { bookingIds: [bookingA.id], decision: 'verified' },
+  });
+  const paidARes = await app.inject({ method: 'GET', url: `/bookings/${bookingA.id}`, headers: { authorization: `Bearer ${acCoachToken}` } });
+  assertEqual(paidARes.json().status, 'paid', 'caso A: la reserva queda "paid" antes de jugar');
+
+  const matchARes = await app.inject({
+    method: 'POST',
+    url: '/matches',
+    headers: { authorization: `Bearer ${acCoachToken}` },
+    payload: { bookingId: bookingA.id, player2Label: 'Rival', format: 'single_set', noAd: true, initialServer: 'player1', captureMode: 'detallada' },
+  });
+  const matchA = matchARes.json();
+  await app.inject({
+    method: 'PATCH',
+    url: `/matches/${matchA.id}/status`,
+    headers: { authorization: `Bearer ${acCoachToken}` },
+    payload: { status: 'completed' },
+  });
+
+  const bookingAAfter = (
+    await app.inject({ method: 'GET', url: `/bookings/${bookingA.id}`, headers: { authorization: `Bearer ${acCoachToken}` } })
+  ).json();
+  assertEqual(bookingAAfter.status, 'completed', 'caso A: terminar el partido completa sola la reserva (ya estaba paid)');
+  assertTrue(!!bookingAAfter.completedAt, 'caso A: completedAt queda fijado');
+  assertTrue(
+    pushState.sent.some((m) => m.data?.bookingId === bookingA.id && m.title === 'Tu reporte ya está listo'),
+    'caso A: completar la reserva sola también avisa al padre por push que el reporte ya está listo',
+  );
+
+  // --- Caso B: el partido termina primero (pago manual todavía sin verificar), se verifica después ---
+  const bookingBRes = await requestBooking(acCoach.id, inFuture(48));
+  const bookingB = bookingBRes.json();
+  await app.inject({ method: 'POST', url: `/bookings/${bookingB.id}/accept`, headers: { authorization: `Bearer ${acCoachToken}` } });
+  await app.inject({
+    method: 'POST',
+    url: '/bookings/submit-payment-proof-batch',
+    headers: { authorization: `Bearer ${parentToken}` },
+    payload: { bookingIds: [bookingB.id], provider: 'deuna', referenceCode: 'AUTOCOMPLETE-B' },
+  });
+
+  const matchBRes = await app.inject({
+    method: 'POST',
+    url: '/matches',
+    headers: { authorization: `Bearer ${acCoachToken}` },
+    payload: { bookingId: bookingB.id, player2Label: 'Rival', format: 'single_set', noAd: true, initialServer: 'player1', captureMode: 'detallada' },
+  });
+  const matchB = matchBRes.json();
+  await app.inject({
+    method: 'POST',
+    url: `/matches/${matchB.id}/retire`,
+    headers: { authorization: `Bearer ${acCoachToken}` },
+    payload: { retiredBy: 'player1' },
+  });
+
+  const bookingBMidway = (
+    await app.inject({ method: 'GET', url: `/bookings/${bookingB.id}`, headers: { authorization: `Bearer ${acCoachToken}` } })
+  ).json();
+  assertEqual(
+    bookingBMidway.status,
+    'payment_submitted',
+    'caso B: el partido ya terminó pero el pago todavía no se verificó — la reserva NO se completa sola todavía',
+  );
+
+  await app.inject({
+    method: 'PUT',
+    url: '/bookings/verify-payment',
+    headers: { authorization: `Bearer ${platformAdminToken}` },
+    payload: { bookingIds: [bookingB.id], decision: 'verified' },
+  });
+
+  const bookingBAfter = (
+    await app.inject({ method: 'GET', url: `/bookings/${bookingB.id}`, headers: { authorization: `Bearer ${acCoachToken}` } })
+  ).json();
+  assertEqual(
+    bookingBAfter.status,
+    'completed',
+    'caso B: al verificar el pago de un partido ya terminado, la reserva se completa directo (salta "paid")',
+  );
+  assertTrue(!!bookingBAfter.completedAt, 'caso B: completedAt queda fijado');
+}
+
 console.log(`\n=== Resultado: ${passed} pasaron, ${failed} fallaron ===`);
 await app.close();
 process.exit(failed > 0 ? 1 : 0);

@@ -33,7 +33,14 @@ export default function ParentReportsScreen() {
     setError(null);
     listParentBookings(token, user.id)
       .then((result) => {
-        if (!cancelled) setBookings(result.map(toBookingHistoryEntry).filter((b) => b.status === 'completed'));
+        // El partido puede terminar antes de que se verifique el pago manual (P2P) — se muestra
+        // igual acá, con un aviso de "pendiente" en la fila, en vez de desaparecer hasta que el
+        // admin confirme el pago. Ver matchService#maybeCompleteBookingForFinishedMatch.
+        if (!cancelled) {
+          setBookings(
+            result.map(toBookingHistoryEntry).filter((b) => b.status === 'completed' || b.matchStatus === 'completed'),
+          );
+        }
       })
       .catch((err) => {
         if (cancelled) return;
@@ -66,22 +73,30 @@ export default function ParentReportsScreen() {
           <Text style={styles.emptyText}>Todavía no tienes sesiones completadas.</Text>
         ) : (
           <View style={styles.list}>
-            {bookings.map((booking) => (
-              <Pressable key={booking.id} style={styles.row} onPress={() => setSelected(booking)}>
-                <View style={styles.rowIcon}>
-                  <Ionicons name="bar-chart-outline" size={18} color={colors.courtBlue} />
-                </View>
-                <View style={styles.rowInfo}>
-                  <Text style={styles.trainerName} numberOfLines={1}>
-                    {booking.trainerName}
-                  </Text>
-                  <Text style={styles.meta} numberOfLines={1}>
-                    {booking.tournamentName} · {booking.date}
-                  </Text>
-                </View>
-                <Text style={styles.chevron}>›</Text>
-              </Pressable>
-            ))}
+            {bookings.map((booking) => {
+              const pendingPayment = booking.status !== 'completed';
+              return (
+                <Pressable key={booking.id} style={styles.row} onPress={() => setSelected(booking)}>
+                  <View style={styles.rowIcon}>
+                    <Ionicons name="bar-chart-outline" size={18} color={colors.courtBlue} />
+                  </View>
+                  <View style={styles.rowInfo}>
+                    <Text style={styles.trainerName} numberOfLines={1}>
+                      {booking.trainerName}
+                    </Text>
+                    <Text style={styles.meta} numberOfLines={1}>
+                      {booking.tournamentName} · {booking.date}
+                    </Text>
+                    {pendingPayment && (
+                      <View style={styles.pendingPill}>
+                        <Text style={styles.pendingPillText}>Pago pendiente de verificación</Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={styles.chevron}>›</Text>
+                </Pressable>
+              );
+            })}
           </View>
         )}
       </ScrollView>
@@ -98,7 +113,14 @@ function ReportDetail({ booking, onBack }: { booking: BookingHistoryEntry; onBac
   const [sharing, setSharing] = useState(false);
   const shareableRef = useRef<View>(null);
 
+  // El partido puede estar completed (report.report ya calculado del lado del servidor) sin que
+  // el pago todavía se haya verificado — a propósito no se pide/muestra el reporte hasta que
+  // booking.status llegue a 'completed', para no confundir al padre con datos de un partido cuyo
+  // pago todavía está en revisión. Ver ParentReportsScreen's list filter (matchStatus).
+  const paymentPending = booking.status !== 'completed';
+
   useEffect(() => {
+    if (paymentPending) return;
     if (!token) {
       setError('No hay una sesión activa.');
       return;
@@ -116,7 +138,7 @@ function ReportDetail({ booking, onBack }: { booking: BookingHistoryEntry; onBac
     return () => {
       cancelled = true;
     };
-  }, [token, booking.id]);
+  }, [token, booking.id, paymentPending]);
 
   const canShare = !!report?.report;
 
@@ -175,7 +197,11 @@ function ReportDetail({ booking, onBack }: { booking: BookingHistoryEntry; onBac
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        {error ? (
+        {paymentPending ? (
+          <Text style={styles.emptyText}>
+            El partido ya terminó — vas a poder ver el reporte apenas se verifique tu pago.
+          </Text>
+        ) : error ? (
           <Text style={styles.emptyText}>{error}</Text>
         ) : report === undefined ? (
           <View style={styles.centerState}>
@@ -322,6 +348,19 @@ const styles = StyleSheet.create({
   meta: {
     color: colors.textDim,
     fontSize: 12,
+  },
+  pendingPill: {
+    alignSelf: 'flex-start',
+    backgroundColor: withOpacity(colors.amber, 0.14),
+    borderRadius: 8,
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    marginTop: 6,
+  },
+  pendingPillText: {
+    color: colors.amber,
+    fontSize: 10,
+    fontWeight: '700',
   },
   chevron: {
     color: colors.textDim,

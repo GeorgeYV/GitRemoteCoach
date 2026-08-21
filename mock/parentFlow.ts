@@ -1,4 +1,4 @@
-import type { CountryCode } from '../lib/api';
+import type { CountryCode, MatchStatus } from '../lib/api';
 
 export interface Trainer {
   id: string;
@@ -118,6 +118,10 @@ export interface BookingHistoryEntry {
   /** Only meaningful once status is 'completed' — whether the parent already left a review. */
   reviewed?: boolean;
   hasUnreadMessages?: boolean;
+  /** null si el entrenador nunca inició la captura en vivo. ParentReportsScreen: una sesión con
+   * matchStatus 'completed' pero status todavía no 'completed' (pago sin verificar) se muestra
+   * igual en "Reportes", con un aviso de pendiente en vez del reporte. */
+  matchStatus?: MatchStatus | null;
   /** Solo presente cuando status es 'cancelled' y hubo un pago real de por medio (ver
    * cancellationService.cancelBooking) — cuánto le corresponde de vuelta al padre. El pago real
    * ocurre por fuera de la app (ver PlatformAdminRefundsScreen), esto es solo para que el padre

@@ -72,6 +72,7 @@ function mapRowForParent(row: any): BookingForParent {
     tournamentEndDate: row.tournament_end_date,
     reviewed: row.reviewed,
     hasUnreadMessages: row.has_unread_messages,
+    matchStatus: row.match_status ?? null,
   };
 }
 
@@ -448,6 +449,11 @@ export async function listBookingsForParent(
     // de la consulta externa (b.id) — mismo tipo de limitación ya documentada ahí.
     // COALESCE(cl.city, t.city): mismo criterio que tournamentRepository.search — un torneo sin
     // reclamar (club_id NULL) todavía tiene su propia ciudad, uno reclamado la hereda del club.
+    // LEFT JOIN matches: a lo sumo una fila por reserva (matches.booking_id es UNIQUE), sin
+    // riesgo de duplicar filas de bookings. ParentReportsScreen la usa para mostrar una sesión
+    // en "Reportes" apenas el partido termina, aunque el pago todavía no se haya verificado —
+    // con un aviso de "pendiente" en vez de directamente el reporte (ver decisión de producto:
+    // no mostrar el reporte hasta que el pago quede confirmado).
     `SELECT b.*, cu.full_name AS coach_name, p.full_name AS player_name, p.age_category,
             t.name AS tournament_name, t.venue AS tournament_venue,
             COALESCE(cl.city, t.city) AS tournament_city,
@@ -455,13 +461,15 @@ export async function listBookingsForParent(
             t.start_date AS tournament_start_date, t.end_date AS tournament_end_date,
             (rv.id IS NOT NULL) AS reviewed,
             (coach_msgs.last_at IS NOT NULL
-             AND coach_msgs.last_at > COALESCE(b.parent_messages_read_at, TIMESTAMP '1970-01-01')) AS has_unread_messages
+             AND coach_msgs.last_at > COALESCE(b.parent_messages_read_at, TIMESTAMP '1970-01-01')) AS has_unread_messages,
+            m.status AS match_status
      FROM bookings b
      JOIN players p ON p.id = b.player_id
      JOIN users cu ON cu.id = b.coach_id
      JOIN tournaments t ON t.id = b.tournament_id
      LEFT JOIN clubs cl ON cl.id = t.club_id
      LEFT JOIN reviews rv ON rv.booking_id = b.id
+     LEFT JOIN matches m ON m.booking_id = b.id
      LEFT JOIN (
        SELECT booking_id, MAX(created_at) AS last_at
        FROM booking_messages

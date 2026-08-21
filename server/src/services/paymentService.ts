@@ -7,7 +7,9 @@ import { ConflictError, ValidationError } from '../lib/errors.js';
 import * as bookingRepository from '../repositories/bookingRepository.js';
 import * as paymentRepository from '../repositories/paymentRepository.js';
 import * as coachRepository from '../repositories/coachRepository.js';
+import * as matchRepository from '../repositories/matchRepository.js';
 import * as tournamentRepository from '../repositories/tournamentRepository.js';
+import * as notificationService from './notificationService.js';
 import type { Booking, PaymentProvider } from '../types.js';
 
 const CURRENCY = 'mxn';
@@ -384,12 +386,29 @@ export async function submitPaymentProof(
  * vuelve a 'accepted' con payment_deadline re-armado — si no, el job de expiración podría matarla
  * antes de que el padre pueda reintentar con otro comprobante.
  */
+/** Orden inverso a matchService#maybeCompleteBookingForFinishedMatch: ahí el partido ya había
+ * terminado cuando se verifica el pago (el entrenador y la jugadora ya jugaron, el comprobante
+ * quedó esperando revisión del admin). Sin esto, esa reserva se quedaría "paid" para siempre — el
+ * botón manual "Marcar sesión como completada" seguiría sirviendo, pero nadie se acordaría de
+ * tocarlo. Corre DESPUÉS de que la transacción de verifyPayment ya confirmó (completeBooking abre
+ * su propia transacción — anidarla acá adentro bloquearía sobre la misma fila `bookings`). */
+async function maybeCompleteBookingForAlreadyFinishedMatch(bookingId: string): Promise<void> {
+  try {
+    const match = await matchRepository.findByBookingId(bookingId);
+    if (match?.status === 'completed') {
+      await completeBooking(bookingId);
+    }
+  } catch (err) {
+    console.error(`No se pudo completar automáticamente la reserva ${bookingId} tras verificar el pago:`, err);
+  }
+}
+
 export async function verifyPayment(
   bookingIds: string[],
   verifiedByUserId: string,
   decision: 'verified' | 'rejected',
 ): Promise<Booking[]> {
-  return withTransaction(async (client) => {
+  const verifiedBookings = await withTransaction(async (client) => {
     const bookings = await bookingRepository.getBookingsByIdsForUpdate(bookingIds, client);
     for (const booking of bookings) {
       if (booking.status !== 'payment_submitted') {
@@ -452,6 +471,14 @@ export async function verifyPayment(
     }
     return updated;
   });
+
+  if (decision === 'verified') {
+    for (const booking of verifiedBookings) {
+      await maybeCompleteBookingForAlreadyFinishedMatch(booking.id);
+    }
+  }
+
+  return verifiedBookings;
 }
 
 /** Libera los fondos retenidos al entrenador y marca el servicio como completado. Reserva pagada
@@ -459,7 +486,7 @@ export async function verifyPayment(
  * Connect de por medio. Reserva pagada por Stripe (paymentProvider null, camino dormido en esta
  * fase): comportamiento real sin cambios. */
 export async function completeBooking(bookingId: string): Promise<Booking> {
-  return withTransaction(async (client) => {
+  const updated = await withTransaction(async (client) => {
     const booking = await bookingRepository.getBookingByIdForUpdate(bookingId, client);
     if (booking.status !== 'paid') {
       throw new ConflictError(`No se puede completar una reserva en estado "${booking.status}"`, 'invalid_transition');
@@ -490,14 +517,26 @@ export async function completeBooking(bookingId: string): Promise<Booking> {
       );
     }
 
-    const updated = await bookingRepository.updateStatus(
+    const result = await bookingRepository.updateStatus(
       bookingId,
       ['paid'],
       'completed',
       { completed_at: new Date() },
       client,
     );
-    if (!updated) throw new ConflictError('La reserva cambió de estado durante la liberación de fondos', 'invalid_transition');
-    return updated;
+    if (!result) throw new ConflictError('La reserva cambió de estado durante la liberación de fondos', 'invalid_transition');
+    return result;
   });
+
+  // Un solo lugar para avisar "tu reporte ya está listo" sin importar cómo se llegó acá — botón
+  // manual del entrenador, o cualquiera de los dos casos automáticos (ver matchService y
+  // verifyPayment más arriba). notifyUser nunca tira (token inválido/expirado es un no-op ahí).
+  const parentUserId = await bookingRepository.getParentUserIdForBooking(updated.id);
+  await notificationService.notifyUser(parentUserId, {
+    title: 'Tu reporte ya está listo',
+    body: 'El reporte del partido ya está disponible — entrá a la app para verlo.',
+    data: { bookingId: updated.id },
+  });
+
+  return updated;
 }
