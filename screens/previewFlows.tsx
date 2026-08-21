@@ -479,14 +479,25 @@ export function CoachHomeFlow({ coachId, coachName }: { coachId: string; coachNa
     // Mismo flujo que "Iniciar partido" — createOrGetMatch es idempotente por booking_id, así
     // que devuelve la misma fila 'suspended' y LiveCaptureView muestra la pantalla de reanudar.
     return (
-      <CoachMatchDayFlow booking={suspendedBookingRaw} onExit={completeBookingAndGoHome} />
+      <CoachMatchDayFlow
+        booking={suspendedBookingRaw}
+        onBack={() => setStep('home')}
+        onExit={completeBookingAndGoHome}
+      />
     );
   }
 
   if (step === 'match' && selectedBookingRaw) {
     // Sin onBack durante la captura activa (a propósito, igual que CoachCapturePreview en
     // /dev-preview) — onExit solo habilita "Ir al inicio" desde la pantalla de resumen final.
-    return <CoachMatchDayFlow booking={selectedBookingRaw} onExit={completeBookingAndGoHome} />;
+    // onBack solo se usa en el paso 'reminder', antes de arrancar a capturar.
+    return (
+      <CoachMatchDayFlow
+        booking={selectedBookingRaw}
+        onBack={() => setStep('detail')}
+        onExit={completeBookingAndGoHome}
+      />
+    );
   }
 
   if (step === 'requests') {
@@ -605,9 +616,11 @@ export function CoachHomeFlow({ coachId, coachName }: { coachId: string; coachNa
  */
 export function CoachMatchDayFlow({
   booking: initialBooking,
+  onBack,
   onExit,
 }: {
   booking: BookingWithParticipants;
+  onBack?: () => void;
   onExit?: () => void;
 }) {
   const { token } = useAuth();
@@ -652,6 +665,7 @@ export function CoachMatchDayFlow({
     return (
       <CoachPreMatchReminderScreen
         booking={booking}
+        onBack={onBack}
         onStartCapture={() => setStep('setup')}
         onOpenChat={() => setStep('chat')}
         onMeetingSaved={(details) => setBooking((b) => ({ ...b, ...details }))}

@@ -30,12 +30,14 @@ function usePreMatchCountdown(initialMinutes: number): number {
 
 export default function CoachPreMatchReminderScreen({
   booking,
+  onBack,
   onStartCapture,
   onOpenChat,
   onMeetingSaved,
   onRescheduled,
 }: {
   booking: BookingWithParticipants;
+  onBack?: () => void;
   onStartCapture?: () => void;
   onOpenChat?: () => void;
   onMeetingSaved?: (details: { courtLabel: string; meetingPointDetail: string }) => void;
@@ -119,6 +121,14 @@ export default function CoachPreMatchReminderScreen({
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      {onBack && (
+        <View style={styles.header}>
+          <Pressable style={styles.backButton} onPress={onBack}>
+            <Text style={styles.backIcon}>←</Text>
+          </Pressable>
+          <Text style={styles.headerTitle}>Antes del partido</Text>
+        </View>
+      )}
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.notifCaption}>Así llega a tu teléfono</Text>
         <View style={styles.notifCard}>
@@ -312,6 +322,26 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.bg,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderSoft,
+  },
+  backButton: {
+    paddingRight: 12,
+  },
+  backIcon: {
+    color: colors.lineWhite,
+    fontSize: 20,
+  },
+  headerTitle: {
+    color: colors.lineWhite,
+    fontSize: 17,
+    fontWeight: '800',
   },
   content: {
     padding: 20,
