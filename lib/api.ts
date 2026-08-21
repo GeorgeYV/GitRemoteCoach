@@ -245,6 +245,8 @@ export interface BookingWithParticipants extends Booking {
   tournamentVenue: string;
   tournamentCity?: string;
   hasUnreadMessages: boolean;
+  /** Solo poblado por listCoachBookings — null si el entrenador nunca inició la captura en vivo. */
+  matchStatus?: MatchStatus | null;
 }
 
 /** GET /bookings/:id — BookingStatusScreen (poll hasta que el coach acepte). */

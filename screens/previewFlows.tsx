@@ -81,8 +81,14 @@ export function CoachFlow({
    * salida, la captura activa sigue siendo forward-only a propósito. */
   onExit?: () => void;
 }) {
-  const { matchState, reducerState } = useMatch();
-  const showSummary = matchState.matchEnded || reducerState.matchClosed;
+  const { matchState, reducerState, match } = useMatch();
+  // match.status === 'completed' es la señal AUTORITATIVA (viene del servidor) — necesaria además
+  // de matchState/reducerState (que solo reflejan lo que este dispositivo tiene en AsyncStorage)
+  // porque un partido ya cerrado puede reabrirse en un dispositivo/instalación que nunca capturó
+  // sus puntos localmente; sin este chequeo, ese dispositivo mostraría una captura en vivo en
+  // 0-0 para un partido que el servidor ya considera terminado, con el riesgo real de que el
+  // entrenador siga anotando puntos sobre un partido que ya se cerró.
+  const showSummary = matchState.matchEnded || reducerState.matchClosed || match.status === 'completed';
   return showSummary ? <MatchSummaryView onGoHome={onExit} /> : <LiveCaptureView roundLabel={roundLabel} />;
 }
 
@@ -613,6 +619,13 @@ export function CoachHomeFlow({ coachId, coachName }: { coachId: string; coachNa
  * confirm match setup → resolve/create the server-side `matches` row for this booking → the
  * existing, unmodified live-capture wireframe. Chat is a side-step off the reminder screen,
  * back to it on close.
+ *
+ * Si esta reserva YA tiene una fila `matches` (en curso, pausado, suspendido o ya terminado —
+ * booking.matchStatus != null), reminder/setup se saltan por completo: createOrGetMatch es
+ * idempotente por bookingId (ON CONFLICT DO NOTHING) y de todas formas ignora silenciosamente
+ * cualquier formato/rival que el entrenador reescriba ahí, así que volver a mostrar ese formulario
+ * no logra nada y encima arriesga que el MatchConfig local (reglas de scoring) diverja de los
+ * puntos ya grabados con la configuración original. El config sale directo de la fila real.
  */
 export function CoachMatchDayFlow({
   booking: initialBooking,
@@ -626,13 +639,17 @@ export function CoachMatchDayFlow({
   const { token } = useAuth();
   const [booking, setBooking] = useState(initialBooking);
   const bookingId = booking.id;
-  const [step, setStep] = useState<'reminder' | 'setup' | 'loadingMatch' | 'live' | 'chat'>('reminder');
+  const hasExistingMatch = initialBooking.matchStatus != null;
+  const [step, setStep] = useState<'reminder' | 'setup' | 'loadingMatch' | 'live' | 'chat'>(
+    hasExistingMatch ? 'loadingMatch' : 'reminder'
+  );
   const [session, setSession] = useState<{ config: MatchConfig; roundLabel: string } | null>(null);
   const [match, setMatch] = useState<Match | null>(null);
   const [matchError, setMatchError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (step !== 'loadingMatch' || !session) return;
+    if (step !== 'loadingMatch' || hasExistingMatch) return;
+    if (!session) return;
     if (!token) {
       setMatchError('No hay una sesión activa.');
       return;
@@ -659,7 +676,51 @@ export function CoachMatchDayFlow({
     return () => {
       cancelled = true;
     };
-  }, [step, session, bookingId, token]);
+  }, [step, session, bookingId, token, hasExistingMatch]);
+
+  useEffect(() => {
+    if (step !== 'loadingMatch' || !hasExistingMatch) return;
+    if (!token) {
+      setMatchError('No hay una sesión activa.');
+      return;
+    }
+    let cancelled = false;
+    setMatchError(null);
+    // player2Label/format/noAd/initialServer acá son solo el fallback si por alguna razón la fila
+    // no existiera todavía — con hasExistingMatch=true, ON CONFLICT DO NOTHING los descarta y
+    // devuelve la fila real de todas formas.
+    createOrGetMatch(token, {
+      bookingId,
+      player2Label: 'Rival',
+      format: 'best_of_3',
+      noAd: false,
+      initialServer: 'player1',
+      captureMode: 'rapida',
+    })
+      .then((createdMatch) => {
+        if (cancelled) return;
+        setSession({
+          config: {
+            format: createdMatch.format,
+            noAd: createdMatch.noAd,
+            player1Name: booking.playerName,
+            player2Name: createdMatch.player2Label,
+            initialServer: createdMatch.initialServer,
+          },
+          roundLabel: booking.ageCategory,
+        });
+        setMatch(createdMatch);
+        setStep('live');
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setMatchError(err instanceof ApiError ? err.message : 'No se pudo abrir el partido.');
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, hasExistingMatch, bookingId, token]);
 
   if (step === 'reminder') {
     return (

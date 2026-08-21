@@ -107,6 +107,11 @@ export interface BookingWithParticipants extends Booking {
    * este mismo tipo (verificación de pagos, reembolsos) no necesitan la ciudad todavía. */
   tournamentCity?: string;
   hasUnreadMessages: boolean;
+  /** Solo poblado por listBookingsForCoach — null si el entrenador nunca inició la captura en
+   * vivo. Le permite a CoachBookingDetailScreen distinguir "iniciar partido" de "ya hay un
+   * partido en curso/terminado para esta reserva", en vez de guiarse solo por booking.status
+   * (que no cambia hasta que se verifica el pago). */
+  matchStatus?: MatchStatus | null;
 }
 
 /** Lo que devuelve el listado por padre (BookingHistoryScreen) — nombre del entrenador y del

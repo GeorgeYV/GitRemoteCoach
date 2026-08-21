@@ -40,6 +40,17 @@ export default function CoachBookingDetailScreen({
   const net = booking.coachNetAmount ?? booking.agreedRate * (1 - PLATFORM_COMMISSION_RATE);
   const commission = booking.agreedRate - net;
   const confirmed = booking.status === 'confirmed';
+  // El estado del partido (booking.matchStatus) es independiente del estado de pago de la reserva
+  // (booking.status) — una reserva puede seguir "confirmada" (pago sin verificar) aunque el
+  // partido ya haya terminado, así que el botón tiene que reflejar lo que realmente va a pasar al
+  // tocarlo en vez de asumir siempre "arrancar uno nuevo".
+  const startMatchLabel =
+    booking.matchStatus === 'completed'
+      ? 'Ver resumen del partido'
+      : booking.matchStatus === 'in_progress' || booking.matchStatus === 'suspended'
+        ? 'Continuar partido'
+        : 'Iniciar partido';
+  const startMatchIcon = booking.matchStatus === 'completed' ? 'document-text-outline' : 'play-outline';
 
   async function handleComplete() {
     if (!token) {
@@ -128,8 +139,8 @@ export default function CoachBookingDetailScreen({
           {onStartMatch && (
             <Pressable style={styles.startMatchButton} onPress={onStartMatch}>
               <View style={styles.buttonContent}>
-                <Ionicons name="play-outline" size={17} color={colors.courtBlueDeep} />
-                <Text style={styles.startMatchLabel}>Iniciar partido</Text>
+                <Ionicons name={startMatchIcon} size={17} color={colors.courtBlueDeep} />
+                <Text style={styles.startMatchLabel}>{startMatchLabel}</Text>
               </View>
             </Pressable>
           )}

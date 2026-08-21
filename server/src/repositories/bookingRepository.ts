@@ -55,6 +55,7 @@ function mapRowWithParticipants(row: any): BookingWithParticipants {
     tournamentVenue: row.tournament_venue,
     tournamentCity: row.tournament_city ?? undefined,
     hasUnreadMessages: row.has_unread_messages,
+    matchStatus: row.match_status ?? null,
   };
 }
 
@@ -414,11 +415,16 @@ export async function listBookingsForCoach(
   const { rows } = await db.query(
     // LEFT JOIN a una subquery derivada (no correlacionada) en vez de un EXISTS en el SELECT
     // list — mismo motivo que reviewed en listBookingsForParent, pg-mem no resuelve esa forma.
+    // LEFT JOIN matches: mismo criterio que listBookingsForParent — a lo sumo una fila por reserva
+    // (matches.booking_id es UNIQUE). CoachBookingDetailScreen la usa para distinguir "todavía sin
+    // partido" de "ya hay un partido en curso/pausado/suspendido/terminado" y así decidir si
+    // "Iniciar partido" debe arrancar uno nuevo o retomar directo el que ya existe.
     `SELECT b.*, p.full_name AS player_name, p.age_category, u.full_name AS parent_name,
             t.name AS tournament_name, t.venue AS tournament_venue,
             COALESCE(cl.city, t.city) AS tournament_city,
             (parent_msgs.last_at IS NOT NULL
-             AND parent_msgs.last_at > COALESCE(b.coach_messages_read_at, TIMESTAMP '1970-01-01')) AS has_unread_messages
+             AND parent_msgs.last_at > COALESCE(b.coach_messages_read_at, TIMESTAMP '1970-01-01')) AS has_unread_messages,
+            m.status AS match_status
      FROM bookings b
      JOIN players p ON p.id = b.player_id
      JOIN users u ON u.id = p.guardian_user_id
@@ -430,6 +436,7 @@ export async function listBookingsForCoach(
        WHERE sender_type != 'coach'
        GROUP BY booking_id
      ) parent_msgs ON parent_msgs.booking_id = b.id
+     LEFT JOIN matches m ON m.booking_id = b.id
      WHERE b.coach_id = $1
      ORDER BY b.match_datetime DESC`,
     [coachId],

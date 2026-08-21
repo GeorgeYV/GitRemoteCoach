@@ -42,5 +42,6 @@ export function toCoachBooking(booking: BookingWithParticipants): CoachBooking {
     status: STATUS_MAP[booking.status],
     readyToComplete: booking.status === 'paid',
     hasUnreadMessages: booking.hasUnreadMessages,
+    matchStatus: booking.matchStatus ?? null,
   };
 }

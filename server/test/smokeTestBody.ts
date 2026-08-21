@@ -2832,6 +2832,80 @@ console.log('\n=== Escenario 30: terminar el partido completa la reserva sola (e
   assertTrue(!!bookingBAfter.completedAt, 'caso B: completedAt queda fijado');
 }
 
+console.log('\n=== Escenario 31: GET /coaches/:id/bookings expone matchStatus, incluso con el pago sin verificar ===');
+{
+  const registerRes = await app.inject({
+    method: 'POST',
+    url: '/auth/register',
+    payload: {
+      email: 'coach.matchstatus.e2e@example.com',
+      password: 'super-secreta-123',
+      fullName: 'Coach MatchStatus E2E',
+      primaryRole: 'coach',
+    },
+  });
+  const { token: msCoachToken, user: msCoach } = registerRes.json();
+  await app.inject({
+    method: 'POST',
+    url: '/coaches',
+    headers: { authorization: `Bearer ${msCoachToken}` },
+    payload: { city: 'CDMX', country: 'EC', yearsExperience: 4, hourlyRate: 30, ageCategories: ['U14'], levels: ['competitivo'] },
+  });
+
+  const bookingRes = await requestBooking(msCoach.id, inFuture(48));
+  const booking = bookingRes.json();
+  await app.inject({ method: 'POST', url: `/bookings/${booking.id}/accept`, headers: { authorization: `Bearer ${msCoachToken}` } });
+
+  function findBooking(list: any[]): any {
+    return list.find((b: any) => b.id === booking.id);
+  }
+
+  const beforeMatchList = (
+    await app.inject({ method: 'GET', url: `/coaches/${msCoach.id}/bookings`, headers: { authorization: `Bearer ${msCoachToken}` } })
+  ).json();
+  assertEqual(findBooking(beforeMatchList).matchStatus, null, 'antes de capturar: matchStatus viene null');
+
+  // Pago mandado pero NUNCA verificado — booking.status se queda en 'payment_submitted' para
+  // siempre, así que "Iniciar partido" seguiría visible en CoachBookingDetailScreen (se guía por
+  // status==='confirmed', que incluye payment_submitted) si no fuera por matchStatus.
+  await app.inject({
+    method: 'POST',
+    url: '/bookings/submit-payment-proof-batch',
+    headers: { authorization: `Bearer ${parentToken}` },
+    payload: { bookingIds: [booking.id], provider: 'deuna', referenceCode: 'MATCHSTATUS-E2E' },
+  });
+
+  const matchRes = await app.inject({
+    method: 'POST',
+    url: '/matches',
+    headers: { authorization: `Bearer ${msCoachToken}` },
+    payload: { bookingId: booking.id, player2Label: 'Rival', format: 'single_set', noAd: true, initialServer: 'player1', captureMode: 'detallada' },
+  });
+  const match = matchRes.json();
+
+  await app.inject({
+    method: 'POST',
+    url: `/matches/${match.id}/retire`,
+    headers: { authorization: `Bearer ${msCoachToken}` },
+    payload: { retiredBy: 'player1' },
+  });
+
+  const afterRetireList = (
+    await app.inject({ method: 'GET', url: `/coaches/${msCoach.id}/bookings`, headers: { authorization: `Bearer ${msCoachToken}` } })
+  ).json();
+  const bookingAfterRetire = findBooking(afterRetireList);
+  assertEqual(
+    bookingAfterRetire.status,
+    'payment_submitted',
+    'el pago nunca se verificó, así que booking.status se queda en payment_submitted',
+  );
+  assertEqual(
+    bookingAfterRetire.matchStatus,
+    'completed',
+    'pero matchStatus sí refleja que el partido ya terminó por retiro, aunque el pago siga sin verificar',
+  );
+}
+
 console.log(`\n=== Resultado: ${passed} pasaron, ${failed} fallaron ===`);
 await app.close();
 process.exit(failed > 0 ? 1 : 0);

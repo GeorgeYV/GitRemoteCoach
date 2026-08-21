@@ -1,4 +1,4 @@
-import type { VerificationDocType } from '../lib/api';
+import type { MatchStatus, VerificationDocType } from '../lib/api';
 
 export interface DocumentItem {
   id: VerificationDocType;
@@ -168,4 +168,6 @@ export interface CoachBooking {
    * POST /bookings/:id/complete puede liberar el pago. */
   readyToComplete: boolean;
   hasUnreadMessages?: boolean;
+  /** null si el entrenador nunca inició la captura en vivo para esta reserva. */
+  matchStatus?: MatchStatus | null;
 }
