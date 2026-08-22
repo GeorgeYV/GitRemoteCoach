@@ -363,6 +363,10 @@ interface PendingDetailedPoint {
   winner: PlayerId;
   server: PlayerId;
   step: DetailedStep;
+  /** true por defecto (el caso más común) — el entrenador lo cambia a "2do saque" con 1 toque
+   * cuando corresponde. Antes esto solo se preguntaba cuando sacaba player1 y nunca viajaba más
+   * allá del Ace; ahora se pregunta siempre y llega hasta el commit final de cualquier camino. */
+  firstServeIn: boolean;
   serveDirection: ServeDirection | null;
   category: PointOutcomeCategory | null;
   shotType: ShotType | null;
@@ -380,6 +384,7 @@ function DetailedPointFlow({ onOpenMenu }: { onOpenMenu: () => void }) {
       winner,
       server: getCurrentServer(matchState),
       step: 'serve',
+      firstServeIn: true,
       serveDirection: null,
       category: null,
       shotType: null,
@@ -403,7 +408,7 @@ function DetailedPointFlow({ onOpenMenu }: { onOpenMenu: () => void }) {
     commit({
       wonBy: pending.winner,
       detail: 'ace',
-      firstServeIn: true,
+      firstServeIn: pending.firstServeIn,
       serveDirection: pending.serveDirection,
       errorDirection: null,
       rallyLength: 'corto',
@@ -419,6 +424,8 @@ function DetailedPointFlow({ onOpenMenu }: { onOpenMenu: () => void }) {
     commit({
       wonBy: pending.winner,
       detail: 'doble_falta',
+      // Una doble falta es, por definición, las dos veces (1er Y 2do saque) falladas — firstServeIn
+      // en false es lo correcto acá siempre, no depende de lo que el entrenador haya tocado arriba.
       firstServeIn: false,
       serveDirection: null,
       errorDirection: null,
@@ -435,8 +442,8 @@ function DetailedPointFlow({ onOpenMenu }: { onOpenMenu: () => void }) {
     commit({
       wonBy: pending.winner,
       detail: lado === 'derecha' ? 'error_no_forzado_derecha' : 'error_no_forzado_reves',
-      firstServeIn: true,
-      serveDirection: null,
+      firstServeIn: pending.firstServeIn,
+      serveDirection: pending.serveDirection,
       errorDirection: pending.errorDirection,
       rallyLength: 'corto',
       netApproach: false,
@@ -451,8 +458,8 @@ function DetailedPointFlow({ onOpenMenu }: { onOpenMenu: () => void }) {
     commit({
       wonBy: pending.winner,
       detail: pending.category,
-      firstServeIn: true,
-      serveDirection: null,
+      firstServeIn: pending.firstServeIn,
+      serveDirection: pending.serveDirection,
       errorDirection: pending.errorDirection,
       rallyLength,
       netApproach: pending.shotNetApproach,
@@ -486,6 +493,7 @@ function DetailedPointFlow({ onOpenMenu }: { onOpenMenu: () => void }) {
           pending={pending}
           serverName={serverName}
           config={config}
+          onSetFirstServe={(firstServeIn) => setPending((p) => (p ? { ...p, firstServeIn } : p))}
           onSetDirection={(dir) =>
             setPending((p) => (p ? { ...p, serveDirection: p.serveDirection === dir ? null : dir } : p))
           }
@@ -538,6 +546,7 @@ function DetailedServeStep({
   pending,
   serverName,
   config,
+  onSetFirstServe,
   onSetDirection,
   onAce,
   onDoubleFault,
@@ -548,6 +557,7 @@ function DetailedServeStep({
   pending: PendingDetailedPoint;
   serverName: string;
   config: { player1Name: string };
+  onSetFirstServe: (firstServeIn: boolean) => void;
   onSetDirection: (dir: ServeDirection) => void;
   onAce: () => void;
   onDoubleFault: () => void;
@@ -566,6 +576,13 @@ function DetailedServeStep({
     <View>
       <StepHeader title={`PASO 1 · SERVICIO DE ${serverName.toUpperCase()}`} onCancel={onCancel} />
 
+      <SectionLabel label="Saque" />
+      <View style={styles.row3}>
+        <DirectionChip label="1er saque" sub="" active={pending.firstServeIn} onPress={() => onSetFirstServe(true)} />
+        <DirectionChip label="2do saque" sub="" active={!pending.firstServeIn} onPress={() => onSetFirstServe(false)} />
+      </View>
+
+      <View style={styles.divider} />
       <SectionLabel label="Dirección del saque" hint="OBLIGATORIO PARA ACE" />
       <View style={styles.row3}>
         <DirectionChip label="T" sub="A LA T" active={pending.serveDirection === 'T'} onPress={() => onSetDirection('T')} />
