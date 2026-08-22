@@ -1351,6 +1351,23 @@ export interface SetOutcome {
   unforcedErrors: number;
 }
 
+/** Dónde cayó el saque — solo cuenta puntos con serveDirection capturado. 1er/2do saque
+ * separados por conteo dentro de cada zona, no por zona aparte. */
+export interface ServeZoneCounts {
+  T: { first: number; second: number };
+  cuerpo: { first: number; second: number };
+  abierto: { first: number; second: number };
+}
+
+export interface ServeEfficiency {
+  firstServeWon: number;
+  firstServeTotal: number;
+  firstServeWonPct: number | null;
+  secondServeWon: number;
+  secondServeTotal: number;
+  secondServeWonPct: number | null;
+}
+
 export type SemaforoTone = 'green' | 'amber' | 'red';
 
 export interface SemaforoItem {
@@ -1370,6 +1387,14 @@ export interface MatchReportView {
   winnerSlot: MatchPlayerSlot | null;
   semaforo: SemaforoItem[];
   tacticalDiagnosis: string | null;
+  player1ServeZones: ServeZoneCounts;
+  player1ServeEfficiency: ServeEfficiency;
+  /** errores de player1 devolviendo el saque de la rival (atajo "error de devolución"). */
+  player1ReturnErrorZones: ErrorZoneCounts;
+  player2ServeZones: ServeZoneCounts;
+  player2ServeEfficiency: ServeEfficiency;
+  /** errores de la rival devolviendo el saque de player1 (atajo "error de devolución"). */
+  player2ReturnErrorZones: ErrorZoneCounts;
 }
 
 export type TranscriptStatus = 'pending' | 'completed' | 'failed';

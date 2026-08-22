@@ -5,6 +5,8 @@ import type {
   PlayerMatchStats,
   PressureEfficiency,
   RallyErrorBucket,
+  ServeEfficiency,
+  ServeZoneCounts,
   SetOutcome,
 } from './lib/matchStatsEngine.js';
 import type { SemaforoItem } from './lib/matchReportNarratives.js';
@@ -533,6 +535,12 @@ export interface MatchReportView {
   winnerSlot: MatchPlayerSlot | null;
   semaforo: SemaforoItem[];
   tacticalDiagnosis: string | null;
+  player1ServeZones: ServeZoneCounts;
+  player1ServeEfficiency: ServeEfficiency;
+  player1ReturnErrorZones: ErrorZoneCounts;
+  player2ServeZones: ServeZoneCounts;
+  player2ServeEfficiency: ServeEfficiency;
+  player2ReturnErrorZones: ErrorZoneCounts;
 }
 
 /** TrainerProfileScreen: stats agregadas de todos los partidos completados de un coach —

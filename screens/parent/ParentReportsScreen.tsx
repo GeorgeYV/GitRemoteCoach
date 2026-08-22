@@ -9,6 +9,7 @@ import KeyStatsCard from '../../components/parent/report/KeyStatsCard';
 import PressureEfficiencyCard from '../../components/parent/report/PressureEfficiencyCard';
 import ScoreSummary from '../../components/parent/report/ScoreSummary';
 import SemaforoCard from '../../components/parent/report/SemaforoCard';
+import ServePlacementCourt from '../../components/parent/report/ServePlacementCourt';
 import TacticalDiagnosisCard from '../../components/parent/report/TacticalDiagnosisCard';
 import VoiceNoteCard from '../../components/parent/report/VoiceNoteCard';
 import ParentTabBar from '../../components/parent/ParentTabBar';
@@ -226,6 +227,22 @@ function ReportDetail({ booking, onBack }: { booking: BookingHistoryEntry; onBac
                 <KeyStatsCard player1={report.report.player1} />
                 <PressureEfficiencyCard pressureEfficiency={report.report.pressureEfficiency} />
                 <ErrorScatterCourt errorZones={report.report.errorZones} />
+                <ServePlacementCourt
+                  playerName={booking.playerName}
+                  accentColor={colors.courtBlue}
+                  serveZones={report.report.player1ServeZones}
+                  serveEfficiency={report.report.player1ServeEfficiency}
+                  opponentReturnErrors={report.report.player2ReturnErrorZones}
+                  opponentLabel={report.match.player2Label}
+                />
+                <ServePlacementCourt
+                  playerName={report.match.player2Label}
+                  accentColor={colors.errorCoral}
+                  serveZones={report.report.player2ServeZones}
+                  serveEfficiency={report.report.player2ServeEfficiency}
+                  opponentReturnErrors={report.report.player1ReturnErrorZones}
+                  opponentLabel={booking.playerName}
+                />
                 <TacticalDiagnosisCard text={report.report.tacticalDiagnosis} />
               </>
             )}

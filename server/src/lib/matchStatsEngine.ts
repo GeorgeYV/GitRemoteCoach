@@ -1,4 +1,4 @@
-import type { ErrorDirection, Lado, MatchPlayerSlot, PointDetail, RallyLength } from '../types.js';
+import type { ErrorDirection, Lado, MatchPlayerSlot, PointDetail, RallyLength, ServeDirection } from '../types.js';
 import {
   MATCH_FORMAT_RULES,
   MATCH_TIEBREAK_TARGET,
@@ -28,6 +28,11 @@ export interface StatsPointEvent {
   rallyLength: RallyLength | null;
   /** solo modo de captura 'detallada' — ver errorZones más abajo. */
   lado: Lado | null;
+  /** dónde cayó el saque de quien sirvió este punto — ver serveZones más abajo. */
+  serveDirection: ServeDirection | null;
+  /** atajo de 3 toques "error de devolución" — separa las devoluciones erradas del resto de los
+   * errores no forzados en player1ReturnErrorZones/player2ReturnErrorZones. */
+  isReturnError: boolean;
 }
 
 export interface StatsScoreAdjustment {
@@ -501,6 +506,24 @@ export interface SetOutcome {
   unforcedErrors: number;
 }
 
+/** Dónde cayó el saque — solo cuenta puntos con serveDirection capturado (nulo en modo 'rapida'
+ * cuando sacaba el rival, o en cualquier "punto no visto"). 1er/2do saque separados por conteo,
+ * no por zona — la ubicación T/cuerpo/abierto es la misma, lo que cambia es cuál intento fue. */
+export interface ServeZoneCounts {
+  T: { first: number; second: number };
+  cuerpo: { first: number; second: number };
+  abierto: { first: number; second: number };
+}
+
+export interface ServeEfficiency {
+  firstServeWon: number;
+  firstServeTotal: number;
+  firstServeWonPct: number | null;
+  secondServeWon: number;
+  secondServeTotal: number;
+  secondServeWonPct: number | null;
+}
+
 export interface MatchReportStats {
   player1: PlayerMatchStats;
   pressureEfficiency: PressureEfficiency;
@@ -509,14 +532,47 @@ export interface MatchReportStats {
   sets: SetOutcome[];
   totalUnforcedErrors: number;
   winnerSlot: MatchPlayerSlot | null;
+  player1ServeZones: ServeZoneCounts;
+  player1ServeEfficiency: ServeEfficiency;
+  /** errores de player1 devolviendo el saque de la rival (atajo "error de devolución"). */
+  player1ReturnErrorZones: ErrorZoneCounts;
+  player2ServeZones: ServeZoneCounts;
+  player2ServeEfficiency: ServeEfficiency;
+  /** errores de la rival devolviendo el saque de player1 (atajo "error de devolución"). */
+  player2ReturnErrorZones: ErrorZoneCounts;
 }
 
 function emptyErrorZones(): ErrorZoneCounts {
   return { red_derecha: 0, red_reves: 0, larga_derecha: 0, larga_reves: 0, ancha_derecha: 0, ancha_reves: 0 };
 }
 
+function emptyServeZones(): ServeZoneCounts {
+  return { T: { first: 0, second: 0 }, cuerpo: { first: 0, second: 0 }, abierto: { first: 0, second: 0 } };
+}
+
+function emptyServeEfficiency(): ServeEfficiency {
+  return {
+    firstServeWon: 0,
+    firstServeTotal: 0,
+    firstServeWonPct: null,
+    secondServeWon: 0,
+    secondServeTotal: 0,
+    secondServeWonPct: null,
+  };
+}
+
 function pct(numerator: number, denominator: number): number | null {
   return denominator > 0 ? Math.round((numerator / denominator) * 100) : null;
+}
+
+/** `lado` (modo 'detallada') es la fuente de verdad cuando está — el sufijo _derecha/_reves de
+ * `detail` (modo 'rapida', o cualquier punto capturado antes de que existiera `lado`) es el
+ * fallback. null cuando no hay ninguna de las dos formas de saber el lado. */
+function deriveSide(event: Pick<StatsPointEvent, 'lado' | 'detail'>): 'derecha' | 'reves' | null {
+  if (event.lado) return event.lado;
+  if (event.detail === 'error_no_forzado_reves') return 'reves';
+  if (event.detail === 'error_no_forzado_derecha') return 'derecha';
+  return null;
 }
 
 /** Igual que computePlayer1MatchStats, pero para el reporte enriquecido del padre: agrega
@@ -544,16 +600,57 @@ export function computeMatchReportStats(
   const unforcedErrorsBySet: number[] = [];
   let totalUnforcedErrors = 0;
 
+  const serveZones: Record<MatchPlayerSlot, ServeZoneCounts> = { player1: emptyServeZones(), player2: emptyServeZones() };
+  const serveEfficiency: Record<MatchPlayerSlot, ServeEfficiency> = {
+    player1: emptyServeEfficiency(),
+    player2: emptyServeEfficiency(),
+  };
+  // Quién erró la devolución, no quién ganó el punto — separado de errorZones (que solo mira los
+  // errores de player1, mezclando devolución y rally) para poder mostrar "la rival te devolvió
+  // mal el saque" al lado del dibujo del saque de cada jugador.
+  const returnErrorZones: Record<MatchPlayerSlot, ErrorZoneCounts> = {
+    player1: emptyErrorZones(),
+    player2: emptyErrorZones(),
+  };
+
   for (const point of state.pointHistory) {
     const { event, server, setIndex, isBreakPointAgainstServer } = point;
+    const notPointNotSeen = event.detail !== 'dato_no_capturado';
 
     // Eficiencia bajo presión: solo tiene sentido para los puntos donde player1 saca — el saque
     // del rival no se captura con el mismo detalle (ver PointFlow#ServeStep, firstServeIn queda
     // en un valor de relleno cuando sirve player2).
-    if (server === 'player1' && event.detail !== 'dato_no_capturado') {
+    if (server === 'player1' && notPointNotSeen) {
       const bucket = isBreakPointAgainstServer ? pressureEfficiency.breakPoint : pressureEfficiency.normal;
       bucket.attempts += 1;
       if (event.firstServeIn) bucket.firstServeIn += 1;
+    }
+
+    // Dónde cayó el saque + eficiencia por 1er/2do — de cualquiera de los dos jugadores, a
+    // diferencia de pressureEfficiency arriba (que sigue siendo solo de player1).
+    if (notPointNotSeen) {
+      const eff = serveEfficiency[server];
+      const wonThisServe = event.wonBy === server;
+      if (event.firstServeIn) {
+        eff.firstServeTotal += 1;
+        if (wonThisServe) eff.firstServeWon += 1;
+      } else {
+        eff.secondServeTotal += 1;
+        if (wonThisServe) eff.secondServeWon += 1;
+      }
+      if (event.serveDirection) {
+        const zone = serveZones[server][event.serveDirection];
+        if (event.firstServeIn) zone.first += 1;
+        else zone.second += 1;
+      }
+    }
+
+    if (event.isReturnError) {
+      const erringPlayer = otherPlayer(event.wonBy);
+      const side = deriveSide(event);
+      if (event.errorDirection && side) {
+        returnErrorZones[erringPlayer][`${event.errorDirection}_${side}` as ErrorZoneKey] += 1;
+      }
     }
 
     const isUnforcedByPlayer1 =
@@ -566,9 +663,7 @@ export function computeMatchReportStats(
     if (isUnforcedByPlayer1) {
       totalUnforcedErrors += 1;
       unforcedErrorsBySet[setIndex] = (unforcedErrorsBySet[setIndex] ?? 0) + 1;
-      // `lado` (modo 'detallada') es la fuente de verdad cuando está — el sufijo _derecha/_reves
-      // de `detail` (modo 'rapida') es el fallback para puntos capturados antes de que existiera.
-      const side = event.lado ?? (event.detail === 'error_no_forzado_reves' ? 'reves' : event.detail === 'error_no_forzado_derecha' ? 'derecha' : null);
+      const side = deriveSide(event);
       if (event.errorDirection && side) {
         errorZones[`${event.errorDirection}_${side}` as ErrorZoneKey] += 1;
       }
@@ -584,6 +679,12 @@ export function computeMatchReportStats(
 
   pressureEfficiency.normal.pct = pct(pressureEfficiency.normal.firstServeIn, pressureEfficiency.normal.attempts);
   pressureEfficiency.breakPoint.pct = pct(pressureEfficiency.breakPoint.firstServeIn, pressureEfficiency.breakPoint.attempts);
+
+  (['player1', 'player2'] as MatchPlayerSlot[]).forEach((p) => {
+    const eff = serveEfficiency[p];
+    eff.firstServeWonPct = pct(eff.firstServeWon, eff.firstServeTotal);
+    eff.secondServeWonPct = pct(eff.secondServeWon, eff.secondServeTotal);
+  });
 
   const rallyErrorBuckets: RallyErrorBucket[] = (['corto', 'medio', 'largo'] as RallyLength[])
     .map((rallyLength) => ({ rallyLength, ...rallyTotals[rallyLength] }))
@@ -604,6 +705,12 @@ export function computeMatchReportStats(
     sets,
     totalUnforcedErrors,
     winnerSlot: state.winner,
+    player1ServeZones: serveZones.player1,
+    player1ServeEfficiency: serveEfficiency.player1,
+    player1ReturnErrorZones: returnErrorZones.player1,
+    player2ServeZones: serveZones.player2,
+    player2ServeEfficiency: serveEfficiency.player2,
+    player2ReturnErrorZones: returnErrorZones.player2,
   };
 }
 
