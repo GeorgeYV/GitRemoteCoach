@@ -74,6 +74,9 @@ CREATE TYPE point_detail AS ENUM (
   'error_no_forzado',
   'error_no_forzado_derecha',
   'error_no_forzado_reves',
+  -- Solo modo de captura 'detallada' (ver decisión #40 más abajo) — espejo "de volea" de
+  -- error_no_forzado.
+  'error_no_forzado_volea',
   -- "Punto no visto" (Hija/Rival) — el marcador avanza pero el punto queda fuera de los %.
   'dato_no_capturado'
 );
@@ -1309,6 +1312,24 @@ CREATE TABLE match_point_events (
   -- Atajo de 3 toques del Paso 2 (error de devolución) — separado de `detail` porque el mismo
   -- tipo_finalizacion (error_no_forzado_derecha/reves) puede ocurrir también en un rally largo.
   is_return_error  BOOLEAN NOT NULL DEFAULT FALSE,
+  -- Lado del golpe y tipo de golpe — solo modo de captura 'detallada' (ver decisión #40).
+  -- `lado` es independiente de `detail`: `detail` ya dice la categoría (winner/error no
+  -- forzado/…), `lado` de qué lado del cuerpo salió. TEXT + CHECK en vez de ENUM para
+  -- shot_type, mismo criterio que decisión #35 — la lista de golpes es la que más probablemente
+  -- siga cambiando a medida que se ajusta el árbol de captura, y ampliar un CHECK es mucho más
+  -- barato que ampliar un ENUM (ver decisión #34).
+  -- "col IS NULL OR col IN (...)" en vez de solo "col IN (...)": semánticamente son lo mismo en
+  -- Postgres real (un CHECK ya deja pasar NULL), pero pg-mem (server/test/setupDb.ts) evalúa mal
+  -- IN (...) contra NULL y rechaza filas válidas si no está explícito.
+  lado             TEXT CHECK (lado IS NULL OR lado IN ('derecha', 'reves')),
+  shot_type        TEXT CHECK (shot_type IS NULL OR shot_type IN (
+                     'paralelo', 'cruzado', 'angulo_corto', 'contrapie', 'de_fondo_invertido',
+                     'de_aproximacion', 'drop_shot_fondo', 'drop_shot_cancha', 'passing_shot',
+                     'globo', 'volea', 'dejada_volea', 'remate', 'de_fondo', 'volea_baja',
+                     'volea_alta', 'swing_volley', 'bote_pronto', 'tiro_aceleracion',
+                     'volea_bloqueo', 'tiro_angular_corto', 'tiro_profundo_linea',
+                     'topspin_alto', 'slice'
+                   )),
   -- Snapshot denormalizado del marcador tras este punto, solo para
   -- lectura rápida (evita recalcular replayeando todos los eventos).
   -- La fuente de verdad sigue siendo la secuencia de eventos.
@@ -1861,4 +1882,23 @@ CREATE INDEX idx_push_tokens_user_id ON push_tokens (user_id);
 --     transcribirse (con éxito o agotando reintentos), después se borra
 --     y esta columna vuelve a NULL — el reporte del padre nunca reproduce
 --     el audio, solo lee el texto ya transcrito.
+--
+-- 40. match_point_events ganó lado (TEXT+CHECK, 'derecha'/'reves') y
+--     shot_type (TEXT+CHECK, ~24 valores — ver lib/shotTypes.ts) para el
+--     árbol de "tipo de golpe" del modo de captura 'detallada'
+--     (capture_mode, ver PointFlow.tsx). point_detail ganó un valor
+--     nuevo, 'error_no_forzado_volea' — espejo "de volea" de
+--     error_no_forzado, la única categoría de detallada sin equivalente
+--     ya existente. Las otras 4 categorías del modo detallada
+--     (error_no_forzado, error_no_forzado_volea, error_forzado, winner,
+--     winner_volea) reusan valores de point_detail que ya existían —
+--     `detail` sigue siendo la categoría, `lado` es un campo aparte e
+--     independiente (a diferencia de winner_derecha/reves o
+--     error_no_forzado_derecha/reves del modo 'rapida', que ya
+--     codifican el lado directo en el detail). shot_type usa TEXT+CHECK
+--     en vez de un ENUM nuevo por el mismo motivo que decisión #35: es
+--     la lista con más chances de seguir ajustándose, y ampliar un
+--     CHECK con ALTER TABLE es mucho más barato que ampliar un ENUM
+--     (decisión #34). Ambas columnas son NULL por defecto — el modo
+--     'rapida' (el único activo hoy) nunca las completa.
 -- =====================================================================

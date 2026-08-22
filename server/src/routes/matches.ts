@@ -3,6 +3,7 @@ import { z } from 'zod';
 import * as bookingRepository from '../repositories/bookingRepository.js';
 import * as matchService from '../services/matchService.js';
 import { ForbiddenError, ValidationError } from '../lib/errors.js';
+import { SHOT_TYPE_IDS, type ShotType } from '../lib/shotTypes.js';
 
 // Mismos 6 ids que lib/matchFormats.ts#MatchFormatId — repetidos como tupla literal para que
 // z.enum() los acepte (mismo patrón que COUNTRY_CODES en routes/clubs.ts y routes/tournaments.ts).
@@ -28,11 +29,16 @@ const POINT_DETAIL = [
   'error_no_forzado',
   'error_no_forzado_derecha',
   'error_no_forzado_reves',
+  'error_no_forzado_volea',
   'dato_no_capturado',
 ] as const;
 const SERVE_DIRECTION = ['T', 'cuerpo', 'abierto'] as const;
 const ERROR_DIRECTION = ['red', 'larga', 'ancha'] as const;
 const RALLY_LENGTH = ['corto', 'medio', 'largo'] as const;
+const LADO = ['derecha', 'reves'] as const;
+// SHOT_TYPE_IDS ya es la lista completa (lib/shotTypes.ts) — z.enum() necesita una tupla no
+// vacía y literal, no un array plano, de ahí el "as [ShotType, ...ShotType[]]".
+const SHOT_TYPE = SHOT_TYPE_IDS as [ShotType, ...ShotType[]];
 
 const getOrCreateMatchSchema = z.object({
   bookingId: z.string().uuid(),
@@ -51,6 +57,11 @@ const pointSchema = z.object({
   serveDirection: z.enum(SERVE_DIRECTION).nullable(),
   errorDirection: z.enum(ERROR_DIRECTION).nullable(),
   rallyLength: z.enum(RALLY_LENGTH).nullable(),
+  // .default(null) en vez de solo .nullable(): los puntos de modo 'rapida' (y cualquier smoke
+  // test/cliente viejo) nunca mandan estos dos campos — sin el default, zod los exige presentes
+  // (aunque sea en null) y rechaza el payload entero con 422.
+  lado: z.enum(LADO).nullable().default(null),
+  shotType: z.enum(SHOT_TYPE).nullable().default(null),
   netApproach: z.boolean(),
   isReturnError: z.boolean(),
 });

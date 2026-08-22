@@ -93,6 +93,8 @@ function toPointInput(event: PointEvent, sequenceNumber: number): MatchPointInpu
     rallyLength: event.rallyLength,
     netApproach: event.netApproach,
     isReturnError: event.isReturnError,
+    lado: event.lado,
+    shotType: event.shotType,
   };
 }
 

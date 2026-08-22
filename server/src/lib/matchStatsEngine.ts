@@ -1,4 +1,4 @@
-import type { ErrorDirection, MatchPlayerSlot, PointDetail, RallyLength } from '../types.js';
+import type { ErrorDirection, Lado, MatchPlayerSlot, PointDetail, RallyLength } from '../types.js';
 import {
   MATCH_FORMAT_RULES,
   MATCH_TIEBREAK_TARGET,
@@ -26,6 +26,8 @@ export interface StatsPointEvent {
   firstServeIn: boolean;
   errorDirection: ErrorDirection | null;
   rallyLength: RallyLength | null;
+  /** solo modo de captura 'detallada' — ver errorZones más abajo. */
+  lado: Lado | null;
 }
 
 export interface StatsScoreAdjustment {
@@ -425,6 +427,7 @@ function statsFromState(state: MatchState): PlayerMatchStats {
       case 'error_no_forzado':
       case 'error_no_forzado_derecha':
       case 'error_no_forzado_reves':
+      case 'error_no_forzado_volea':
         stats[otherPlayer(event.wonBy)].unforcedErrors += 1;
         break;
       default:
@@ -556,14 +559,17 @@ export function computeMatchReportStats(
     const isUnforcedByPlayer1 =
       (event.detail === 'error_no_forzado' ||
         event.detail === 'error_no_forzado_derecha' ||
-        event.detail === 'error_no_forzado_reves') &&
+        event.detail === 'error_no_forzado_reves' ||
+        event.detail === 'error_no_forzado_volea') &&
       otherPlayer(event.wonBy) === 'player1';
 
     if (isUnforcedByPlayer1) {
       totalUnforcedErrors += 1;
       unforcedErrorsBySet[setIndex] = (unforcedErrorsBySet[setIndex] ?? 0) + 1;
-      if (event.errorDirection && event.detail !== 'error_no_forzado') {
-        const side = event.detail === 'error_no_forzado_reves' ? 'reves' : 'derecha';
+      // `lado` (modo 'detallada') es la fuente de verdad cuando está — el sufijo _derecha/_reves
+      // de `detail` (modo 'rapida') es el fallback para puntos capturados antes de que existiera.
+      const side = event.lado ?? (event.detail === 'error_no_forzado_reves' ? 'reves' : event.detail === 'error_no_forzado_derecha' ? 'derecha' : null);
+      if (event.errorDirection && side) {
         errorZones[`${event.errorDirection}_${side}` as ErrorZoneKey] += 1;
       }
     }

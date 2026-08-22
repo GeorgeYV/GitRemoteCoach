@@ -1,6 +1,7 @@
 import type { Pool, PoolClient } from 'pg';
 import { pool } from '../lib/db.js';
-import type { MatchPlayerSlot, MatchPointEvent, PointDetail, ServeDirection, ErrorDirection, RallyLength } from '../types.js';
+import type { ShotType } from '../lib/shotTypes.js';
+import type { MatchPlayerSlot, MatchPointEvent, PointDetail, ServeDirection, ErrorDirection, RallyLength, Lado } from '../types.js';
 
 type Queryable = Pool | PoolClient;
 
@@ -18,6 +19,8 @@ function mapRow(row: any): MatchPointEvent {
     rallyLength: row.rally_length,
     netApproach: row.net_approach,
     isReturnError: row.is_return_error,
+    lado: row.lado,
+    shotType: row.shot_type,
   };
 }
 
@@ -31,6 +34,8 @@ export interface PointInput {
   rallyLength: RallyLength | null;
   netApproach: boolean;
   isReturnError: boolean;
+  lado: Lado | null;
+  shotType: ShotType | null;
 }
 
 /**
@@ -42,8 +47,9 @@ export async function create(matchId: string, point: PointInput, db: Queryable =
   const { rows } = await db.query(
     `INSERT INTO match_point_events
        (match_id, sequence_number, won_by, detail, first_serve_in,
-        serve_direction, error_direction, rally_length, net_approach, is_return_error)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        serve_direction, error_direction, rally_length, net_approach, is_return_error,
+        lado, shot_type)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
      ON CONFLICT (match_id, sequence_number) DO NOTHING
      RETURNING *`,
     [
@@ -57,6 +63,8 @@ export async function create(matchId: string, point: PointInput, db: Queryable =
       point.rallyLength,
       point.netApproach,
       point.isReturnError,
+      point.lado,
+      point.shotType,
     ],
   );
   if (rows.length > 0) return mapRow(rows[0]);

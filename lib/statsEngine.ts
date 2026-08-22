@@ -68,6 +68,7 @@ export function computeMatchStats(state: MatchState): MatchStats {
       case 'error_no_forzado':
       case 'error_no_forzado_derecha':
       case 'error_no_forzado_reves':
+      case 'error_no_forzado_volea':
         stats[loser].unforcedErrors += 1;
         break;
       default:

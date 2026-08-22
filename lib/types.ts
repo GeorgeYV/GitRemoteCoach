@@ -1,4 +1,5 @@
 import type { MatchFormatId } from './matchFormats';
+import type { ShotType } from './shotTypes';
 
 export type PlayerId = 'player1' | 'player2';
 
@@ -14,12 +15,17 @@ export type PointDetail =
   | 'error_no_forzado'
   | 'error_no_forzado_derecha'
   | 'error_no_forzado_reves'
+  /** solo modo 'detallada' — espejo "de volea" de error_no_forzado (ver lib/shotTypes.ts). */
+  | 'error_no_forzado_volea'
   /** "Punto no visto" con Hija/Rival — el marcador avanza pero el punto queda fuera de los % (saque, etc). */
   | 'dato_no_capturado';
 
 export type ServeDirection = 'T' | 'cuerpo' | 'abierto';
 export type ErrorDirection = 'red' | 'larga' | 'ancha';
 export type RallyLength = 'corto' | 'medio' | 'largo';
+/** Lado del golpe — solo modo 'detallada' (ver PointFlow.tsx Paso 4), independiente de detail:
+ * detail dice la categoría (winner/error/…), lado dice de qué lado del cuerpo salió el golpe. */
+export type Lado = 'derecha' | 'reves';
 
 export interface PointEvent {
   id: string;
@@ -35,6 +41,10 @@ export interface PointEvent {
   netApproach: boolean;
   /** true only for the 3-tap "error de devolución" shortcut in Paso 2 */
   isReturnError: boolean;
+  /** solo modo 'detallada' — opcional, se completa en el Paso 4 (ver PointFlow.tsx). */
+  lado: Lado | null;
+  /** solo modo 'detallada' — elegido en el Paso 3 (ver lib/shotTypes.ts). */
+  shotType: ShotType | null;
 }
 
 /**
@@ -97,5 +107,6 @@ export const POINT_DETAIL_LABELS: Record<PointDetail, string> = {
   error_no_forzado: 'Error no forzado',
   error_no_forzado_derecha: 'Error no forzado (derecha)',
   error_no_forzado_reves: 'Error no forzado (revés)',
+  error_no_forzado_volea: 'Error no forzado de volea',
   dato_no_capturado: 'Punto no visto',
 };

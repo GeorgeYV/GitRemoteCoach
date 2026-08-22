@@ -2906,6 +2906,113 @@ console.log('\n=== Escenario 31: GET /coaches/:id/bookings expone matchStatus, i
   );
 }
 
+console.log('\n=== Escenario 32: modo de captura \'detallada\' — lado y shot_type ===');
+{
+  const registerRes = await app.inject({
+    method: 'POST',
+    url: '/auth/register',
+    payload: {
+      email: 'coach.shottype.e2e@example.com',
+      password: 'super-secreta-123',
+      fullName: 'Coach Shot Type E2E',
+      primaryRole: 'coach',
+    },
+  });
+  const { token: stCoachToken, user: stCoach } = registerRes.json();
+  await app.inject({
+    method: 'POST',
+    url: '/coaches',
+    headers: { authorization: `Bearer ${stCoachToken}` },
+    payload: { city: 'CDMX', country: 'EC', yearsExperience: 4, hourlyRate: 30, ageCategories: ['U14'], levels: ['competitivo'] },
+  });
+
+  const bookingRes = await requestBooking(stCoach.id, inFuture(48));
+  const stBooking = bookingRes.json();
+  await app.inject({ method: 'POST', url: `/bookings/${stBooking.id}/accept`, headers: { authorization: `Bearer ${stCoachToken}` } });
+
+  const matchRes = await app.inject({
+    method: 'POST',
+    url: '/matches',
+    headers: { authorization: `Bearer ${stCoachToken}` },
+    payload: {
+      bookingId: stBooking.id,
+      player2Label: 'Rival',
+      format: 'single_set',
+      noAd: true,
+      initialServer: 'player1',
+      captureMode: 'detallada',
+    },
+  });
+  const stMatch = matchRes.json();
+  assertEqual(stMatch.captureMode, 'detallada', 'el partido queda creado con captureMode detallada');
+
+  function postPoint(sequenceNumber: number, body: Record<string, unknown>) {
+    return app.inject({
+      method: 'POST',
+      url: `/matches/${stMatch.id}/points`,
+      headers: { authorization: `Bearer ${stCoachToken}` },
+      payload: {
+        sequenceNumber,
+        firstServeIn: true,
+        serveDirection: null,
+        errorDirection: null,
+        rallyLength: null,
+        netApproach: false,
+        isReturnError: false,
+        lado: null,
+        shotType: null,
+        ...body,
+      },
+    });
+  }
+
+  // Ace — solo sirve/gana el saque, lado/shotType se quedan en null.
+  const aceRes = await postPoint(1, { wonBy: 'player1', detail: 'ace', serveDirection: 'T', rallyLength: 'corto' });
+  assertEqual(aceRes.statusCode, 201, 'ace con serveDirection devuelve 201');
+
+  // "Rally en juego" · error no forzado de volea, con lado + shotType + dirección del error.
+  const errorVoleaRes = await postPoint(2, {
+    wonBy: 'player2',
+    detail: 'error_no_forzado_volea',
+    lado: 'reves',
+    shotType: 'volea_alta',
+    errorDirection: 'larga',
+    netApproach: true,
+    rallyLength: 'medio',
+  });
+  assertEqual(errorVoleaRes.statusCode, 201, 'error_no_forzado_volea con lado+shotType devuelve 201');
+
+  // "Rally en juego" · winner, con lado + shotType (sin dirección del error — no aplica a winners).
+  const winnerRes = await postPoint(3, {
+    wonBy: 'player1',
+    detail: 'winner',
+    lado: 'derecha',
+    shotType: 'passing_shot',
+    netApproach: true,
+    rallyLength: 'largo',
+  });
+  assertEqual(winnerRes.statusCode, 201, 'winner con lado+shotType devuelve 201');
+
+  // shotType inválido — rechazado (no es parte de la lista de lib/shotTypes.ts).
+  const badShotTypeRes = await postPoint(4, { wonBy: 'player1', detail: 'winner', shotType: 'globo_invertido' });
+  assertEqual(badShotTypeRes.statusCode, 422, 'un shotType que no existe en la lista devuelve 422');
+
+  const listRes = await app.inject({
+    method: 'GET',
+    url: `/bookings/${stBooking.id}/match`,
+    headers: { authorization: `Bearer ${stCoachToken}` },
+  });
+  const points = listRes.json().points as any[];
+  assertEqual(points.length, 3, 'quedaron los 3 puntos válidos guardados (el inválido nunca se insertó)');
+
+  const stored = points.find((p) => p.sequenceNumber === 2);
+  assertEqual(stored.detail, 'error_no_forzado_volea', 'el punto 2 vuelve con detail=error_no_forzado_volea');
+  assertEqual(stored.lado, 'reves', 'el punto 2 vuelve con lado=reves');
+  assertEqual(stored.shotType, 'volea_alta', 'el punto 2 vuelve con shotType=volea_alta');
+  assertEqual(stored.errorDirection, 'larga', 'el punto 2 vuelve con errorDirection=larga');
+  assertEqual(stored.netApproach, true, 'el punto 2 vuelve con netApproach=true');
+}
+
 console.log(`\n=== Resultado: ${passed} pasaron, ${failed} fallaron ===`);
 await app.close();
 process.exit(failed > 0 ? 1 : 0);

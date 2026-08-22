@@ -1,4 +1,5 @@
 import type { MatchFormatId } from './lib/matchFormats.js';
+import type { ShotType } from './lib/shotTypes.js';
 import type {
   ErrorZoneCounts,
   PlayerMatchStats,
@@ -435,10 +436,14 @@ export type PointDetail =
   | 'error_no_forzado'
   | 'error_no_forzado_derecha'
   | 'error_no_forzado_reves'
+  | 'error_no_forzado_volea'
   | 'dato_no_capturado';
 export type ServeDirection = 'T' | 'cuerpo' | 'abierto';
 export type ErrorDirection = 'red' | 'larga' | 'ancha';
 export type RallyLength = 'corto' | 'medio' | 'largo';
+/** Lado del golpe — solo modo de captura 'detallada', independiente de PointDetail (ver
+ * lib/shotTypes.ts del frontend, espejado en server/src/lib/shotTypes.ts). */
+export type Lado = 'derecha' | 'reves';
 
 export interface Match {
   id: string;
@@ -471,6 +476,8 @@ export interface MatchPointEvent {
   rallyLength: RallyLength | null;
   netApproach: boolean;
   isReturnError: boolean;
+  lado: Lado | null;
+  shotType: ShotType | null;
 }
 
 export interface MatchScoreAdjustment {

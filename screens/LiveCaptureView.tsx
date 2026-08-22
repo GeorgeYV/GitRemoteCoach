@@ -40,6 +40,8 @@ export default function LiveCaptureView({ roundLabel }: { roundLabel: string }) 
       rallyLength: null,
       netApproach: false,
       isReturnError: false,
+      lado: null,
+      shotType: null,
     });
     setMenuOpen(false);
   }

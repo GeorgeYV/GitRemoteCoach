@@ -3,10 +3,35 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useMatch } from '../context/MatchContext';
 import { NewPointInput } from '../lib/matchReducer';
 import { getCurrentServer } from '../lib/scoringEngine';
+import {
+  CATEGORY_NEEDS_ERROR_DIRECTION,
+  POINT_OUTCOME_CATEGORY_LABELS,
+  PointOutcomeCategory,
+  SHOT_TYPE_OPTIONS,
+  ShotType,
+} from '../lib/shotTypes';
 import { colors, radius } from '../lib/theme';
-import { ErrorDirection, PlayerId, PointDetail, RallyLength, ServeDirection } from '../lib/types';
+import { ErrorDirection, Lado, PlayerId, PointDetail, RallyLength, ServeDirection, otherPlayer } from '../lib/types';
 import PointButtons from './PointButtons';
 import VoiceNoteRecorder from './VoiceNoteRecorder';
+
+export default function PointFlow({ onOpenMenu }: { onOpenMenu: () => void }) {
+  const { config, matchState, match } = useMatch();
+
+  if (matchState.matchEnded) {
+    return <PointButtons disabled onPoint={() => {}} player1Name={config.player1Name} player2Name={config.player2Name} />;
+  }
+
+  return match.captureMode === 'detallada' ? (
+    <DetailedPointFlow onOpenMenu={onOpenMenu} />
+  ) : (
+    <RapidaPointFlow onOpenMenu={onOpenMenu} />
+  );
+}
+
+// =====================================================================
+// Modo 'rapida' — flujo original, sin cambios.
+// =====================================================================
 
 type Step = 'serve' | 'outcome' | 'meta';
 
@@ -25,7 +50,7 @@ interface PendingPoint {
 
 const UNFORCED_ERROR_DETAILS: PointDetail[] = ['error_no_forzado', 'error_no_forzado_derecha', 'error_no_forzado_reves'];
 
-export default function PointFlow({ onOpenMenu }: { onOpenMenu: () => void }) {
+function RapidaPointFlow({ onOpenMenu }: { onOpenMenu: () => void }) {
   const { config, matchState, addPoint } = useMatch();
   const [pending, setPending] = useState<PendingPoint | null>(null);
 
@@ -60,13 +85,11 @@ export default function PointFlow({ onOpenMenu }: { onOpenMenu: () => void }) {
       rallyLength: final.rallyLength,
       netApproach: final.netApproach,
       isReturnError: final.isReturnError,
+      lado: null,
+      shotType: null,
     };
     addPoint(input);
     setPending(null);
-  }
-
-  if (matchState.matchEnded) {
-    return <PointButtons disabled onPoint={() => {}} player1Name={config.player1Name} player2Name={config.player2Name} />;
   }
 
   if (!pending) {
@@ -327,6 +350,417 @@ function MetaStep({
   );
 }
 
+// =====================================================================
+// Modo 'detallada' — árbol de tipo de golpe (ver lib/shotTypes.ts).
+// Solo se monta cuando match.captureMode === 'detallada' — hoy ningún
+// partido nuevo lo pide todavía (ver previewFlows.tsx), así que este
+// árbol queda sin uso real hasta que se habilite ese modo a propósito.
+// =====================================================================
+
+type DetailedStep = 'serve' | 'returnError' | 'shotType' | 'close';
+
+interface PendingDetailedPoint {
+  winner: PlayerId;
+  server: PlayerId;
+  step: DetailedStep;
+  serveDirection: ServeDirection | null;
+  category: PointOutcomeCategory | null;
+  shotType: ShotType | null;
+  shotNetApproach: boolean;
+  lado: Lado | null;
+  errorDirection: ErrorDirection | null;
+}
+
+function DetailedPointFlow({ onOpenMenu }: { onOpenMenu: () => void }) {
+  const { config, matchState, addPoint } = useMatch();
+  const [pending, setPending] = useState<PendingDetailedPoint | null>(null);
+
+  function startPoint(winner: PlayerId) {
+    setPending({
+      winner,
+      server: getCurrentServer(matchState),
+      step: 'serve',
+      serveDirection: null,
+      category: null,
+      shotType: null,
+      shotNetApproach: false,
+      lado: null,
+      errorDirection: null,
+    });
+  }
+
+  function cancel() {
+    setPending(null);
+  }
+
+  function commit(input: NewPointInput) {
+    addPoint(input);
+    setPending(null);
+  }
+
+  function commitAce() {
+    if (!pending || !pending.serveDirection) return;
+    commit({
+      wonBy: pending.winner,
+      detail: 'ace',
+      firstServeIn: true,
+      serveDirection: pending.serveDirection,
+      errorDirection: null,
+      rallyLength: 'corto',
+      netApproach: false,
+      isReturnError: false,
+      lado: null,
+      shotType: null,
+    });
+  }
+
+  function commitDoubleFault() {
+    if (!pending) return;
+    commit({
+      wonBy: pending.winner,
+      detail: 'doble_falta',
+      firstServeIn: false,
+      serveDirection: null,
+      errorDirection: null,
+      rallyLength: null,
+      netApproach: false,
+      isReturnError: false,
+      lado: null,
+      shotType: null,
+    });
+  }
+
+  function commitReturnError(lado: Lado) {
+    if (!pending) return;
+    commit({
+      wonBy: pending.winner,
+      detail: lado === 'derecha' ? 'error_no_forzado_derecha' : 'error_no_forzado_reves',
+      firstServeIn: true,
+      serveDirection: null,
+      errorDirection: pending.errorDirection,
+      rallyLength: 'corto',
+      netApproach: false,
+      isReturnError: true,
+      lado: null,
+      shotType: null,
+    });
+  }
+
+  function commitClose(rallyLength: RallyLength) {
+    if (!pending || !pending.category || !pending.shotType) return;
+    commit({
+      wonBy: pending.winner,
+      detail: pending.category,
+      firstServeIn: true,
+      serveDirection: null,
+      errorDirection: pending.errorDirection,
+      rallyLength,
+      netApproach: pending.shotNetApproach,
+      isReturnError: false,
+      lado: pending.lado,
+      shotType: pending.shotType,
+    });
+  }
+
+  if (!pending) {
+    return (
+      <View style={styles.baseContainer}>
+        <PointButtons
+          disabled={false}
+          onPoint={startPoint}
+          player1Name={config.player1Name}
+          player2Name={config.player2Name}
+          servingPlayer={getCurrentServer(matchState)}
+        />
+        <VoiceNoteRecorder onOpenMenu={onOpenMenu} />
+      </View>
+    );
+  }
+
+  const serverName = pending.server === 'player1' ? config.player1Name : config.player2Name;
+
+  return (
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      {pending.step === 'serve' && (
+        <DetailedServeStep
+          pending={pending}
+          serverName={serverName}
+          config={config}
+          onSetDirection={(dir) =>
+            setPending((p) => (p ? { ...p, serveDirection: p.serveDirection === dir ? null : dir } : p))
+          }
+          onAce={commitAce}
+          onDoubleFault={commitDoubleFault}
+          onReturnError={() => setPending((p) => (p ? { ...p, step: 'returnError' } : p))}
+          onCategory={(category) => setPending((p) => (p ? { ...p, category, step: 'shotType' } : p))}
+          onCancel={cancel}
+        />
+      )}
+
+      {pending.step === 'returnError' && (
+        <ReturnErrorStep
+          pending={pending}
+          onSetErrorDirection={(dir) =>
+            setPending((p) => (p ? { ...p, errorDirection: p.errorDirection === dir ? null : dir } : p))
+          }
+          onClose={commitReturnError}
+          onCancel={cancel}
+        />
+      )}
+
+      {pending.step === 'shotType' && pending.category && (
+        <ShotTypeStep
+          category={pending.category}
+          onSelect={(shotType, netApproach) =>
+            setPending((p) => (p ? { ...p, shotType, shotNetApproach: netApproach, step: 'close' } : p))
+          }
+          onCancel={cancel}
+        />
+      )}
+
+      {pending.step === 'close' && pending.category && (
+        <CloseStep
+          pending={pending}
+          category={pending.category}
+          onSetLado={(lado) => setPending((p) => (p ? { ...p, lado: p.lado === lado ? null : lado } : p))}
+          onSetErrorDirection={(dir) =>
+            setPending((p) => (p ? { ...p, errorDirection: p.errorDirection === dir ? null : dir } : p))
+          }
+          onClose={commitClose}
+          onCancel={cancel}
+        />
+      )}
+    </ScrollView>
+  );
+}
+
+function DetailedServeStep({
+  pending,
+  serverName,
+  config,
+  onSetDirection,
+  onAce,
+  onDoubleFault,
+  onReturnError,
+  onCategory,
+  onCancel,
+}: {
+  pending: PendingDetailedPoint;
+  serverName: string;
+  config: { player1Name: string };
+  onSetDirection: (dir: ServeDirection) => void;
+  onAce: () => void;
+  onDoubleFault: () => void;
+  onReturnError: () => void;
+  onCategory: (category: PointOutcomeCategory) => void;
+  onCancel: () => void;
+}) {
+  const serverIsWinner = pending.server === pending.winner;
+  const loser = otherPlayer(pending.winner);
+  const receiver = otherPlayer(pending.server);
+  const receiverName = receiver === 'player1' ? config.player1Name : 'rival';
+  const errorSectionLabel = `Error de ${loser === 'player1' ? config.player1Name : 'rival'}`;
+  const winnerSectionLabel = `Winner de ${pending.winner === 'player1' ? config.player1Name : 'rival'}`;
+
+  return (
+    <View>
+      <StepHeader title={`PASO 1 · SERVICIO DE ${serverName.toUpperCase()}`} onCancel={onCancel} />
+
+      <SectionLabel label="Dirección del saque" hint="OBLIGATORIO PARA ACE" />
+      <View style={styles.row3}>
+        <DirectionChip label="T" sub="A LA T" active={pending.serveDirection === 'T'} onPress={() => onSetDirection('T')} />
+        <DirectionChip
+          label="Cuerpo"
+          sub="AL CUERPO"
+          active={pending.serveDirection === 'cuerpo'}
+          onPress={() => onSetDirection('cuerpo')}
+        />
+        <DirectionChip
+          label="Abierto"
+          sub="ABIERTO"
+          active={pending.serveDirection === 'abierto'}
+          onPress={() => onSetDirection('abierto')}
+        />
+      </View>
+
+      <View style={styles.divider} />
+      <SectionLabel label="Cierra el punto ahora" />
+
+      {serverIsWinner ? (
+        <>
+          <TerminalCard
+            label={pending.server === 'player2' ? 'Ace / saque ganador rival' : 'Ace / saque ganador'}
+            hint={pending.serveDirection ? '3 TOQUES' : 'ELEGÍ DIRECCIÓN'}
+            disabled={!pending.serveDirection}
+            onPress={onAce}
+          />
+          <TerminalCard label={`Error de devolución de ${receiverName}`} hint="" onPress={onReturnError} />
+        </>
+      ) : (
+        <TerminalCard
+          label={pending.server === 'player2' ? 'Doble falta rival' : 'Doble falta'}
+          hint="2 TOQUES"
+          onPress={onDoubleFault}
+        />
+      )}
+
+      <View style={styles.divider} />
+      <SectionLabel label="Rally en juego" />
+
+      <SectionLabel label={errorSectionLabel} />
+      <OptionRow label={POINT_OUTCOME_CATEGORY_LABELS.error_no_forzado} onPress={() => onCategory('error_no_forzado')} />
+      <OptionRow
+        label={POINT_OUTCOME_CATEGORY_LABELS.error_no_forzado_volea}
+        onPress={() => onCategory('error_no_forzado_volea')}
+      />
+      <OptionRow label={POINT_OUTCOME_CATEGORY_LABELS.error_forzado} onPress={() => onCategory('error_forzado')} />
+
+      <SectionLabel label={winnerSectionLabel} />
+      <OptionRow label={POINT_OUTCOME_CATEGORY_LABELS.winner} onPress={() => onCategory('winner')} />
+      <OptionRow label={POINT_OUTCOME_CATEGORY_LABELS.winner_volea} onPress={() => onCategory('winner_volea')} />
+    </View>
+  );
+}
+
+function ReturnErrorStep({
+  pending,
+  onSetErrorDirection,
+  onClose,
+  onCancel,
+}: {
+  pending: PendingDetailedPoint;
+  onSetErrorDirection: (dir: ErrorDirection) => void;
+  onClose: (lado: Lado) => void;
+  onCancel: () => void;
+}) {
+  return (
+    <View>
+      <StepHeader title="PASO 2 · ERROR DE DEVOLUCIÓN" onCancel={onCancel} />
+
+      <SectionLabel label="Dirección del error" hint="OPCIONAL" />
+      <View style={styles.row3}>
+        <DirectionChip
+          label="Red"
+          sub="PIERNAS/MARGEN"
+          active={pending.errorDirection === 'red'}
+          onPress={() => onSetErrorDirection('red')}
+        />
+        <DirectionChip
+          label="Larga"
+          sub="CONTROL/TENSIÓN"
+          active={pending.errorDirection === 'larga'}
+          onPress={() => onSetErrorDirection('larga')}
+        />
+        <DirectionChip
+          label="Ancha"
+          sub="CONTROL/TENSIÓN"
+          active={pending.errorDirection === 'ancha'}
+          onPress={() => onSetErrorDirection('ancha')}
+        />
+      </View>
+
+      <View style={styles.divider} />
+      <SectionLabel label="Tipo de golpe" />
+      <OptionRow label="Derecha" onPress={() => onClose('derecha')} />
+      <OptionRow label="Revés" onPress={() => onClose('reves')} />
+    </View>
+  );
+}
+
+function ShotTypeStep({
+  category,
+  onSelect,
+  onCancel,
+}: {
+  category: PointOutcomeCategory;
+  onSelect: (shotType: ShotType, netApproach: boolean) => void;
+  onCancel: () => void;
+}) {
+  return (
+    <View>
+      <StepHeader title="PASO 3 · TIPO DE GOLPE" onCancel={onCancel} />
+      <SectionLabel label={`${POINT_OUTCOME_CATEGORY_LABELS[category]} — ¿con qué golpe?`} />
+      {SHOT_TYPE_OPTIONS[category].map((option) => (
+        <OptionRow
+          key={option.value}
+          label={option.label}
+          hint={option.netApproach ? 'SUBE A LA RED' : undefined}
+          onPress={() => onSelect(option.value, option.netApproach)}
+        />
+      ))}
+    </View>
+  );
+}
+
+function CloseStep({
+  pending,
+  category,
+  onSetLado,
+  onSetErrorDirection,
+  onClose,
+  onCancel,
+}: {
+  pending: PendingDetailedPoint;
+  category: PointOutcomeCategory;
+  onSetLado: (lado: Lado) => void;
+  onSetErrorDirection: (dir: ErrorDirection) => void;
+  onClose: (len: RallyLength) => void;
+  onCancel: () => void;
+}) {
+  const needsErrorDirection = CATEGORY_NEEDS_ERROR_DIRECTION[category];
+
+  return (
+    <View>
+      <StepHeader title="PASO 4 · CERRAR EL PUNTO" onCancel={onCancel} />
+
+      <SectionLabel label="Lado" hint="OPCIONAL" />
+      <View style={styles.row3}>
+        <DirectionChip label="Derecha" sub="" active={pending.lado === 'derecha'} onPress={() => onSetLado('derecha')} />
+        <DirectionChip label="Revés" sub="" active={pending.lado === 'reves'} onPress={() => onSetLado('reves')} />
+      </View>
+
+      {needsErrorDirection && (
+        <>
+          <View style={styles.divider} />
+          <SectionLabel label="Dirección del error" hint="OPCIONAL" />
+          <View style={styles.row3}>
+            <DirectionChip
+              label="Red"
+              sub="PIERNAS/MARGEN"
+              active={pending.errorDirection === 'red'}
+              onPress={() => onSetErrorDirection('red')}
+            />
+            <DirectionChip
+              label="Larga"
+              sub="CONTROL/TENSIÓN"
+              active={pending.errorDirection === 'larga'}
+              onPress={() => onSetErrorDirection('larga')}
+            />
+            <DirectionChip
+              label="Ancha"
+              sub="CONTROL/TENSIÓN"
+              active={pending.errorDirection === 'ancha'}
+              onPress={() => onSetErrorDirection('ancha')}
+            />
+          </View>
+        </>
+      )}
+
+      <View style={styles.divider} />
+      <SectionLabel label="Duración del intercambio" />
+      <View style={styles.row3}>
+        <DirectionChip label="Corto" sub="1-4" active={false} onPress={() => onClose('corto')} />
+        <DirectionChip label="Medio" sub="5-8" active={false} onPress={() => onClose('medio')} />
+        <DirectionChip label="Largo" sub="9+" active={false} onPress={() => onClose('largo')} />
+      </View>
+    </View>
+  );
+}
+
+// =====================================================================
+// Componentes y estilos compartidos por los dos modos.
+// =====================================================================
+
 function StepHeader({ title, onCancel }: { title: string; onCancel: () => void }) {
   return (
     <View style={styles.metaHeaderRow}>
@@ -356,11 +790,25 @@ function OptionRow({ label, hint, onPress }: { label: string; hint?: string; onP
   );
 }
 
-function TerminalCard({ label, hint, onPress }: { label: string; hint: string; onPress: () => void }) {
+function TerminalCard({
+  label,
+  hint,
+  disabled,
+  onPress,
+}: {
+  label: string;
+  hint: string;
+  disabled?: boolean;
+  onPress: () => void;
+}) {
   return (
-    <Pressable style={styles.terminalCard} onPress={onPress}>
-      <Text style={styles.terminalLabel}>{label}</Text>
-      {!!hint && <Text style={styles.terminalHint}>{hint}</Text>}
+    <Pressable
+      style={[styles.terminalCard, disabled && styles.terminalCardDisabled]}
+      disabled={disabled}
+      onPress={onPress}
+    >
+      <Text style={[styles.terminalLabel, disabled && styles.terminalLabelDisabled]}>{label}</Text>
+      {!!hint && <Text style={[styles.terminalHint, disabled && styles.terminalLabelDisabled]}>{hint}</Text>}
     </Pressable>
   );
 }
@@ -379,7 +827,7 @@ function DirectionChip({
   return (
     <Pressable style={[styles.directionChip, active && styles.directionChipActive]} onPress={onPress}>
       <Text style={[styles.directionLabel, active && styles.directionLabelActive]}>{label}</Text>
-      <Text style={[styles.directionSub, active && styles.directionLabelActive]}>{sub}</Text>
+      {!!sub && <Text style={[styles.directionSub, active && styles.directionLabelActive]}>{sub}</Text>}
     </Pressable>
   );
 }
@@ -503,10 +951,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 8,
   },
+  terminalCardDisabled: {
+    borderColor: colors.border,
+    opacity: 0.6,
+  },
   terminalLabel: {
     fontSize: 14,
     fontWeight: '700',
     color: colors.courtBlue,
+  },
+  terminalLabelDisabled: {
+    color: colors.textDim,
   },
   terminalHint: {
     fontSize: 10,

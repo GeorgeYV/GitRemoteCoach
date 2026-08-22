@@ -1,4 +1,5 @@
 import type { MatchFormatId } from './matchFormats';
+import type { ShotType } from './shotTypes';
 
 /** Cliente HTTP mínimo hacia server/ (ver server/src/routes). Sin auth todavía: los
  * IDs de padre/coach se pasan explícitamente hasta que exista sesión real. */
@@ -1233,10 +1234,13 @@ export type PointDetail =
   | 'error_no_forzado'
   | 'error_no_forzado_derecha'
   | 'error_no_forzado_reves'
+  | 'error_no_forzado_volea'
   | 'dato_no_capturado';
 export type ServeDirection = 'T' | 'cuerpo' | 'abierto';
 export type ErrorDirection = 'red' | 'larga' | 'ancha';
 export type RallyLength = 'corto' | 'medio' | 'largo';
+/** Espeja server/src/types.ts#Lado — solo modo 'detallada'. */
+export type Lado = 'derecha' | 'reves';
 
 /** Espeja server/src/types.ts#Match. */
 export interface Match {
@@ -1271,6 +1275,8 @@ export interface MatchPointEvent {
   rallyLength: RallyLength | null;
   netApproach: boolean;
   isReturnError: boolean;
+  lado: Lado | null;
+  shotType: ShotType | null;
 }
 
 export interface MatchPointInput {
@@ -1283,6 +1289,8 @@ export interface MatchPointInput {
   rallyLength: RallyLength | null;
   netApproach: boolean;
   isReturnError: boolean;
+  lado: Lado | null;
+  shotType: ShotType | null;
 }
 
 /** Espeja server/src/types.ts#MatchScoreAdjustment. */

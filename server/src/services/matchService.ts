@@ -34,6 +34,7 @@ function toStatsPointEvents(points: MatchPointEvent[]): StatsPointEvent[] {
     firstServeIn: p.firstServeIn,
     errorDirection: p.errorDirection,
     rallyLength: p.rallyLength,
+    lado: p.lado,
   }));
 }
 
