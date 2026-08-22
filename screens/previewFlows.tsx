@@ -662,7 +662,7 @@ export function CoachMatchDayFlow({
       format: session.config.format,
       noAd: session.config.noAd,
       initialServer: session.config.initialServer,
-      captureMode: 'rapida',
+      captureMode: 'detallada',
     })
       .then((createdMatch) => {
         if (cancelled) return;
@@ -695,7 +695,7 @@ export function CoachMatchDayFlow({
       format: 'best_of_3',
       noAd: false,
       initialServer: 'player1',
-      captureMode: 'rapida',
+      captureMode: 'detallada',
     })
       .then((createdMatch) => {
         if (cancelled) return;
@@ -793,7 +793,7 @@ export function CoachCapturePreview() {
       format: mockMatchConfig.format,
       noAd: mockMatchConfig.noAd,
       initialServer: mockMatchConfig.initialServer,
-      captureMode: 'rapida',
+      captureMode: 'detallada',
     })
       .then((createdMatch) => {
         if (!cancelled) setMatch(createdMatch);
