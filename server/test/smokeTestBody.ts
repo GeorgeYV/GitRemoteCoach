@@ -2336,7 +2336,7 @@ console.log('\n=== Escenario 26: reporte enriquecido de partido (semáforo, pres
   assertEqual(report.rallyErrorBuckets.length, 1, 'solo el bucket "largo" tiene puntos jugados (corto/medio quedan filtrados)');
   assertEqual(
     report.rallyErrorBuckets[0],
-    { rallyLength: 'largo', pointsPlayed: 5, pointsLost: 4, unforcedErrors: 3 },
+    { rallyLength: 'largo', pointsPlayed: 5, pointsLost: 4, unforcedErrors: 3, pointsWon: 1, winPct: 20 },
     'rallies largos: pierde 4 de 5, 3 de esas pérdidas son error no forzado',
   );
 

@@ -9,6 +9,7 @@ import KeyStatsCard from '../../components/parent/report/KeyStatsCard';
 import PressureEfficiencyCard from '../../components/parent/report/PressureEfficiencyCard';
 import ScoreSummary from '../../components/parent/report/ScoreSummary';
 import SemaforoCard from '../../components/parent/report/SemaforoCard';
+import RallyLengthChart from '../../components/parent/report/RallyLengthChart';
 import ServePlacementCourt from '../../components/parent/report/ServePlacementCourt';
 import TacticalDiagnosisCard from '../../components/parent/report/TacticalDiagnosisCard';
 import VoiceNoteCard from '../../components/parent/report/VoiceNoteCard';
@@ -243,6 +244,7 @@ function ReportDetail({ booking, onBack }: { booking: BookingHistoryEntry; onBac
                   opponentReturnErrors={report.report.player1ReturnErrorZones}
                   opponentLabel={booking.playerName}
                 />
+                <RallyLengthChart buckets={report.report.rallyErrorBuckets} />
                 <TacticalDiagnosisCard text={report.report.tacticalDiagnosis} />
               </>
             )}

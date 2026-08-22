@@ -1340,7 +1340,9 @@ export interface PressureEfficiency {
 export interface RallyErrorBucket {
   rallyLength: RallyLength;
   pointsPlayed: number;
+  pointsWon: number;
   pointsLost: number;
+  winPct: number | null;
   unforcedErrors: number;
 }
 

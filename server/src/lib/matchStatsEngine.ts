@@ -495,7 +495,9 @@ export interface PressureEfficiency {
 export interface RallyErrorBucket {
   rallyLength: RallyLength;
   pointsPlayed: number;
+  pointsWon: number;
   pointsLost: number;
+  winPct: number | null;
   unforcedErrors: number;
 }
 
@@ -687,7 +689,11 @@ export function computeMatchReportStats(
   });
 
   const rallyErrorBuckets: RallyErrorBucket[] = (['corto', 'medio', 'largo'] as RallyLength[])
-    .map((rallyLength) => ({ rallyLength, ...rallyTotals[rallyLength] }))
+    .map((rallyLength) => {
+      const totals = rallyTotals[rallyLength];
+      const pointsWon = totals.pointsPlayed - totals.pointsLost;
+      return { rallyLength, ...totals, pointsWon, winPct: pct(pointsWon, totals.pointsPlayed) };
+    })
     .filter((b) => b.pointsPlayed > 0);
 
   const sets: SetOutcome[] = state.completedSets.map((set, setIndex) => ({
