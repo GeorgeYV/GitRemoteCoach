@@ -857,6 +857,13 @@ CREATE TABLE players (
   -- País donde juega — default del filtro "mi país" en ParentHomeScreen (por hijo, no por padre:
   -- un mismo padre podría tener hijos jugando en países distintos).
   country          TEXT,
+  -- Archivar en vez de borrar (ver decisión #44): no hay forma de borrar un jugador de verdad una
+  -- vez que tiene reservas — bookings.player_id no tiene ON DELETE CASCADE, así que Postgres
+  -- rechazaría el borrado. 'active = false' lo saca del selector de "¿para quién reservo?" y de
+  -- los conteos/filtros de ParentHomeScreen, pero conserva su historial de reportes intacto.
+  -- Reversible (a diferencia de club/coach verification_status, que no vuelve atrás sola): el
+  -- padre puede reactivarlo.
+  active           BOOLEAN NOT NULL DEFAULT true,
   created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
   CONSTRAINT chk_players_country CHECK (country IS NULL OR country IN ('EC', 'PE', 'CO', 'CL', 'BO', 'AR', 'VE', 'BR', 'PY', 'UY'))
 );
@@ -2096,4 +2103,17 @@ CREATE INDEX idx_push_tokens_user_id ON push_tokens (user_id);
 --       caso de un solo campo — la revisión sigue siendo la misma
 --       decisión manual y holística del platform_admin (decisión #41),
 --       ahora con este dato más a la vista.
+--
+-- 44. players ganó active (BOOLEAN, default true) — hasta acá no había
+--     ninguna forma de sacar un jugador de la lista del padre (registro
+--     duplicado por error, o un hijo/a que dejó de competir pero cuyo
+--     historial de reportes se quiere conservar). Un DELETE real ni
+--     siquiera sería viable en general: bookings.player_id no tiene
+--     ON DELETE CASCADE, así que Postgres rechaza borrar un jugador que
+--     ya tenga una reserva. 'active = false' lo saca del selector de
+--     "¿para quién reservo?" (PlayerPickerScreen) y de los conteos/
+--     filtros de ParentHomeScreen (childName, país por defecto), pero
+--     sigue apareciendo en ParentProfileScreen (marcado "Archivado") y
+--     su historial de partidos/reportes queda intacto — reversible, el
+--     padre puede reactivarlo cuando quiera.
 -- =====================================================================

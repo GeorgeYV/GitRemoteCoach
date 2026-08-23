@@ -3347,6 +3347,75 @@ console.log('\n=== Escenario 37: borrar un push token ajeno no funciona ===');
   );
 }
 
+console.log('\n=== Escenario 38: archivar/reactivar un jugador (decisión #44) ===');
+{
+  const createRes = await app.inject({
+    method: 'POST',
+    url: '/players',
+    headers: { authorization: `Bearer ${parentToken}` },
+    payload: { fullName: 'Jugadora Archivable', birthDate: '2013-05-01', ageCategory: 'U12', country: 'EC' },
+  });
+  assertEqual(createRes.statusCode, 201, 'POST /players devuelve 201');
+  assertEqual(createRes.json().active, true, 'un jugador nuevo nace active=true');
+  const newPlayerId = createRes.json().id;
+
+  const activeOnlyBeforeRes = await app.inject({
+    method: 'GET',
+    url: '/players?activeOnly=true',
+    headers: { authorization: `Bearer ${parentToken}` },
+  });
+  assertTrue(
+    activeOnlyBeforeRes.json().some((p: any) => p.id === newPlayerId),
+    '?activeOnly=true incluye al jugador recién creado (todavía activo)',
+  );
+
+  const wrongUserArchiveRes = await app.inject({
+    method: 'PUT',
+    url: `/players/${newPlayerId}/active`,
+    headers: { authorization: `Bearer ${coachAToken}` },
+    payload: { active: false },
+  });
+  assertEqual(wrongUserArchiveRes.statusCode, 403, 'archivar el jugador de otro padre devuelve 403');
+
+  const archiveRes = await app.inject({
+    method: 'PUT',
+    url: `/players/${newPlayerId}/active`,
+    headers: { authorization: `Bearer ${parentToken}` },
+    payload: { active: false },
+  });
+  assertEqual(archiveRes.statusCode, 200, 'PUT /players/:id/active (dueño real) devuelve 200');
+  assertEqual(archiveRes.json().active, false, 'el jugador queda active=false');
+
+  const activeOnlyAfterRes = await app.inject({
+    method: 'GET',
+    url: '/players?activeOnly=true',
+    headers: { authorization: `Bearer ${parentToken}` },
+  });
+  assertTrue(
+    !activeOnlyAfterRes.json().some((p: any) => p.id === newPlayerId),
+    '?activeOnly=true ya no incluye al jugador archivado',
+  );
+
+  const allPlayersRes = await app.inject({
+    method: 'GET',
+    url: '/players',
+    headers: { authorization: `Bearer ${parentToken}` },
+  });
+  assertTrue(
+    allPlayersRes.json().some((p: any) => p.id === newPlayerId && p.active === false),
+    'GET /players sin filtro sigue trayendo al jugador archivado (para ParentProfileScreen)',
+  );
+
+  const reactivateRes = await app.inject({
+    method: 'PUT',
+    url: `/players/${newPlayerId}/active`,
+    headers: { authorization: `Bearer ${parentToken}` },
+    payload: { active: true },
+  });
+  assertEqual(reactivateRes.statusCode, 200, 'reactivar (active: true) devuelve 200');
+  assertEqual(reactivateRes.json().active, true, 'el jugador vuelve a quedar active=true — reversible');
+}
+
 console.log(`\n=== Resultado: ${passed} pasaron, ${failed} fallaron ===`);
 await app.close();
 process.exit(failed > 0 ? 1 : 0);

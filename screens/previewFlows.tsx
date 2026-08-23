@@ -151,7 +151,7 @@ export function ParentBookingFlow({ initialTournamentId }: { initialTournamentId
       setPlayers([]);
       return;
     }
-    listPlayers(token)
+    listPlayers(token, { activeOnly: true })
       .then((result) => {
         setPlayers(result);
         if (result.length === 1) setSelectedPlayerId(result[0].id);

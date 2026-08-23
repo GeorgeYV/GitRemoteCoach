@@ -18,14 +18,23 @@ function mapPlayerRow(row: any): Player {
     birthDate: row.birth_date.toISOString().slice(0, 10),
     ageCategory: row.age_category,
     country: row.country,
+    active: row.active,
     createdAt: row.created_at,
   };
 }
 
-/** BookingConfirmScreen: hijos/as ya registrados por el padre logueado. */
-export async function listForGuardian(guardianUserId: string, db: Queryable = pool): Promise<Player[]> {
+/** BookingConfirmScreen/PlayerPickerScreen (activeOnly=true, no ofrecer reservar a un jugador
+ * archivado) y ParentProfileScreen (activeOnly=false, "Jugadores registrados" muestra todos, con
+ * los archivados marcados aparte — ver decisión #44 en db/schema.sql). */
+export async function listForGuardian(
+  guardianUserId: string,
+  options: { activeOnly?: boolean } = {},
+  db: Queryable = pool,
+): Promise<Player[]> {
+  const conditions = ['guardian_user_id = $1'];
+  if (options.activeOnly) conditions.push('active = true');
   const { rows } = await db.query(
-    `SELECT * FROM players WHERE guardian_user_id = $1 ORDER BY created_at`,
+    `SELECT * FROM players WHERE ${conditions.join(' AND ')} ORDER BY created_at`,
     [guardianUserId],
   );
   return rows.map(mapPlayerRow);
@@ -50,6 +59,14 @@ export async function create(
      RETURNING *`,
     [guardianUserId, params.fullName, params.birthDate, params.ageCategory, params.country],
   );
+  return mapPlayerRow(rows[0]);
+}
+
+/** ParentProfileScreen "Archivar"/"Reactivar" — la pertenencia ya se verificó en la ruta, mismo
+ * criterio que update(). */
+export async function setActive(playerId: string, active: boolean, db: Queryable = pool): Promise<Player> {
+  const { rows } = await db.query(`UPDATE players SET active = $2 WHERE id = $1 RETURNING *`, [playerId, active]);
+  if (rows.length === 0) throw new NotFoundError('Player', playerId);
   return mapPlayerRow(rows[0]);
 }
 

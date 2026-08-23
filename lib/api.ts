@@ -782,12 +782,25 @@ export interface Player {
   birthDate: string;
   ageCategory: AgeCategory;
   country: CountryCode | null;
+  /** Ver decisión #44 en db/schema.sql — false lo saca del selector de reservas. Reversible. */
+  active: boolean;
   createdAt: string;
 }
 
-/** GET /players — BookingConfirmScreen: hijos/as del padre de la sesión. */
-export function listPlayers(authToken: string): Promise<Player[]> {
-  return request('/players', { headers: { Authorization: `Bearer ${authToken}` } });
+/** GET /players — BookingConfirmScreen/PlayerPickerScreen (activeOnly: true, no ofrecer un
+ * jugador archivado) y ParentProfileScreen (sin opciones, trae todos). */
+export function listPlayers(authToken: string, options: { activeOnly?: boolean } = {}): Promise<Player[]> {
+  const suffix = options.activeOnly ? '?activeOnly=true' : '';
+  return request(`/players${suffix}`, { headers: { Authorization: `Bearer ${authToken}` } });
+}
+
+/** PUT /players/:id/active — ParentProfileScreen "Archivar"/"Reactivar". */
+export function setPlayerActive(authToken: string, playerId: string, active: boolean): Promise<Player> {
+  return request(`/players/${playerId}/active`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${authToken}` },
+    body: JSON.stringify({ active }),
+  });
 }
 
 /** POST /players — PlayerRegistrationScreen. Crea al hijo/a del padre de la sesión (deriva el

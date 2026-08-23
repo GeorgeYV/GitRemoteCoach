@@ -106,7 +106,7 @@ export default function ParentHomeScreen() {
 
   useEffect(() => {
     if (!token) return;
-    listPlayers(token)
+    listPlayers(token, { activeOnly: true })
       .then((players) => {
         // Nombrar a un hijo/a específico solo tiene sentido si es el único — con 2+ registrados
         // no hay forma de saber para cuál está buscando el padre en este momento.

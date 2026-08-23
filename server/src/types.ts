@@ -237,6 +237,9 @@ export interface Player {
   ageCategory: AgeCategory;
   /** País donde juega — default del filtro "mi país" en ParentHomeScreen. */
   country: CountryCode | null;
+  /** Ver decisión #44 en db/schema.sql — false lo saca del selector de reservas y de los
+   * conteos de ParentHomeScreen, pero conserva su historial. Reversible. */
+  active: boolean;
   createdAt: string;
 }
 

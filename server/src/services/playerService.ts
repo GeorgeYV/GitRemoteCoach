@@ -1,8 +1,15 @@
 import * as playerRepository from '../repositories/playerRepository.js';
 import type { AgeCategory, CountryCode, Player } from '../types.js';
 
-export async function listPlayersForGuardian(guardianUserId: string): Promise<Player[]> {
-  return playerRepository.listForGuardian(guardianUserId);
+export async function listPlayersForGuardian(
+  guardianUserId: string,
+  options: { activeOnly?: boolean } = {},
+): Promise<Player[]> {
+  return playerRepository.listForGuardian(guardianUserId, options);
+}
+
+export async function setPlayerActive(playerId: string, active: boolean): Promise<Player> {
+  return playerRepository.setActive(playerId, active);
 }
 
 export async function registerPlayer(

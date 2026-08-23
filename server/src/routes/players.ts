@@ -14,12 +14,19 @@ const registerPlayerSchema = z.object({
   country: z.enum(COUNTRY_CODES),
 });
 
+const setActiveSchema = z.object({
+  active: z.boolean(),
+});
+
 export async function playerRoutes(app: FastifyInstance): Promise<void> {
   // BookingConfirmScreen: hijos/as ya registrados por el padre logueado — el guardián sale de
   // la sesión, no de query params, para que nadie pueda leer los hijos de otro usuario.
+  // ?activeOnly=true (PlayerPickerScreen, ParentHomeScreen) excluye a los archivados — ver
+  // decisión #44 en db/schema.sql; sin el parámetro (ParentProfileScreen) trae todos.
   app.get('/players', { preHandler: app.authenticate }, async (req) => {
     const { sub } = req.user as { sub: string };
-    return playerService.listPlayersForGuardian(sub);
+    const { activeOnly } = req.query as { activeOnly?: string };
+    return playerService.listPlayersForGuardian(sub, { activeOnly: activeOnly === 'true' });
   });
 
   // PlayerRegistrationScreen: crea al hijo/a del padre logueado — mismo razonamiento que POST /coaches.
@@ -45,5 +52,19 @@ export async function playerRoutes(app: FastifyInstance): Promise<void> {
     const parsed = registerPlayerSchema.safeParse(req.body);
     if (!parsed.success) throw new ValidationError(parsed.error.message);
     return playerService.updatePlayer(id, parsed.data);
+  });
+
+  // ParentProfileScreen "Archivar"/"Reactivar" — ver decisión #44 en db/schema.sql. Mismo chequeo
+  // de pertenencia que PUT /players/:id.
+  app.put('/players/:id/active', { preHandler: app.authenticate }, async (req) => {
+    const { id } = req.params as { id: string };
+    const { sub } = req.user as { sub: string };
+    const player = await playerRepository.getById(id);
+    if (player.guardianUserId !== sub) {
+      throw new ForbiddenError('El jugador indicado no pertenece a tu cuenta');
+    }
+    const parsed = setActiveSchema.safeParse(req.body);
+    if (!parsed.success) throw new ValidationError(parsed.error.message);
+    return playerService.setPlayerActive(id, parsed.data.active);
   });
 }

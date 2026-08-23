@@ -6,7 +6,7 @@ import ParentTabBar from '../../components/parent/ParentTabBar';
 import IconTextInput from '../../components/shared/IconTextInput';
 import InitialAvatar from '../../components/shared/InitialAvatar';
 import { useAuth } from '../../context/AuthContext';
-import { ApiError, listPlayers, Player } from '../../lib/api';
+import { ApiError, listPlayers, Player, setPlayerActive } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
 import { COUNTRY_LABELS } from '../../mock/coachFlow';
 import PlayerRegistrationScreen from './PlayerRegistrationScreen';
@@ -30,6 +30,8 @@ export default function ParentProfileScreen() {
   const [phoneInput, setPhoneInput] = useState('');
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
+  const [togglingPlayerId, setTogglingPlayerId] = useState<string | null>(null);
+  const [toggleError, setToggleError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!token) {
@@ -59,6 +61,20 @@ export default function ParentProfileScreen() {
     setPhoneInput(user?.phone ?? '');
     setProfileError(null);
     setEditingProfile(true);
+  }
+
+  async function handleToggleActive(player: Player) {
+    if (!token) return;
+    setTogglingPlayerId(player.id);
+    setToggleError(null);
+    try {
+      const updated = await setPlayerActive(token, player.id, !player.active);
+      setPlayers((prev) => prev?.map((p) => (p.id === updated.id ? updated : p)) ?? null);
+    } catch (err) {
+      setToggleError(err instanceof ApiError ? err.message : 'No se pudo actualizar el jugador. Intenta de nuevo.');
+    } finally {
+      setTogglingPlayerId(null);
+    }
   }
 
   async function handleSaveProfile() {
@@ -175,21 +191,42 @@ export default function ParentProfileScreen() {
             <Text style={styles.emptyText}>Todavía no registraste a ningún jugador.</Text>
           ) : (
             <View style={styles.playerList}>
+              {toggleError && <Text style={styles.errorText}>{toggleError}</Text>}
               {players.map((player) => (
-                <View key={player.id} style={styles.playerRow}>
+                <View key={player.id} style={[styles.playerRow, !player.active && styles.playerRowArchived]}>
                   <View style={styles.playerIcon}>
                     <Ionicons name="person-outline" size={16} color={colors.courtBlue} />
                   </View>
                   <View style={styles.playerInfo}>
-                    <Text style={styles.playerName}>{player.fullName}</Text>
+                    <View style={styles.playerNameRow}>
+                      <Text style={styles.playerName}>{player.fullName}</Text>
+                      {!player.active && <Text style={styles.archivedTag}>Archivado</Text>}
+                    </View>
                     <Text style={styles.playerMeta}>
                       {AGE_CATEGORY_LABELS[player.ageCategory] ?? player.ageCategory} · {player.birthDate}
                       {player.country ? ` · ${COUNTRY_LABELS[player.country]}` : ''}
                     </Text>
                   </View>
-                  <Pressable style={styles.editButton} onPress={() => setEditingPlayer(player)}>
-                    <Ionicons name="pencil-outline" size={16} color={colors.textDim} />
+                  <Pressable
+                    style={styles.editButton}
+                    onPress={() => handleToggleActive(player)}
+                    disabled={togglingPlayerId === player.id}
+                  >
+                    {togglingPlayerId === player.id ? (
+                      <ActivityIndicator color={colors.textDim} size="small" />
+                    ) : (
+                      <Ionicons
+                        name={player.active ? 'archive-outline' : 'refresh-outline'}
+                        size={16}
+                        color={colors.textDim}
+                      />
+                    )}
                   </Pressable>
+                  {player.active && (
+                    <Pressable style={styles.editButton} onPress={() => setEditingPlayer(player)}>
+                      <Ionicons name="pencil-outline" size={16} color={colors.textDim} />
+                    </Pressable>
+                  )}
                 </View>
               ))}
             </View>
@@ -357,6 +394,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
+  playerRowArchived: {
+    opacity: 0.55,
+  },
   playerIcon: {
     width: 32,
     height: 32,
@@ -369,11 +409,28 @@ const styles = StyleSheet.create({
   playerInfo: {
     flex: 1,
   },
+  playerNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 2,
+  },
   playerName: {
     color: colors.lineWhite,
     fontSize: 14,
     fontWeight: '700',
-    marginBottom: 2,
+  },
+  archivedTag: {
+    color: colors.textDim,
+    fontSize: 10,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
   },
   playerMeta: {
     color: colors.textDim,
