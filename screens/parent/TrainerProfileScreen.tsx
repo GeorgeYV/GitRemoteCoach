@@ -8,7 +8,7 @@ import StatTile from '../../components/shared/StatTile';
 import TrainerAvatarPlaceholder from '../../components/shared/TrainerAvatarPlaceholder';
 import {
   ApiError,
-  CoachProfileWithTraining,
+  CoachProfileWithTrainingAndBadges,
   CoachReportSummary,
   CoachTournamentAvailability,
   getCoachProfile,
@@ -23,7 +23,7 @@ import {
   VerificationStatus,
 } from '../../lib/api';
 import { buildDaySlotsFromRange, PRE_TOURNAMENT_DAYS } from '../../lib/dateSlots';
-import { colors, radius } from '../../lib/theme';
+import { colors, radius, withOpacity } from '../../lib/theme';
 import { AvailabilityDay, buildMatchDatetime } from '../../mock/parentFlow';
 
 const LEVEL_LABELS: Record<PlayingLevel, string> = {
@@ -90,7 +90,7 @@ export default function TrainerProfileScreen({
   onBack?: () => void;
   onReserve?: (info: { coachId: string; name: string; price: number; rateMode: RateMode; availability: AvailabilityDay[] }) => void;
 }) {
-  const [profile, setProfile] = useState<CoachProfileWithTraining | null>(null);
+  const [profile, setProfile] = useState<CoachProfileWithTrainingAndBadges | null>(null);
   const [availability, setAvailability] = useState<AvailabilityDay[] | null>(null);
   const [price, setPrice] = useState<number | null>(null);
   const [rateMode, setRateMode] = useState<RateMode | null>(null);
@@ -233,6 +233,22 @@ export default function TrainerProfileScreen({
 
         <Section label="Verificación">
           <Text style={styles.verificationText}>{VERIFICATION_LABELS[profile.profile.verificationStatus]}</Text>
+          {(profile.verifiedBadges.backgroundCheck || profile.verifiedBadges.certification) && (
+            <View style={styles.trustBadgeRow}>
+              {profile.verifiedBadges.backgroundCheck && (
+                <View style={styles.trustBadge}>
+                  <Ionicons name="shield-checkmark" size={13} color={colors.ballLime} />
+                  <Text style={styles.trustBadgeLabel}>Antecedentes verificados</Text>
+                </View>
+              )}
+              {profile.verifiedBadges.certification && (
+                <View style={styles.trustBadge}>
+                  <Ionicons name="ribbon" size={13} color={colors.ballLime} />
+                  <Text style={styles.trustBadgeLabel}>Certificación federativa</Text>
+                </View>
+              )}
+            </View>
+          )}
         </Section>
 
         <Section label="Reseñas de padres">
@@ -421,6 +437,28 @@ const styles = StyleSheet.create({
     color: colors.textSoft,
     fontSize: 13,
     lineHeight: 19,
+  },
+  trustBadgeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 10,
+  },
+  trustBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: withOpacity(colors.ballLime, 0.12),
+    borderRadius: 14,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: withOpacity(colors.ballLime, 0.35),
+  },
+  trustBadgeLabel: {
+    color: colors.textSoft,
+    fontSize: 11,
+    fontWeight: '700',
   },
   reviewsMessage: {
     color: colors.textDim,

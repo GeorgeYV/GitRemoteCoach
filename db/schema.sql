@@ -240,22 +240,22 @@ EXECUTE FUNCTION fn_coach_verification_documents_set_reviewed_at();
 
 -- ---------------------------------------------------------------------
 -- Trigger: mantener coach_profiles.verification_status al día a partir
--- de los documentos obligatorios ('identity', 'background_check').
--- 'certification' y 'club_reference' son opcionales (distintivo, no
--- bloquean ni otorgan la aprobación).
+-- del único documento obligatorio, 'identity' (ver decisión #43 — antes
+-- 'background_check' también bloqueaba la aprobación; se bajó a opcional
+-- igual que 'certification'/'club_reference' para no ser un freno al
+-- alta de un coach nuevo. Los tres opcionales no dejan de tener valor:
+-- se muestran como distintivo aparte en el perfil público, ver
+-- coachProfileService.getCoachProfile).
 --
--- Regla: por cada doc_type obligatorio se mira el documento más
--- reciente subido (por si hubo un rechazo y luego un reenvío):
---   - si CUALQUIER obligatorio tiene su versión más reciente 'rejected'
---     -> 'rejected'
---   - si TODOS los obligatorios tienen su versión más reciente
---     'approved' -> 'approved'
+-- Regla: se mira el documento 'identity' más reciente subido (por si
+-- hubo un rechazo y luego un reenvío):
+--   - 'rejected' -> 'rejected'
+--   - 'approved' -> 'approved'
 --   - en cualquier otro caso (falta subir, o 'pending') -> 'pending'
 -- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION recalculate_coach_verification_status(p_coach_id UUID) RETURNS VOID AS $$
 DECLARE
   v_identity_status   verification_status;
-  v_background_status verification_status;
   v_new_status        verification_status;
 BEGIN
   SELECT status INTO v_identity_status
@@ -264,15 +264,9 @@ BEGIN
    ORDER BY uploaded_at DESC, id DESC
    LIMIT 1;
 
-  SELECT status INTO v_background_status
-    FROM coach_verification_documents
-   WHERE coach_id = p_coach_id AND doc_type = 'background_check'
-   ORDER BY uploaded_at DESC, id DESC
-   LIMIT 1;
-
-  IF v_identity_status = 'rejected' OR v_background_status = 'rejected' THEN
+  IF v_identity_status = 'rejected' THEN
     v_new_status := 'rejected';
-  ELSIF v_identity_status = 'approved' AND v_background_status = 'approved' THEN
+  ELSIF v_identity_status = 'approved' THEN
     v_new_status := 'approved';
   ELSE
     v_new_status := 'pending';
@@ -324,10 +318,16 @@ CREATE TABLE clubs (
   -- publicar torneos falsos de inmediato. Reutiliza el mismo enum verification_status que ya usan
   -- los entrenadores, no uno nuevo. verification_reviewed_by/at quedan NULL mientras está
   -- 'pending' — sin CHECK que lo obligue (a diferencia de coach_verification_documents): acá es
-  -- un solo campo de auditoría opcional, no un flujo de documentos por revisar.
+  -- un solo campo de auditoría, no un flujo de documentos por revisar.
   verification_status       verification_status NOT NULL DEFAULT 'pending',
   verification_reviewed_by  UUID REFERENCES users (id),
   verification_reviewed_at  TIMESTAMPTZ,
+  -- Identidad de la persona que registra el club (ver decisión #43) — mismo criterio "sin
+  -- almacenamiento real todavía" que coach_verification_documents.file_url, el cliente manda un
+  -- placeholder. Nullable: obligatorio para clubes nuevos (registerClubSchema no deja mandar
+  -- vacío), pero los clubes que ya existían antes de esta columna se quedan en NULL sin que se
+  -- les exija retroactivamente.
+  identity_document_url  TEXT,
   created_at             TIMESTAMPTZ NOT NULL DEFAULT now(),
   CONSTRAINT chk_clubs_country CHECK (country IS NULL OR country IN ('EC', 'PE', 'CO', 'CL', 'BO', 'AR', 'VE', 'BR', 'PY', 'UY'))
 );
@@ -2071,4 +2071,29 @@ CREATE INDEX idx_push_tokens_user_id ON push_tokens (user_id);
 --     aplicación al aceptar/aprobar, no acá — no tiene sentido
 --     expresarla como CHECK porque depende de una fila en club_admins,
 --     no de esta tabla.
+--
+-- 43. Ajuste de qué es "obligatorio" para verificarse, en ambos lados
+--     (decisión de producto, para no tener tantos frenos al alta pero
+--     sí un mínimo de identidad real de por medio):
+--     - coach_profiles: recalculate_coach_verification_status ya no
+--       exige 'background_check' aprobado para llegar a 'approved',
+--       solo 'identity' — 'background_check' pasa a opcional, mismo
+--       trato que 'certification'/'club_reference' ya tenían. Los tres
+--       opcionales siguen sirviendo: se muestran como distintivo aparte
+--       en el perfil público (coachProfileService.getCoachProfile),
+--       algo que el padre puede notar aunque no sea requisito para
+--       operar.
+--     - clubs gana identity_document_url (mismo criterio "sin
+--       almacenamiento real todavía" que coach_verification_documents.
+--       file_url — placeholder, no archivo real) — a diferencia del
+--       resto de la verificación de club (decisión #41), este campo si
+--       es obligatorio para clubes nuevos (registerClubSchema), porque
+--       hoy no se pedía ninguna identidad real de quien registra el
+--       club, ni siquiera opcional. No se armó una tabla de documentos
+--       aparte (a diferencia de coach_verification_documents): un club
+--       solo necesita este único documento, así que una tabla con
+--       doc_type/trigger de recálculo sería sobre-ingeniería para un
+--       caso de un solo campo — la revisión sigue siendo la misma
+--       decisión manual y holística del platform_admin (decisión #41),
+--       ahora con este dato más a la vista.
 -- =====================================================================

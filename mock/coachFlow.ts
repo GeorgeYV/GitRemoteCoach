@@ -43,8 +43,9 @@ export const VERIFICATION_DOC_CHECKLIST: DocumentItem[] = [
   {
     id: 'background_check',
     title: 'Certificado de antecedentes penales',
-    subtitle: 'Vigencia no mayor a 6 meses',
+    subtitle: 'Opcional, pero se muestra como distintivo ante los padres',
     status: 'uploaded',
+    optional: true,
   },
   {
     id: 'certification',

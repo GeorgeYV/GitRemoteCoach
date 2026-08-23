@@ -23,7 +23,11 @@ const reviewClubSchema = z.object({
   status: z.enum(['approved', 'rejected']),
 });
 
-const registerClubSchema = z.object({
+// Compartido entre POST /clubs y PUT /clubs/:id — identityDocumentUrl queda afuera de este base:
+// obligatorio para crear (createClubSchema abajo), pero editar un club existente no debe volver
+// a pedirlo (ver decisión #43 en db/schema.sql, mismo criterio que ClubRegistrationScreen "Editar
+// perfil" no toca documentos de coach tampoco).
+const updateClubSchema = z.object({
   name: z.string().min(1),
   type: z.enum(['club', 'federation']),
   city: z.string().min(1),
@@ -32,10 +36,14 @@ const registerClubSchema = z.object({
   contactPhone: z.string().min(1).optional(),
 });
 
+const createClubSchema = updateClubSchema.extend({
+  identityDocumentUrl: z.string().min(1),
+});
+
 export async function clubRoutes(app: FastifyInstance): Promise<void> {
   // ClubRegistrationScreen: onboarding del club_admin logueado — crea el club y lo vincula a él.
   app.post('/clubs', { preHandler: app.authenticate }, async (req, reply) => {
-    const parsed = registerClubSchema.safeParse(req.body);
+    const parsed = createClubSchema.safeParse(req.body);
     if (!parsed.success) throw new ValidationError(parsed.error.message);
     const { sub } = req.user as { sub: string };
     const club = await clubService.registerClub(sub, parsed.data);
@@ -74,7 +82,7 @@ export async function clubRoutes(app: FastifyInstance): Promise<void> {
       throw new ForbiddenError('Solo un administrador del club puede editarlo');
     }
 
-    const parsed = registerClubSchema.safeParse(req.body);
+    const parsed = updateClubSchema.safeParse(req.body);
     if (!parsed.success) throw new ValidationError(parsed.error.message);
     return clubService.updateClub(id, parsed.data);
   });

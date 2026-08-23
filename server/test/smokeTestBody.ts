@@ -1892,11 +1892,18 @@ console.log('\n=== Escenario 23: documentos de verificación de coach (CoachRegi
     'el documento aprobado ya no aparece en la cola de pendientes',
   );
 
-  const stillPendingRes = await app.inject({ method: 'GET', url: `/coaches/${docCoach.id}` });
+  // Ver decisión #43: 'identity' es el único documento obligatorio — aprobarlo solo (sin tocar
+  // background_check) ya alcanza para 'approved'.
+  const approvedAfterIdentityRes = await app.inject({ method: 'GET', url: `/coaches/${docCoach.id}` });
   assertEqual(
-    stillPendingRes.json().profile.verificationStatus,
-    'pending',
-    'con solo 1 de 2 documentos obligatorios aprobados, el coach sigue en pending',
+    approvedAfterIdentityRes.json().profile.verificationStatus,
+    'approved',
+    'con solo el documento obligatorio (identity) aprobado, el coach ya pasa a approved',
+  );
+  assertEqual(
+    approvedAfterIdentityRes.json().verifiedBadges,
+    { backgroundCheck: false, certification: false },
+    'background_check todavía pending — el distintivo opcional del perfil público todavía no se prende',
   );
 
   const approveBackgroundRes = await app.inject({
@@ -1905,13 +1912,18 @@ console.log('\n=== Escenario 23: documentos de verificación de coach (CoachRegi
     headers: { authorization: `Bearer ${platformAdminToken}` },
     payload: { status: 'approved' },
   });
-  assertEqual(approveBackgroundRes.statusCode, 200, 'platform_admin aprueba el documento de antecedentes');
+  assertEqual(approveBackgroundRes.statusCode, 200, 'platform_admin aprueba el documento (opcional) de antecedentes');
 
-  const approvedCoachRes = await app.inject({ method: 'GET', url: `/coaches/${docCoach.id}` });
+  const withBadgeRes = await app.inject({ method: 'GET', url: `/coaches/${docCoach.id}` });
   assertEqual(
-    approvedCoachRes.json().profile.verificationStatus,
+    withBadgeRes.json().profile.verificationStatus,
     'approved',
-    'con los 2 documentos obligatorios aprobados, el coach pasa a approved',
+    'aprobar un documento opcional no cambia verificationStatus (ya estaba approved solo con identity)',
+  );
+  assertEqual(
+    withBadgeRes.json().verifiedBadges,
+    { backgroundCheck: true, certification: false },
+    'background_check aprobado prende su distintivo en el perfil público — es un plus, no un requisito',
   );
 
   const rejectRes = await app.inject({
@@ -1926,7 +1938,7 @@ console.log('\n=== Escenario 23: documentos de verificación de coach (CoachRegi
   assertEqual(
     rejectedCoachRes.json().profile.verificationStatus,
     'rejected',
-    'un solo documento obligatorio rechazado tumba al coach a rejected, aunque el otro esté approved',
+    'rechazar el documento obligatorio (identity) tumba al coach a rejected, aunque background_check siga approved',
   );
 }
 
@@ -1954,6 +1966,14 @@ console.log('\n=== Escenario 24: onboarding de club_admin (POST /clubs) ===');
   });
   assertEqual(noAuthRes.statusCode, 401, 'POST /clubs sin Bearer token devuelve 401');
 
+  const missingIdentityRes = await app.inject({
+    method: 'POST',
+    url: '/clubs',
+    headers: { authorization: `Bearer ${newAdminToken}` },
+    payload: { name: 'Academia Nueva', type: 'club', city: 'Monterrey', country: 'EC' },
+  });
+  assertEqual(missingIdentityRes.statusCode, 422, 'POST /clubs sin identityDocumentUrl devuelve 422 (decisión #43)');
+
   const createRes = await app.inject({
     method: 'POST',
     url: '/clubs',
@@ -1964,11 +1984,13 @@ console.log('\n=== Escenario 24: onboarding de club_admin (POST /clubs) ===');
       city: 'Monterrey',
       country: 'EC',
       contactEmail: 'contacto@academianueva.com',
+      identityDocumentUrl: 'placeholder://identity',
     },
   });
-  assertEqual(createRes.statusCode, 201, 'POST /clubs con datos válidos devuelve 201');
+  assertEqual(createRes.statusCode, 201, 'POST /clubs con datos válidos (incl. identityDocumentUrl) devuelve 201');
   const createdClub = createRes.json();
   assertEqual(createdClub.name, 'Academia Nueva', 'devuelve el club recién creado');
+  assertEqual(createdClub.identityDocumentUrl, 'placeholder://identity', 'devuelve el identityDocumentUrl enviado');
 
   const afterRes = await app.inject({ method: 'GET', url: `/club-admins/${newAdmin.id}/club` });
   assertEqual(afterRes.statusCode, 200, 'GET /club-admins/:userId/club ya resuelve el club recién creado');
@@ -1978,11 +2000,25 @@ console.log('\n=== Escenario 24: onboarding de club_admin (POST /clubs) ===');
     method: 'POST',
     url: '/clubs',
     headers: { authorization: `Bearer ${newAdminToken}` },
-    payload: { name: 'Otra Academia', type: 'federation', city: 'CDMX', country: 'EC' },
+    payload: { name: 'Otra Academia', type: 'federation', city: 'CDMX', country: 'EC', identityDocumentUrl: 'placeholder://identity' },
   });
   assertEqual(duplicateRes.statusCode, 409, 'un segundo POST /clubs para el mismo usuario devuelve 409');
 
   assertEqual(createdClub.verificationStatus, 'pending', 'un club recién creado nace \'pending\' (decisión #41)');
+
+  const publicClubRes = await app.inject({ method: 'GET', url: `/clubs/${createdClub.id}` });
+  assertEqual(
+    publicClubRes.json().identityDocumentUrl,
+    null,
+    'identityDocumentUrl nunca sale en GET /clubs/:id (público), aunque el club sí lo tenga',
+  );
+
+  const publicAdminLookupRes = await app.inject({ method: 'GET', url: `/club-admins/${newAdmin.id}/club` });
+  assertEqual(
+    publicAdminLookupRes.json().identityDocumentUrl,
+    null,
+    'identityDocumentUrl tampoco sale en GET /club-admins/:userId/club (también público)',
+  );
 
   const inDays = (n: number) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
   const newClubTournamentRes = await app.inject({

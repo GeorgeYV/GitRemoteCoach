@@ -5,7 +5,9 @@ import type { CoachVerificationDocument, CoachVerificationDocumentWithCoachName,
 
 type Queryable = Pool | PoolClient;
 
-const REQUIRED_DOC_TYPES: VerificationDocType[] = ['identity', 'background_check'];
+// Ver decisión #43 en db/schema.sql: 'background_check' pasó a opcional (mismo trato que
+// 'certification'/'club_reference') — solo 'identity' bloquea/otorga la aprobación.
+const REQUIRED_DOC_TYPES: VerificationDocType[] = ['identity'];
 
 function mapRow(row: any): CoachVerificationDocument {
   return {
@@ -85,6 +87,36 @@ export async function review(
   );
   if (rows.length === 0) throw new NotFoundError('CoachVerificationDocument', id);
   return mapRow(rows[0]);
+}
+
+// Documentos opcionales que, aunque no bloquean ni otorgan verification_status (ver decisión
+// #43), sí se muestran como distintivo aparte en el perfil público — algo que el padre puede
+// notar sin que sea un requisito para operar. 'club_reference' queda afuera: es una referencia
+// de texto libre, no un documento verificable de la misma forma que los otros dos.
+const BADGE_DOC_TYPES: VerificationDocType[] = ['background_check', 'certification'];
+
+export interface CoachVerificationBadges {
+  backgroundCheck: boolean;
+  certification: boolean;
+}
+
+/** TrainerProfileScreen: qué documentos opcionales tiene aprobados este coach — mismo patrón de
+ * "versión más reciente" que recalculateVerificationStatus, pero sin efecto sobre
+ * verification_status. */
+export async function getVerifiedBadges(coachId: string, db: Queryable = pool): Promise<CoachVerificationBadges> {
+  const statuses = await Promise.all(
+    BADGE_DOC_TYPES.map(async (docType) => {
+      const { rows } = await db.query(
+        `SELECT status FROM coach_verification_documents
+         WHERE coach_id = $1 AND doc_type = $2
+         ORDER BY uploaded_at DESC, id DESC
+         LIMIT 1`,
+        [coachId, docType],
+      );
+      return rows[0]?.status as string | undefined;
+    }),
+  );
+  return { backgroundCheck: statuses[0] === 'approved', certification: statuses[1] === 'approved' };
 }
 
 /**

@@ -89,6 +89,9 @@ export default function PlatformAdminClubVerificationScreen() {
                     </Text>
                     {club.contactEmail && <Text style={styles.clubMeta}>{club.contactEmail}</Text>}
                     {club.contactPhone && <Text style={styles.clubMeta}>{club.contactPhone}</Text>}
+                    <Text style={club.identityDocumentUrl ? styles.identityOk : styles.identityMissing}>
+                      {club.identityDocumentUrl ? '✓ Identidad recibida' : '⚠ Sin identidad (club previo a este requisito)'}
+                    </Text>
                   </View>
                   <View style={styles.clubActions}>
                     <Pressable style={styles.rejectButton} onPress={() => respond(club.id, 'rejected')} disabled={acting}>
@@ -180,6 +183,18 @@ const styles = StyleSheet.create({
     color: colors.textDim,
     fontSize: 12,
     marginTop: 1,
+  },
+  identityOk: {
+    color: colors.ballLimeDim,
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: 6,
+  },
+  identityMissing: {
+    color: colors.amber,
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: 6,
   },
   clubActions: {
     flexDirection: 'row',

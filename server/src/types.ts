@@ -219,6 +219,10 @@ export interface Club {
   verificationStatus: VerificationStatus;
   verificationReviewedBy: string | null;
   verificationReviewedAt: string | null;
+  /** Identidad de quien registró el club (ver decisión #43 en db/schema.sql) — placeholder, sin
+   * almacenamiento real todavía (mismo criterio que CoachVerificationDocument.fileUrl). Nullable
+   * solo por los clubes que ya existían antes de esta columna; obligatorio para clubes nuevos. */
+  identityDocumentUrl: string | null;
   createdAt: string;
 }
 

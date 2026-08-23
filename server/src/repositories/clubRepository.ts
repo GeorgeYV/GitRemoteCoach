@@ -27,6 +27,7 @@ function mapRow(row: any): Club {
     verificationStatus: row.verification_status,
     verificationReviewedBy: row.verification_reviewed_by,
     verificationReviewedAt: row.verification_reviewed_at,
+    identityDocumentUrl: row.identity_document_url,
     createdAt: row.created_at,
   };
 }
@@ -73,13 +74,23 @@ export async function create(
     country: CountryCode;
     contactEmail: string | null;
     contactPhone: string | null;
+    identityDocumentUrl: string;
   },
   db: Queryable = pool,
 ): Promise<Club> {
   const { rows } = await db.query(
-    `INSERT INTO clubs (name, type, city, country, contact_email, contact_phone, default_commission_rate)
-     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-    [input.name, input.type, input.city, input.country, input.contactEmail, input.contactPhone, DEFAULT_COMMISSION_RATE],
+    `INSERT INTO clubs (name, type, city, country, contact_email, contact_phone, default_commission_rate, identity_document_url)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+    [
+      input.name,
+      input.type,
+      input.city,
+      input.country,
+      input.contactEmail,
+      input.contactPhone,
+      DEFAULT_COMMISSION_RATE,
+      input.identityDocumentUrl,
+    ],
   );
   return mapRow(rows[0]);
 }

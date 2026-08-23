@@ -6,14 +6,23 @@ import * as settlementRepository from '../repositories/settlementRepository.js';
 import * as tournamentRepository from '../repositories/tournamentRepository.js';
 import type { Club, ClubSearchResult, ClubSettlementWithTournamentName, CountryCode, TournamentSummary } from '../types.js';
 
+// GET /clubs/:id y GET /club-admins/:userId/club son públicas, sin sesión (ver comentario en
+// routes/clubs.ts) — identityDocumentUrl es la identidad de la persona que registró el club (ver
+// decisión #43 en db/schema.sql), nunca debería quedar visible ahí. La cola de verificación del
+// platform_admin (listPendingClubVerifications, ruta protegida por rol) sí lo necesita para saber
+// si ya se recibió, así que esta función NO se usa en ese camino.
+function withoutIdentityDocument(club: Club): Club {
+  return { ...club, identityDocumentUrl: null };
+}
+
 export async function getClub(clubId: string): Promise<Club> {
-  return clubRepository.getById(clubId);
+  return withoutIdentityDocument(await clubRepository.getById(clubId));
 }
 
 /** ClubFlow: resuelve el club del club_admin logueado antes de montar sus pantallas. */
 export async function getClubForAdmin(userId: string): Promise<Club> {
   const clubId = await clubRepository.getClubIdForAdminUser(userId);
-  return clubRepository.getById(clubId);
+  return withoutIdentityDocument(await clubRepository.getById(clubId));
 }
 
 /** Un usuario solo puede administrar un club a la vez (ver decisión #42) — reusado por
@@ -41,6 +50,7 @@ export async function registerClub(
     country: CountryCode;
     contactEmail?: string;
     contactPhone?: string;
+    identityDocumentUrl: string;
   },
 ): Promise<Club> {
   await assertUserHasNoClub(adminUserId);
@@ -53,6 +63,7 @@ export async function registerClub(
         country: input.country,
         contactEmail: input.contactEmail ?? null,
         contactPhone: input.contactPhone ?? null,
+        identityDocumentUrl: input.identityDocumentUrl,
       },
       client,
     );

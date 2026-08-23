@@ -2,17 +2,29 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import React, { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import DocumentRow from '../../components/coach/DocumentRow';
 import IconTextInput from '../../components/shared/IconTextInput';
 import { useAuth } from '../../context/AuthContext';
 import { ApiError, Club, CountryCode, registerClub, updateClub } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
 import { isValidEmail } from '../../lib/validation';
-import { COUNTRY_LABELS, COUNTRY_OPTIONS } from '../../mock/coachFlow';
+import { COUNTRY_LABELS, COUNTRY_OPTIONS, DocumentItem } from '../../mock/coachFlow';
 
 const TYPE_OPTIONS: { value: 'club' | 'federation'; label: string }[] = [
   { value: 'club', label: 'Club' },
   { value: 'federation', label: 'Federación' },
 ];
+
+// Mismo criterio "sin almacenamiento real todavía" que CoachRegistrationScreen — el checklist es
+// interactivo, pero el backend recibe un placeholder en vez de un archivo real.
+const PLACEHOLDER_IDENTITY_URL = 'placeholder://identity';
+
+const IDENTITY_DOC: DocumentItem = {
+  id: 'identity',
+  title: 'Identificación oficial de quien registra el club',
+  subtitle: 'INE, pasaporte o cédula — obligatoria para poder aprobar el club',
+  status: 'pending',
+};
 
 export default function ClubRegistrationScreen({
   club,
@@ -33,11 +45,20 @@ export default function ClubRegistrationScreen({
   const [country, setCountry] = useState<CountryCode | null>(club?.country ?? null);
   const [contactEmail, setContactEmail] = useState(club?.contactEmail ?? '');
   const [contactPhone, setContactPhone] = useState(club?.contactPhone ?? '');
+  // Solo aplica al alta (club === undefined) — editar un club ya existente no vuelve a pedir
+  // identidad, mismo criterio que ClubRegistrationScreen "Editar perfil" no toca documentos de
+  // coach tampoco (ver decisión #43 en db/schema.sql).
+  const [identityDoc, setIdentityDoc] = useState<DocumentItem>(IDENTITY_DOC);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const canSubmit =
-    name.trim().length > 0 && type !== null && city.trim().length > 0 && !!country && !submitting;
+    name.trim().length > 0 &&
+    type !== null &&
+    city.trim().length > 0 &&
+    !!country &&
+    (!!club || identityDoc.status === 'uploaded') &&
+    !submitting;
 
   async function handleSubmit() {
     if (!token || !type || !country) {
@@ -57,6 +78,7 @@ export default function ClubRegistrationScreen({
       country,
       contactEmail: contactEmail.trim() || undefined,
       contactPhone: contactPhone.trim() || undefined,
+      identityDocumentUrl: PLACEHOLDER_IDENTITY_URL,
     };
     try {
       const result = club ? await updateClub(token, club.id, params) : await registerClub(token, params);
@@ -127,6 +149,16 @@ export default function ClubRegistrationScreen({
             );
           })}
         </View>
+
+        {!club && (
+          <>
+            <Text style={styles.sectionLabel}>Identidad</Text>
+            <DocumentRow
+              doc={identityDoc}
+              onPressUpload={() => setIdentityDoc((prev) => ({ ...prev, status: 'uploaded' }))}
+            />
+          </>
+        )}
 
         <IconTextInput
           icon="mail-outline"

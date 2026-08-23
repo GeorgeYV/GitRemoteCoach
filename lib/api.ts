@@ -572,14 +572,29 @@ export interface CoachProfile {
   updatedAt: string;
 }
 
+/** backgroundCheck/certification: documentos opcionales (ver decisión #43 en db/schema.sql) —
+ * no afectan verificationStatus, se muestran como distintivo aparte en TrainerProfileScreen. */
+export interface CoachVerifiedBadges {
+  backgroundCheck: boolean;
+  certification: boolean;
+}
+
 export interface CoachProfileWithTraining {
   profile: CoachProfile;
   ageCategories: AgeCategory[];
   levels: PlayingLevel[];
 }
 
-/** GET /coaches/:id — CoachHomeScreen, CoachVerificationPendingScreen, CoachReputationScreen. */
-export function getCoachProfile(coachId: string): Promise<CoachProfileWithTraining> {
+/** Espeja server/src/services/coachProfileService.ts#CoachProfileWithTrainingAndBadges — solo lo
+ * que devuelve GET /coaches/:id (el perfil público); registerCoachProfile/updateCoachTraining
+ * siguen devolviendo CoachProfileWithTraining sin badges. */
+export interface CoachProfileWithTrainingAndBadges extends CoachProfileWithTraining {
+  verifiedBadges: CoachVerifiedBadges;
+}
+
+/** GET /coaches/:id — CoachHomeScreen, CoachVerificationPendingScreen, CoachReputationScreen,
+ * TrainerProfileScreen. */
+export function getCoachProfile(coachId: string): Promise<CoachProfileWithTrainingAndBadges> {
   return request(`/coaches/${coachId}`);
 }
 
@@ -998,6 +1013,7 @@ export interface Club {
   verificationStatus: VerificationStatus;
   verificationReviewedBy: string | null;
   verificationReviewedAt: string | null;
+  identityDocumentUrl: string | null;
   createdAt: string;
 }
 
@@ -1017,6 +1033,7 @@ export function registerClub(
     country: CountryCode;
     contactEmail?: string;
     contactPhone?: string;
+    identityDocumentUrl: string;
   },
 ): Promise<Club> {
   return request('/clubs', {
