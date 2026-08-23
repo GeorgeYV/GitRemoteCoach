@@ -201,7 +201,7 @@ export default function BookingConfirmScreen({
               return (
                 <View key={day.isoDate} style={styles.dayColumn}>
                   <Text style={styles.dayLabel}>{day.dayLabel}</Text>
-                  {day.isPreTournament && <Text style={styles.dayPreTag}>Previo</Text>}
+                  <Text style={styles.dayPreTag}>{day.isPreTournament ? 'Previo' : ' '}</Text>
                   <Pressable
                     disabled={!day.available || daysLocked || !!bookedStatus}
                     onPress={() => toggleDay(day)}
@@ -363,6 +363,7 @@ const styles = StyleSheet.create({
   dayPreTag: {
     color: colors.courtBlue,
     fontSize: 8,
+    lineHeight: 10,
     fontWeight: '800',
     textAlign: 'center',
     textTransform: 'uppercase',

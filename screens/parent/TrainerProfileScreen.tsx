@@ -286,7 +286,7 @@ export default function TrainerProfileScreen({
               return (
                 <View key={day.isoDate} style={styles.availabilityColumn}>
                   <Text style={styles.availabilityDay}>{day.dayLabel}</Text>
-                  {day.isPreTournament && <Text style={styles.availabilityPreTag}>Previo</Text>}
+                  <Text style={styles.availabilityPreTag}>{day.isPreTournament ? 'Previo' : ' '}</Text>
                   <AvailabilitySlotPill label="Disponible" available={day.available} />
                   {exception && <Text style={styles.availabilityException}>{exception}</Text>}
                 </View>
@@ -486,6 +486,7 @@ const styles = StyleSheet.create({
   availabilityPreTag: {
     color: colors.courtBlue,
     fontSize: 8,
+    lineHeight: 10,
     fontWeight: '800',
     textAlign: 'center',
     textTransform: 'uppercase',
