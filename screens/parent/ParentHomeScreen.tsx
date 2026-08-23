@@ -53,25 +53,25 @@ function daysUntilCountdown(startIso: string): { text: string; color: string } |
 // un compromiso real con ese torneo, a diferencia de rejected/expired/cancelled/payment_failed.
 const ACTIVE_ENGAGEMENT_STATUSES = new Set<BookingForParent['status']>(['requested', 'accepted', 'paid', 'completed']);
 
-/** El torneo de "Continuar con" prioriza uno donde el padre ya tiene una reserva en curso, mientras
- * ese torneo siga vigente (fecha de fin no pasada) — con reservas en más de un torneo, el que
- * empieza más pronto. null si no hay ninguna reserva activa en un torneo todavía vigente. */
-function bookedTournamentFeatured(bookings: BookingForParent[]): TournamentSearchResult | null {
+/** "Torneo(s) con reservas": todos los torneos donde el padre ya tiene una reserva en curso,
+ * mientras sigan vigentes (fecha de fin no pasada), ordenados por el que empieza más pronto.
+ * Lista vacía si no hay ninguna reserva activa en un torneo todavía vigente — a diferencia del
+ * comportamiento anterior, esta sección ya no cae a "mostrar cualquier torneo" cuando está vacía,
+ * porque eso confundía al padre con un torneo sin relación a la categoría de su hijo/a. */
+function bookedTournamentsFeatured(bookings: BookingForParent[]): TournamentSearchResult[] {
   const now = Date.now();
-  const candidates = bookings
+  return bookings
     .filter((b) => ACTIVE_ENGAGEMENT_STATUSES.has(b.status) && new Date(b.tournamentEndDate).getTime() >= now)
-    .sort((a, b) => new Date(a.tournamentStartDate).getTime() - new Date(b.tournamentStartDate).getTime());
-  const next = candidates[0];
-  if (!next) return null;
-  return {
-    id: next.tournamentId,
-    name: next.tournamentName,
-    venue: next.tournamentVenue,
-    city: next.tournamentCity,
-    country: null,
-    startDate: next.tournamentStartDate,
-    endDate: next.tournamentEndDate,
-  };
+    .sort((a, b) => new Date(a.tournamentStartDate).getTime() - new Date(b.tournamentStartDate).getTime())
+    .map((next) => ({
+      id: next.tournamentId,
+      name: next.tournamentName,
+      venue: next.tournamentVenue,
+      city: next.tournamentCity,
+      country: null,
+      startDate: next.tournamentStartDate,
+      endDate: next.tournamentEndDate,
+    }));
 }
 
 export default function ParentHomeScreen() {
@@ -165,13 +165,11 @@ export default function ParentHomeScreen() {
   }
 
   const firstName = user?.fullName.split(' ')[0] ?? '';
-  const featured = bookedTournamentFeatured(bookings) ?? tournaments?.[0] ?? null;
+  const featuredList = bookedTournamentsFeatured(bookings);
   const isSearching = query.trim().length > 0;
-  // Sin búsqueda activa: el resto de la carga fija, sin repetir el destacado. Buscando: la lista
-  // completa de resultados del servidor — puede incluir al destacado, y eso está bien (ya no hay
-  // que ocultarlo para evitar el mensaje contradictorio de "no encontramos" cuando en realidad sí
-  // hay un resultado, solo que estaba arriba).
-  const visibleList = isSearching ? searchResults : (tournaments?.slice(1) ?? null);
+  // "Torneo(s) con reservas" es una sección aparte (arriba) con su propia fuente de datos —
+  // la lista general de acá abajo no le resta nada, un torneo puede aparecer en ambas.
+  const visibleList = isSearching ? searchResults : tournaments;
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -203,27 +201,29 @@ export default function ParentHomeScreen() {
             : 'Encuentra un entrenador para tu próximo torneo'}
         </Text>
 
-        {featured && (
+        {featuredList.length > 0 && (
           <>
-            <Text style={styles.sectionLabel}>Continuar con</Text>
-            <View style={styles.featuredCard}>
-              {tournamentBadgeLabel(featured) && (
-                <View style={styles.badge}>
-                  <Text style={styles.badgeLabel}>{tournamentBadgeLabel(featured)}</Text>
-                </View>
-              )}
-              <Text style={styles.featuredName}>{featured.name}</Text>
-              <Text style={styles.featuredMeta}>
-                {featured.venue} · {featured.city}
-              </Text>
-              <Text style={styles.featuredMeta}>{dateRangeLabel(featured.startDate, featured.endDate)}</Text>
-              <Pressable style={styles.ctaButton} onPress={() => goToTrainers(featured.id)}>
-                <View style={styles.ctaContent}>
-                  <Text style={styles.ctaLabel}>Ver entrenadores</Text>
-                  <Ionicons name="arrow-forward-outline" size={16} color={colors.courtBlueDeep} />
-                </View>
-              </Pressable>
-            </View>
+            <Text style={styles.sectionLabel}>{featuredList.length === 1 ? 'Torneo con reserva' : 'Torneos con reservas'}</Text>
+            {featuredList.map((featured) => (
+              <View key={featured.id} style={styles.featuredCard}>
+                {tournamentBadgeLabel(featured) && (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeLabel}>{tournamentBadgeLabel(featured)}</Text>
+                  </View>
+                )}
+                <Text style={styles.featuredName}>{featured.name}</Text>
+                <Text style={styles.featuredMeta}>
+                  {featured.venue} · {featured.city}
+                </Text>
+                <Text style={styles.featuredMeta}>{dateRangeLabel(featured.startDate, featured.endDate)}</Text>
+                <Pressable style={styles.ctaButton} onPress={() => goToTrainers(featured.id)}>
+                  <View style={styles.ctaContent}>
+                    <Text style={styles.ctaLabel}>Ver entrenadores</Text>
+                    <Ionicons name="arrow-forward-outline" size={16} color={colors.courtBlueDeep} />
+                  </View>
+                </Pressable>
+              </View>
+            ))}
           </>
         )}
 
@@ -259,7 +259,7 @@ export default function ParentHomeScreen() {
           <Text style={styles.tournamentMeta}>{isSearching ? 'Buscando…' : 'Cargando torneos…'}</Text>
         ) : visibleList.length === 0 && isSearching ? (
           <Text style={styles.tournamentMeta}>No encontramos torneos con ese nombre, sede o ciudad.</Text>
-        ) : visibleList.length === 0 && !featured ? (
+        ) : visibleList.length === 0 && featuredList.length === 0 ? (
           <Text style={styles.tournamentMeta}>No hay torneos activos por ahora.</Text>
         ) : (
           <View style={styles.tournamentList}>
