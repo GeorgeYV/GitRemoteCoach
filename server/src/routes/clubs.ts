@@ -79,15 +79,41 @@ export async function clubRoutes(app: FastifyInstance): Promise<void> {
     return clubService.updateClub(id, parsed.data);
   });
 
-  // ClubSettlementsScreen
-  app.get('/clubs/:id/settlements', async (req) => {
+  // ClubSettlementsScreen — datos financieros del club (comisiones, referencias de pago), solo
+  // para su propio administrador.
+  app.get('/clubs/:id/settlements', { preHandler: app.authenticate }, async (req) => {
     const { id } = req.params as { id: string };
+    const { sub } = req.user as { sub: string };
+
+    let adminClubId: string;
+    try {
+      adminClubId = await clubRepository.getClubIdForAdminUser(sub);
+    } catch {
+      throw new ForbiddenError('Solo un administrador del club puede ver sus liquidaciones');
+    }
+    if (adminClubId !== id) {
+      throw new ForbiddenError('Solo un administrador del club puede ver sus liquidaciones');
+    }
+
     return clubService.listSettlementsForClub(id);
   });
 
-  // ClubTournamentListScreen
-  app.get('/clubs/:id/tournaments', async (req) => {
+  // ClubTournamentListScreen — incluye pendingCommissionAmount (dato financiero del club), solo
+  // para su propio administrador.
+  app.get('/clubs/:id/tournaments', { preHandler: app.authenticate }, async (req) => {
     const { id } = req.params as { id: string };
+    const { sub } = req.user as { sub: string };
+
+    let adminClubId: string;
+    try {
+      adminClubId = await clubRepository.getClubIdForAdminUser(sub);
+    } catch {
+      throw new ForbiddenError('Solo un administrador del club puede ver sus torneos');
+    }
+    if (adminClubId !== id) {
+      throw new ForbiddenError('Solo un administrador del club puede ver sus torneos');
+    }
+
     return clubService.listTournamentsForClub(id);
   });
 

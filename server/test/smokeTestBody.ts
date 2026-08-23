@@ -3234,6 +3234,83 @@ console.log('\n=== Escenario 34: administrador de respaldo de un club (solicitud
   assertEqual(requesterClubRes.json().id, fixtures.clubId, 'quien pidió acceso ya resuelve al club aprobado');
 }
 
+console.log('\n=== Escenario 35: liquidaciones/torneos de un club, solo para su propio admin ===');
+{
+  const clubAdminToken3 = app.jwt.sign({ sub: fixtures.clubAdminUserId, role: 'club_admin' });
+
+  const settlementsNoAuthRes = await app.inject({ method: 'GET', url: `/clubs/${fixtures.clubId}/settlements` });
+  assertEqual(settlementsNoAuthRes.statusCode, 401, 'GET /clubs/:id/settlements sin token devuelve 401');
+
+  const settlementsWrongUserRes = await app.inject({
+    method: 'GET',
+    url: `/clubs/${fixtures.clubId}/settlements`,
+    headers: { authorization: `Bearer ${parentToken}` },
+  });
+  assertEqual(settlementsWrongUserRes.statusCode, 403, 'GET /clubs/:id/settlements con un usuario ajeno devuelve 403');
+
+  const settlementsOkRes = await app.inject({
+    method: 'GET',
+    url: `/clubs/${fixtures.clubId}/settlements`,
+    headers: { authorization: `Bearer ${clubAdminToken3}` },
+  });
+  assertEqual(settlementsOkRes.statusCode, 200, 'GET /clubs/:id/settlements con su propio admin devuelve 200');
+
+  const tournamentsNoAuthRes = await app.inject({ method: 'GET', url: `/clubs/${fixtures.clubId}/tournaments` });
+  assertEqual(tournamentsNoAuthRes.statusCode, 401, 'GET /clubs/:id/tournaments sin token devuelve 401');
+
+  const tournamentsWrongUserRes = await app.inject({
+    method: 'GET',
+    url: `/clubs/${fixtures.clubId}/tournaments`,
+    headers: { authorization: `Bearer ${parentToken}` },
+  });
+  assertEqual(tournamentsWrongUserRes.statusCode, 403, 'GET /clubs/:id/tournaments con un usuario ajeno devuelve 403');
+
+  const tournamentsOkRes = await app.inject({
+    method: 'GET',
+    url: `/clubs/${fixtures.clubId}/tournaments`,
+    headers: { authorization: `Bearer ${clubAdminToken3}` },
+  });
+  assertEqual(tournamentsOkRes.statusCode, 200, 'GET /clubs/:id/tournaments con su propio admin devuelve 200');
+}
+
+console.log('\n=== Escenario 36: perfil público de coach no expone stripeConnectedAccountId ===');
+{
+  const profileRes = await app.inject({ method: 'GET', url: `/coaches/${fixtures.coachAUserId}` });
+  assertEqual(profileRes.statusCode, 200, 'GET /coaches/:id devuelve 200');
+  assertEqual(
+    profileRes.json().profile.stripeConnectedAccountId,
+    null,
+    'stripeConnectedAccountId nunca sale en el perfil público, aunque el coach tenga uno real',
+  );
+}
+
+console.log('\n=== Escenario 37: borrar un push token ajeno no funciona ===');
+{
+  await app.inject({
+    method: 'POST',
+    url: '/push-tokens',
+    headers: { authorization: `Bearer ${coachAToken}` },
+    payload: { token: 'ExponentPushToken[owned-by-coach-a]' },
+  });
+
+  const deleteWrongOwnerRes = await app.inject({
+    method: 'DELETE',
+    url: '/push-tokens/ExponentPushToken%5Bowned-by-coach-a%5D',
+    headers: { authorization: `Bearer ${coachBToken}` },
+  });
+  assertEqual(deleteWrongOwnerRes.statusCode, 204, 'DELETE de un token ajeno igual devuelve 204 (best-effort, sin filtrar info)');
+
+  const stillThereRows = await testPool.query(
+    `SELECT 1 FROM push_tokens WHERE expo_push_token = 'ExponentPushToken[owned-by-coach-a]' AND user_id = $1`,
+    [fixtures.coachAUserId],
+  );
+  assertEqual(
+    stillThereRows.rows.length,
+    1,
+    'el DELETE de otro usuario no borró el token — sigue existiendo, atado a su dueño real',
+  );
+}
+
 console.log(`\n=== Resultado: ${passed} pasaron, ${failed} fallaron ===`);
 await app.close();
 process.exit(failed > 0 ? 1 : 0);

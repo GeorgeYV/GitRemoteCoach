@@ -20,7 +20,8 @@ export async function pushTokenRoutes(app: FastifyInstance): Promise<void> {
   // de la sesión que se cierra.
   app.delete('/push-tokens/:token', { preHandler: app.authenticate }, async (req, reply) => {
     const { token } = req.params as { token: string };
-    await notificationService.unregisterPushToken(token);
+    const { sub } = req.user as { sub: string };
+    await notificationService.unregisterPushToken(sub, token);
     reply.code(204);
   });
 }

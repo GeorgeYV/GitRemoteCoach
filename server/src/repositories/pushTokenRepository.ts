@@ -17,6 +17,9 @@ export async function listTokensForUser(userId: string, db: Queryable = pool): P
   return rows.map((r: any) => r.expo_push_token);
 }
 
-export async function deleteToken(expoPushToken: string, db: Queryable = pool): Promise<void> {
-  await db.query(`DELETE FROM push_tokens WHERE expo_push_token = $1`, [expoPushToken]);
+/** Acotado a userId — sin esto, cualquier usuario autenticado que conociera el expo_push_token
+ * de otra persona podría borrárselo (DELETE /push-tokens/:token no tenía forma de saber de quién
+ * era el token antes de este chequeo). */
+export async function deleteToken(userId: string, expoPushToken: string, db: Queryable = pool): Promise<void> {
+  await db.query(`DELETE FROM push_tokens WHERE expo_push_token = $1 AND user_id = $2`, [expoPushToken, userId]);
 }

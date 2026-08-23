@@ -49,9 +49,10 @@ export default function ClubTournamentListScreen({
   const [localRefreshKey, setLocalRefreshKey] = useState(0);
 
   useEffect(() => {
+    if (!token) return;
     let cancelled = false;
     setError(null);
-    listClubTournaments(clubId)
+    listClubTournaments(token, clubId)
       .then((result) => {
         if (!cancelled) setTournaments(result);
       })
@@ -62,7 +63,7 @@ export default function ClubTournamentListScreen({
     return () => {
       cancelled = true;
     };
-  }, [clubId, refreshKey, localRefreshKey]);
+  }, [token, clubId, refreshKey, localRefreshKey]);
 
   useEffect(() => {
     let cancelled = false;

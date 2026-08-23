@@ -27,13 +27,17 @@ export async function searchCoaches(params: {
   return coachRepository.search(params);
 }
 
+/** GET /coaches/:id — perfil público (TrainerProfileScreen), sin sesión. stripeConnectedAccountId
+ * se anula acá: es un identificador interno de la pasarela de pago (solo lo necesita el propio
+ * coach al editar su perfil, o el server al pagarle — ver coachProfileService.updateCoachProfile
+ * y paymentService), nunca debería ser visible en el perfil que ve un padre. */
 export async function getCoachProfile(coachId: string): Promise<CoachProfileWithTraining> {
   const [profile, ageCategories, levels] = await Promise.all([
     coachRepository.getCoachProfile(coachId),
     coachRepository.getCoachAgeCategories(coachId),
     coachRepository.getCoachLevels(coachId),
   ]);
-  return { profile, ageCategories, levels };
+  return { profile: { ...profile, stripeConnectedAccountId: null }, ageCategories, levels };
 }
 
 /**

@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import Stripe from 'stripe';
 import { withTransaction } from '../lib/db.js';
 import { stripe } from '../lib/stripe.js';
@@ -33,18 +32,6 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
-/** IDs de mock/parentFlow.ts#mockPaymentMethods ("card-1"/"card-2") — nunca fueron tokens reales
- * de Stripe (esos llegan con prefijo "pm_"). Mandárselos tal cual a la API real de Stripe la hace
- * rechazarlos con un error que no es StripeCardError, así que no lo captura el catch de abajo y
- * termina como un 500 sin manejar. Como todavía no hay un proveedor de pago real conectado (Stripe
- * quedó despriorizado para esta fase, ver decisión de producto), se simula el cobro en su lugar. */
-function isMockPaymentMethod(paymentMethodId: string): boolean {
-  return !paymentMethodId.startsWith('pm_');
-}
-
-function simulatedSucceededIntent(): Stripe.PaymentIntent {
-  return { id: `sim_${randomUUID()}`, status: 'succeeded' } as Stripe.PaymentIntent;
-}
 
 /**
  * El padre paga tras la aceptación del entrenador. Captura inmediata hacia
@@ -72,35 +59,31 @@ export async function initiatePayment(
     const split = computeSplit(Number(booking.agreedRate), clubCommissionRate);
 
     let intent: Stripe.PaymentIntent;
-    if (isMockPaymentMethod(paymentMethodId)) {
-      intent = simulatedSucceededIntent();
-    } else {
-      try {
-        intent = await stripe.paymentIntents.create({
-          amount: Math.round(split.totalAmountPaid * 100),
-          currency: CURRENCY,
-          payment_method: paymentMethodId,
-          confirm: true,
-          automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
-          metadata: { bookingId },
-        });
-      } catch (err) {
-        if (err instanceof Stripe.errors.StripeCardError) {
-          await paymentRepository.recordTransaction(
-            {
-              bookingId,
-              type: 'charge_failed',
-              status: 'failed',
-              amount: split.totalAmountPaid,
-              rawResponse: { message: (err as Error).message },
-            },
-            client,
-          );
-          await bookingRepository.updateStatus(bookingId, ['accepted', 'payment_failed'], 'payment_failed', {}, client);
-          throw new ConflictError('El pago fue rechazado por la pasarela', 'payment_declined');
-        }
-        throw err;
+    try {
+      intent = await stripe.paymentIntents.create({
+        amount: Math.round(split.totalAmountPaid * 100),
+        currency: CURRENCY,
+        payment_method: paymentMethodId,
+        confirm: true,
+        automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
+        metadata: { bookingId },
+      });
+    } catch (err) {
+      if (err instanceof Stripe.errors.StripeCardError) {
+        await paymentRepository.recordTransaction(
+          {
+            bookingId,
+            type: 'charge_failed',
+            status: 'failed',
+            amount: split.totalAmountPaid,
+            rawResponse: { message: (err as Error).message },
+          },
+          client,
+        );
+        await bookingRepository.updateStatus(bookingId, ['accepted', 'payment_failed'], 'payment_failed', {}, client);
+        throw new ConflictError('El pago fue rechazado por la pasarela', 'payment_declined');
       }
+      throw err;
     }
 
     if (intent.status === 'requires_action') {
@@ -253,37 +236,33 @@ export async function initiatePaymentBatch(
     totalAmount = round2(totalAmount);
 
     let intent: Stripe.PaymentIntent;
-    if (isMockPaymentMethod(paymentMethodId)) {
-      intent = simulatedSucceededIntent();
-    } else {
-      try {
-        intent = await stripe.paymentIntents.create({
-          amount: Math.round(totalAmount * 100),
-          currency: CURRENCY,
-          payment_method: paymentMethodId,
-          confirm: true,
-          automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
-          metadata: { bookingIds: bookingIds.join(',') },
-        });
-      } catch (err) {
-        if (err instanceof Stripe.errors.StripeCardError) {
-          for (const booking of bookings) {
-            await paymentRepository.recordTransaction(
-              {
-                bookingId: booking.id,
-                type: 'charge_failed',
-                status: 'failed',
-                amount: splitByBookingId.get(booking.id)!.totalAmountPaid,
-                rawResponse: { message: (err as Error).message },
-              },
-              client,
-            );
-            await bookingRepository.updateStatus(booking.id, ['accepted', 'payment_failed'], 'payment_failed', {}, client);
-          }
-          throw new ConflictError('El pago fue rechazado por la pasarela', 'payment_declined');
+    try {
+      intent = await stripe.paymentIntents.create({
+        amount: Math.round(totalAmount * 100),
+        currency: CURRENCY,
+        payment_method: paymentMethodId,
+        confirm: true,
+        automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
+        metadata: { bookingIds: bookingIds.join(',') },
+      });
+    } catch (err) {
+      if (err instanceof Stripe.errors.StripeCardError) {
+        for (const booking of bookings) {
+          await paymentRepository.recordTransaction(
+            {
+              bookingId: booking.id,
+              type: 'charge_failed',
+              status: 'failed',
+              amount: splitByBookingId.get(booking.id)!.totalAmountPaid,
+              rawResponse: { message: (err as Error).message },
+            },
+            client,
+          );
+          await bookingRepository.updateStatus(booking.id, ['accepted', 'payment_failed'], 'payment_failed', {}, client);
         }
-        throw err;
+        throw new ConflictError('El pago fue rechazado por la pasarela', 'payment_declined');
       }
+      throw err;
     }
 
     if (intent.status === 'requires_action') {

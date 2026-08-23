@@ -174,18 +174,20 @@ export default function ClubHomeScreen({
   onLogout?: () => void;
   tabBar?: React.ReactNode;
 }) {
+  const { token } = useAuth();
   const [club, setClub] = useState<Club | null>(null);
   const [tournaments, setTournaments] = useState<TournamentSummary[] | null>(null);
   const [settlements, setSettlements] = useState<ClubSettlementWithTournamentName[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!token) return;
     let cancelled = false;
     setError(null);
     Promise.all([
       getClub(clubId),
-      listClubTournaments(clubId),
-      listClubSettlements(clubId),
+      listClubTournaments(token, clubId),
+      listClubSettlements(token, clubId),
     ])
       .then(([clubResult, tournamentsResult, settlementsResult]) => {
         if (cancelled) return;
@@ -200,7 +202,7 @@ export default function ClubHomeScreen({
     return () => {
       cancelled = true;
     };
-  }, [clubId]);
+  }, [token, clubId]);
 
   if (error) {
     return (

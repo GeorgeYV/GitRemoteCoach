@@ -395,7 +395,9 @@ export function requestBooking(
   });
 }
 
-/** POST /bookings/:id/pay — BookingPaymentScreen. Solo funciona si el coach ya aceptó la reserva. */
+/** POST /bookings/:id/pay — cargo directo con Stripe. Ninguna pantalla lo llama hoy (el flujo
+ * real es 100% manual, ver submitPaymentProofBatch abajo); se deja disponible para cuando se
+ * reactive Stripe. */
 export function payBooking(
   authToken: string,
   bookingId: string,
@@ -408,8 +410,8 @@ export function payBooking(
   });
 }
 
-/** POST /bookings/pay-batch — BookingPaymentScreen cuando el padre reservó más de un día con el
- * mismo entrenador: un solo cargo por el total en vez de un pago por reserva. */
+/** POST /bookings/pay-batch — variante de payBooking para varios días con el mismo entrenador en
+ * un solo cargo. Mismo estado "sin uso hoy" que payBooking. */
 export function payBookingsBatch(
   authToken: string,
   bookingIds: string[],
@@ -1194,9 +1196,12 @@ export function respondToClubAdminJoinRequest(
   });
 }
 
-/** GET /clubs/:id/settlements — ClubSettlementsScreen. */
-export function listClubSettlements(clubId: string): Promise<ClubSettlementWithTournamentName[]> {
-  return request(`/clubs/${clubId}/settlements`);
+/** GET /clubs/:id/settlements — ClubSettlementsScreen. Datos financieros del club, solo para su
+ * propio administrador. */
+export function listClubSettlements(authToken: string, clubId: string): Promise<ClubSettlementWithTournamentName[]> {
+  return request(`/clubs/${clubId}/settlements`, {
+    headers: { Authorization: `Bearer ${authToken}` },
+  });
 }
 
 export type TournamentStatus = 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
@@ -1214,9 +1219,12 @@ export interface TournamentSummary {
   pendingCommissionAmount: string;
 }
 
-/** GET /clubs/:id/tournaments — ClubTournamentListScreen. */
-export function listClubTournaments(clubId: string): Promise<TournamentSummary[]> {
-  return request(`/clubs/${clubId}/tournaments`);
+/** GET /clubs/:id/tournaments — ClubTournamentListScreen. Incluye pendingCommissionAmount (dato
+ * financiero del club), solo para su propio administrador. */
+export function listClubTournaments(authToken: string, clubId: string): Promise<TournamentSummary[]> {
+  return request(`/clubs/${clubId}/tournaments`, {
+    headers: { Authorization: `Bearer ${authToken}` },
+  });
 }
 
 /** POST /clubs/:id/tournaments — ClubCreateTournamentScreen. Solo un admin del club (derivado de

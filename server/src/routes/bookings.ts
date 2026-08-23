@@ -105,6 +105,10 @@ export async function bookingRoutes(app: FastifyInstance): Promise<void> {
     return bookingService.suggestAlternativeCoaches(id);
   });
 
+  // Cargo directo con Stripe — BookingPaymentScreen ya no llama a esta ruta (el flujo real es
+  // 100% manual, ver submit-payment-proof-batch abajo), pero se deja viva y probada para cuando
+  // se reactive Stripe. paymentService.initiatePayment ya no acepta un paymentMethodId simulado
+  // (ver decisión de seguridad más abajo en ese archivo) — siempre pasa por Stripe de verdad.
   app.post('/bookings/:id/pay', { preHandler: app.authenticate }, async (req) => {
     const { id } = req.params as { id: string };
     const parsed = payBookingSchema.safeParse(req.body);

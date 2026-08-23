@@ -5,8 +5,8 @@ export async function registerPushToken(userId: string, token: string): Promise<
   await pushTokenRepository.upsert(userId, token);
 }
 
-export async function unregisterPushToken(token: string): Promise<void> {
-  await pushTokenRepository.deleteToken(token);
+export async function unregisterPushToken(userId: string, token: string): Promise<void> {
+  await pushTokenRepository.deleteToken(userId, token);
 }
 
 /**

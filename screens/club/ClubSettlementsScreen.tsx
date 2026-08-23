@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import SettlementRow from '../../components/club/SettlementRow';
+import { useAuth } from '../../context/AuthContext';
 import { ApiError, ClubSettlementWithTournamentName, listClubSettlements } from '../../lib/api';
 import { colors, radius } from '../../lib/theme';
 
@@ -20,13 +21,15 @@ export default function ClubSettlementsScreen({
   onBack?: () => void;
   tabBar?: React.ReactNode;
 }) {
+  const { token } = useAuth();
   const [settlements, setSettlements] = useState<ClubSettlementWithTournamentName[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!token) return;
     let cancelled = false;
     setError(null);
-    listClubSettlements(clubId)
+    listClubSettlements(token, clubId)
       .then((result) => {
         if (!cancelled) setSettlements(result);
       })
@@ -37,7 +40,7 @@ export default function ClubSettlementsScreen({
     return () => {
       cancelled = true;
     };
-  }, [clubId]);
+  }, [token, clubId]);
 
   if (error) {
     return (
