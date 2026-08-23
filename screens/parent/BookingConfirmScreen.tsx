@@ -228,9 +228,9 @@ export default function BookingConfirmScreen({
               );
             })}
           </View>
-          <Text style={styles.hint}>
+          <Text style={[styles.hint, selectedDays.length > 0 && styles.hintSelected]}>
             {selectedDays.length > 0
-              ? selectedDays.map((d) => d.dayLabel).join(', ')
+              ? `Elegiste: ${selectedDays.map((d) => d.dayLabel).join(', ')}`
               : 'Elige uno o más días disponibles para continuar'}
           </Text>
         </Section>
@@ -263,7 +263,7 @@ export default function BookingConfirmScreen({
             <ActivityIndicator color={colors.courtBlueDeep} />
           ) : (
             <View style={styles.continueContent}>
-              <Text style={styles.continueLabel}>{error ? 'Reintentar' : 'Continuar a pago'}</Text>
+              <Text style={styles.continueLabel}>{error ? 'Reintentar' : 'Enviar solicitud'}</Text>
               <Ionicons name="arrow-forward-outline" size={18} color={colors.courtBlueDeep} />
             </View>
           )}
@@ -417,7 +417,11 @@ const styles = StyleSheet.create({
   hint: {
     color: colors.textDim,
     fontSize: 12,
-    textAlign: 'center',
+    textAlign: 'left',
+  },
+  hintSelected: {
+    color: colors.courtBlue,
+    fontWeight: '700',
   },
   noteInput: {
     minHeight: 70,
