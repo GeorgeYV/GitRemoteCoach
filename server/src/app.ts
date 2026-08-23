@@ -15,6 +15,8 @@ import { coachVerificationDocumentRoutes } from './routes/coachVerificationDocum
 import { playerRoutes } from './routes/players.js';
 import { parentRoutes } from './routes/parents.js';
 import { clubInvitationRoutes } from './routes/clubInvitations.js';
+import { clubAdminInvitationRoutes } from './routes/clubAdminInvitations.js';
+import { clubAdminJoinRequestRoutes } from './routes/clubAdminJoinRequests.js';
 import { clubRoutes } from './routes/clubs.js';
 import { tournamentRoutes } from './routes/tournaments.js';
 import { coachTournamentRoutes } from './routes/coachTournaments.js';
@@ -80,6 +82,8 @@ export function buildApp() {
   app.register(playerRoutes);
   app.register(parentRoutes);
   app.register(clubInvitationRoutes);
+  app.register(clubAdminInvitationRoutes);
+  app.register(clubAdminJoinRequestRoutes);
   app.register(clubRoutes);
   app.register(tournamentRoutes);
   app.register(coachTournamentRoutes);

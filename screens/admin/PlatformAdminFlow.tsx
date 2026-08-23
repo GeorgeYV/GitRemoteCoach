@@ -2,15 +2,17 @@ import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../../lib/theme';
+import PlatformAdminClubVerificationScreen from './PlatformAdminClubVerificationScreen';
 import PlatformAdminPaymentsScreen from './PlatformAdminPaymentsScreen';
 import PlatformAdminPayoutsScreen from './PlatformAdminPayoutsScreen';
 import PlatformAdminRefundsScreen from './PlatformAdminRefundsScreen';
 import PlatformAdminReviewScreen from './PlatformAdminReviewScreen';
 import PlatformAdminTournamentScreen from './PlatformAdminTournamentScreen';
 
-type Tab = 'documents' | 'payments' | 'payouts' | 'refunds' | 'tournaments';
+type Tab = 'documents' | 'clubs' | 'payments' | 'payouts' | 'refunds' | 'tournaments';
 
 /** Home del platform_admin: revisión de documentos de coaches (flujo original), verificación de
+ * clubes/federaciones autoregistrados (ver decisión #41 en db/schema.sql), verificación de
  * pagos manuales entrantes, reporte de pagos salientes a entrenadores y de reembolsos a padres
  * (fase 1 sin Stripe, ver paymentService.submitPaymentProof/verifyPayment,
  * settlementService.settleTournamentCoachPayouts y cancellationService.cancelBooking) y sembrar
@@ -30,6 +32,9 @@ export default function PlatformAdminFlow() {
         <Pressable style={[styles.tab, tab === 'documents' && styles.tabActive]} onPress={() => setTab('documents')}>
           <Text style={[styles.tabLabel, tab === 'documents' && styles.tabLabelActive]}>Documentos</Text>
         </Pressable>
+        <Pressable style={[styles.tab, tab === 'clubs' && styles.tabActive]} onPress={() => setTab('clubs')}>
+          <Text style={[styles.tabLabel, tab === 'clubs' && styles.tabLabelActive]}>Clubes</Text>
+        </Pressable>
         <Pressable style={[styles.tab, tab === 'payments' && styles.tabActive]} onPress={() => setTab('payments')}>
           <Text style={[styles.tabLabel, tab === 'payments' && styles.tabLabelActive]}>Pagos</Text>
         </Pressable>
@@ -47,6 +52,8 @@ export default function PlatformAdminFlow() {
       <View style={styles.body}>
         {tab === 'documents' ? (
           <PlatformAdminReviewScreen />
+        ) : tab === 'clubs' ? (
+          <PlatformAdminClubVerificationScreen />
         ) : tab === 'payments' ? (
           <PlatformAdminPaymentsScreen />
         ) : tab === 'payouts' ? (

@@ -65,6 +65,7 @@ import ClubTournamentDetailScreen from './club/ClubTournamentDetailScreen';
 import ClubTournamentShareScreen from './club/ClubTournamentShareScreen';
 import ClubInviteCoachScreen from './club/ClubInviteCoachScreen';
 import ClubCreateTournamentScreen from './club/ClubCreateTournamentScreen';
+import ClubJoinScreen from './club/ClubJoinScreen';
 import ClubRegistrationScreen from './club/ClubRegistrationScreen';
 import ClubTabBar from '../components/club/ClubTabBar';
 
@@ -911,13 +912,17 @@ export function ClubFlow({ adminUserId }: { adminUserId: string }) {
   const [error, setError] = useState<string | null>(null);
   // 404 en GET /club-admins/:userId/club no es un error real: significa que este club_admin
   // todavía no tiene ningún club vinculado — antes esto dejaba a ClubFlow atascado para siempre
-  // en un mensaje de error estático. Ahora se resuelve con un onboarding real.
+  // en un mensaje de error estático. Ahora se resuelve con un onboarding real: ClubJoinScreen
+  // primero (invitación pendiente / buscar y pedir acceso a uno existente), con la opción de
+  // igual crear uno nuevo (ver decisión #42 en db/schema.sql).
   const [needsRegistration, setNeedsRegistration] = useState(false);
+  const [creatingNew, setCreatingNew] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     setError(null);
     setNeedsRegistration(false);
+    setCreatingNew(false);
     getClubForAdmin(adminUserId)
       .then((result) => {
         if (!cancelled) setClub(result);
@@ -937,8 +942,22 @@ export function ClubFlow({ adminUserId }: { adminUserId: string }) {
 
   const [screen, setScreen] = useState<'home' | 'tournaments' | 'settlements' | 'editProfile'>('home');
 
+  if (needsRegistration && creatingNew) {
+    return (
+      <ClubRegistrationScreen
+        onBack={() => setCreatingNew(false)}
+        onSuccess={(newClub) => { setClub(newClub); setNeedsRegistration(false); }}
+      />
+    );
+  }
+
   if (needsRegistration) {
-    return <ClubRegistrationScreen onSuccess={(newClub) => { setClub(newClub); setNeedsRegistration(false); }} />;
+    return (
+      <ClubJoinScreen
+        onJoined={(joinedClub) => { setClub(joinedClub); setNeedsRegistration(false); }}
+        onCreateNew={() => setCreatingNew(true)}
+      />
+    );
   }
 
   if (screen === 'editProfile' && club) {

@@ -31,12 +31,20 @@ function mapSearchRow(row: any): TournamentSearchResult {
  * torneos cuyas fechas ya pasaron. country filtra por el país del club (toggle "mi país"/"todos"
  * de ambas pantallas) — opcional, sin él devuelve todos los países. LEFT JOIN (no JOIN) porque un
  * torneo sin reclamar (club_id NULL, ver decisión #36) también debe aparecer aquí — su
- * ciudad/país salen de las columnas propias del torneo en vez del club vía COALESCE. */
+ * ciudad/país salen de las columnas propias del torneo en vez del club vía COALESCE.
+ * (t.club_id IS NULL OR c.verification_status = 'approved'): mismo filtro que ya aplica
+ * coachRepository.search sobre coach_profiles.verification_status — un club recién autoregistrado
+ * y sin revisar puede existir y hasta tener torneos, pero no aparecen acá hasta que un
+ * platform_admin lo apruebe (ver decisión #41). Un torneo sin reclamar sigue visible igual. */
 export async function search(
   params: { query?: string; country?: CountryCode },
   db: Queryable = pool,
 ): Promise<TournamentSearchResult[]> {
-  const conditions: string[] = [`t.status IN ('scheduled', 'in_progress')`, `t.end_date >= CURRENT_DATE`];
+  const conditions: string[] = [
+    `t.status IN ('scheduled', 'in_progress')`,
+    `t.end_date >= CURRENT_DATE`,
+    `(t.club_id IS NULL OR c.verification_status = 'approved')`,
+  ];
   const values: unknown[] = [];
 
   if (params.query) {

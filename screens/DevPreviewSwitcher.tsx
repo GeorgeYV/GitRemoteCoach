@@ -19,7 +19,7 @@ import ParentHomeScreen from './parent/ParentHomeScreen';
 import TrainerListScreen from './parent/TrainerListScreen';
 import ParentChatScreen from './parent/ParentChatScreen';
 import BookingHistoryScreen from './parent/BookingHistoryScreen';
-import PlatformAdminReviewScreen from './admin/PlatformAdminReviewScreen';
+import PlatformAdminFlow from './admin/PlatformAdminFlow';
 import ClubHomeScreen from './club/ClubHomeScreen';
 import ClubRegistrationScreen from './club/ClubRegistrationScreen';
 import ClubSettlementsScreen from './club/ClubSettlementsScreen';
@@ -84,7 +84,7 @@ const PREVIEW_OPTIONS: { key: PreviewScreen; label: string }[] = [
   { key: 'clubTournaments', label: 'Club · Torneos' },
   { key: 'clubSettlements', label: 'Club · Liquidaciones' },
   { key: 'clubRegister', label: 'Club · Registro' },
-  { key: 'platformAdminReview', label: 'Admin · Revisión' },
+  { key: 'platformAdminReview', label: 'Admin' },
 ];
 
 /**
@@ -243,7 +243,7 @@ export default function DevPreviewSwitcher() {
         ) : screen === 'clubRegister' ? (
           <ClubRegistrationScreen />
         ) : screen === 'platformAdminReview' ? (
-          <PlatformAdminReviewScreen />
+          <PlatformAdminFlow />
         ) : (
           <ParentBookingFlow initialTournamentId={PREVIEW_TOURNAMENT.id} />
         )}

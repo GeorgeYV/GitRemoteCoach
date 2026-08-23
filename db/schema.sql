@@ -319,9 +319,20 @@ CREATE TABLE clubs (
   contact_email          CITEXT,
   contact_phone          TEXT,
   default_commission_rate NUMERIC(5, 4) NOT NULL CHECK (default_commission_rate BETWEEN 0 AND 1),
+  -- Un club_admin se autoregistra sin ninguna verificación de identidad (ver decisión #41) — sin
+  -- esto, cualquiera podría crear un club/federación con un nombre engañoso ("... Oficial") y
+  -- publicar torneos falsos de inmediato. Reutiliza el mismo enum verification_status que ya usan
+  -- los entrenadores, no uno nuevo. verification_reviewed_by/at quedan NULL mientras está
+  -- 'pending' — sin CHECK que lo obligue (a diferencia de coach_verification_documents): acá es
+  -- un solo campo de auditoría opcional, no un flujo de documentos por revisar.
+  verification_status       verification_status NOT NULL DEFAULT 'pending',
+  verification_reviewed_by  UUID REFERENCES users (id),
+  verification_reviewed_at  TIMESTAMPTZ,
   created_at             TIMESTAMPTZ NOT NULL DEFAULT now(),
   CONSTRAINT chk_clubs_country CHECK (country IS NULL OR country IN ('EC', 'PE', 'CO', 'CL', 'BO', 'AR', 'VE', 'BR', 'PY', 'UY'))
 );
+
+CREATE INDEX idx_clubs_verification_status ON clubs (verification_status);
 
 CREATE TABLE club_admins (
   club_id UUID NOT NULL REFERENCES clubs (id) ON DELETE CASCADE,
@@ -602,6 +613,130 @@ AFTER UPDATE OF status ON club_coach_invitations
 FOR EACH ROW
 WHEN (NEW.status = 'accepted' AND OLD.status = 'pending')
 EXECUTE FUNCTION fn_club_coach_invitations_apply_acceptance();
+
+-- ---------------------------------------------------------------------
+-- Administrador de respaldo de un club (ver decisión #42): dos tablas para
+-- las dos direcciones posibles de "vincularse a un club ya existente" en
+-- vez de crear uno nuevo — a diferencia de club_coach_invitations (siempre
+-- admin -> coach ya registrado), acá cualquiera de los dos lados puede
+-- moverse primero. Ambas reusan club_invitation_status (pending/accepted/
+-- declined) — son invitaciones/solicitudes, no verificaciones.
+-- ---------------------------------------------------------------------
+
+-- Un club_admin invita por email a alguien que puede no tener cuenta
+-- todavía (a diferencia de club_coach_invitations.coach_id, que exige un
+-- coach_profiles ya existente) — se resuelve por email cuando esa persona
+-- se registra o inicia sesión.
+CREATE TABLE club_admin_invitations (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  club_id      UUID NOT NULL REFERENCES clubs (id) ON DELETE CASCADE,
+  email        CITEXT NOT NULL,
+  invited_by   UUID NOT NULL REFERENCES users (id),
+  status       club_invitation_status NOT NULL DEFAULT 'pending',
+  invited_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  responded_at TIMESTAMPTZ,
+
+  CONSTRAINT chk_club_admin_invitations_responded_at
+    CHECK ((status = 'pending') = (responded_at IS NULL))
+);
+
+CREATE UNIQUE INDEX idx_club_admin_invitations_no_duplicate_pending
+  ON club_admin_invitations (club_id, email)
+  WHERE status = 'pending';
+-- ClubFlow: al iniciar sesión, resolver invitaciones pendientes para el email del usuario.
+CREATE INDEX idx_club_admin_invitations_email ON club_admin_invitations (email) WHERE status = 'pending';
+-- ClubHomeScreen: invitaciones que este club ya mandó, con su estado.
+CREATE INDEX idx_club_admin_invitations_club_id ON club_admin_invitations (club_id, status);
+
+-- ---------------------------------------------------------------------
+-- Trigger: invited_by debe ser club_admin del club — mismo idioma que
+-- fn_club_coach_invitations_validate_inviter, sin el cruce con tournament
+-- (acá no hay torneo de por medio).
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION fn_club_admin_invitations_validate_inviter() RETURNS TRIGGER AS $$
+DECLARE
+  v_is_admin BOOLEAN;
+BEGIN
+  SELECT EXISTS (
+    SELECT 1 FROM club_admins WHERE club_id = NEW.club_id AND user_id = NEW.invited_by
+  ) INTO v_is_admin;
+
+  IF NOT v_is_admin THEN
+    RAISE EXCEPTION
+      'user % no es admin del club %, no puede invitar administradores en su nombre',
+      NEW.invited_by, NEW.club_id;
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_club_admin_invitations_validate_inviter
+BEFORE INSERT ON club_admin_invitations
+FOR EACH ROW EXECUTE FUNCTION fn_club_admin_invitations_validate_inviter();
+
+-- Mismo guard que club_coach_invitations: una invitación solo se responde una vez.
+CREATE OR REPLACE FUNCTION fn_club_admin_invitations_guard_response() RETURNS TRIGGER AS $$
+BEGIN
+  IF OLD.status <> 'pending' THEN
+    RAISE EXCEPTION
+      'invitation % ya fue respondida (%), no puede volver a cambiar de status',
+      OLD.id, OLD.status;
+  END IF;
+
+  NEW.responded_at := now();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_club_admin_invitations_guard_response
+BEFORE UPDATE OF status ON club_admin_invitations
+FOR EACH ROW
+WHEN (NEW.status IS DISTINCT FROM OLD.status)
+EXECUTE FUNCTION fn_club_admin_invitations_guard_response();
+
+-- Alguien que ya se registró (rol club_admin, sin club todavía) pide
+-- unirse a un club existente que encontró por búsqueda — dirección
+-- inversa de club_admin_invitations. A diferencia de esa, acá no hace
+-- falta trigger de "quién puede crear la fila": cualquier usuario puede
+-- pedir, la validación real (que quien aprueba sea club_admin del club)
+-- vive en la ruta, igual que el resto de acciones de club_admin.
+CREATE TABLE club_admin_join_requests (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  club_id      UUID NOT NULL REFERENCES clubs (id) ON DELETE CASCADE,
+  user_id      UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  status       club_invitation_status NOT NULL DEFAULT 'pending',
+  requested_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  responded_at TIMESTAMPTZ,
+
+  CONSTRAINT chk_club_admin_join_requests_responded_at
+    CHECK ((status = 'pending') = (responded_at IS NULL))
+);
+
+CREATE UNIQUE INDEX idx_club_admin_join_requests_no_duplicate_pending
+  ON club_admin_join_requests (club_id, user_id)
+  WHERE status = 'pending';
+-- ClubHomeScreen: solicitudes de acceso pendientes para este club.
+CREATE INDEX idx_club_admin_join_requests_club_id ON club_admin_join_requests (club_id, status);
+
+CREATE OR REPLACE FUNCTION fn_club_admin_join_requests_guard_response() RETURNS TRIGGER AS $$
+BEGIN
+  IF OLD.status <> 'pending' THEN
+    RAISE EXCEPTION
+      'solicitud % ya fue respondida (%), no puede volver a cambiar de status',
+      OLD.id, OLD.status;
+  END IF;
+
+  NEW.responded_at := now();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_club_admin_join_requests_guard_response
+BEFORE UPDATE OF status ON club_admin_join_requests
+FOR EACH ROW
+WHEN (NEW.status IS DISTINCT FROM OLD.status)
+EXECUTE FUNCTION fn_club_admin_join_requests_guard_response();
 
 -- Disponibilidad del entrenador por día dentro de un torneo (más el día
 -- previo, ver trigger más abajo) — CoachAvailabilityScreen. Una fila por
@@ -1901,4 +2036,39 @@ CREATE INDEX idx_push_tokens_user_id ON push_tokens (user_id);
 --     CHECK con ALTER TABLE es mucho más barato que ampliar un ENUM
 --     (decisión #34). Ambas columnas son NULL por defecto — el modo
 --     'rapida' (el único activo hoy) nunca las completa.
+--
+-- 41. clubs ganó verification_status (reutiliza el enum verification_status
+--     que ya usaba coach_profiles, sin tipo nuevo) + verification_reviewed_by/at
+--     — hasta acá, club_admin se autoregistraba y publicaba torneos sin
+--     ninguna revisión (a diferencia de coach_profiles, que sí pasa por
+--     coach_verification_documents). Fase 1: sin subida de documentos
+--     todavía, un platform_admin aprueba o rechaza el club a mano (nombre/
+--     ciudad/contacto) — mismo criterio "manual antes que automatizado"
+--     que ya usa paymentService para pagos P2P. El filtro real que cierra
+--     el hueco no es esta columna sola, sino tournamentRepository.search:
+--     ahora exige club.verification_status = 'approved' (o club_id NULL,
+--     torneo sembrado sin club — ver decisión #36), así que un torneo de
+--     un club todavía no revisado no aparece en el descubrimiento público
+--     aunque el club exista. verification_reviewed_by/at quedan NULL
+--     mientras 'pending', sin CHECK que lo fuerce (a diferencia de
+--     coach_verification_documents): es un solo campo de auditoría por
+--     club, no un flujo de documentos.
+--
+-- 42. club_admin_invitations + club_admin_join_requests: administrador de
+--     respaldo para un club ya existente — hasta acá, un club_admin
+--     recién registrado solo podía CREAR un club (registerClub tira
+--     ConflictError si ya administra uno), sin ningún camino para
+--     sumarse a uno que ya existe. Dos tablas en vez de una porque el
+--     orden importa: si el admin oficial invita primero (club_admin_
+--     invitations, por email — la persona puede no tener cuenta
+--     todavía) o si el backup se registra primero y busca+pide acceso
+--     (club_admin_join_requests, por user_id — ya tiene cuenta) son
+--     flujos distintos con distinta validación en el insert (quién
+--     puede crear la fila), aunque comparten el mismo enum de estado
+--     (club_invitation_status) y el mismo guard de "solo se responde
+--     una vez". La restricción de "un admin, un club" (mismo
+--     ConflictError que ya usa registerClub) se aplica en la capa de
+--     aplicación al aceptar/aprobar, no acá — no tiene sentido
+--     expresarla como CHECK porque depende de una fila en club_admins,
+--     no de esta tabla.
 -- =====================================================================

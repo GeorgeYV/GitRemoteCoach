@@ -19,6 +19,10 @@ const createTournamentSchema = z
 
 const COUNTRY_CODES = ['EC', 'PE', 'CO', 'CL', 'BO', 'AR', 'VE', 'BR', 'PY', 'UY'] as const;
 
+const reviewClubSchema = z.object({
+  status: z.enum(['approved', 'rejected']),
+});
+
 const registerClubSchema = z.object({
   name: z.string().min(1),
   type: z.enum(['club', 'federation']),
@@ -37,6 +41,15 @@ export async function clubRoutes(app: FastifyInstance): Promise<void> {
     const club = await clubService.registerClub(sub, parsed.data);
     reply.code(201);
     return club;
+  });
+
+  // ClubJoinScreen "Buscar mi club" — para pedir administrar un club ya existente en vez de
+  // crear uno nuevo (ver decisión #42 en db/schema.sql). Ruta fija ANTES de /clubs/:id para que
+  // Fastify no confunda "search" con un :id.
+  app.get('/clubs/search', { preHandler: app.authenticate }, async (req) => {
+    const { q } = req.query as { q?: string };
+    if (!q || q.trim().length === 0) return [];
+    return clubService.searchClubs(q.trim());
   });
 
   // ClubHomeScreen
@@ -130,5 +143,26 @@ export async function clubRoutes(app: FastifyInstance): Promise<void> {
   app.get('/club-admins/:userId/club', async (req) => {
     const { userId } = req.params as { userId: string };
     return clubService.getClubForAdmin(userId);
+  });
+
+  // PlatformAdminClubVerificationScreen: cola de clubes autoregistrados sin revisar (ver
+  // decisión #41 en db/schema.sql) — mismo guard idiom que coachVerificationDocuments.ts.
+  app.get('/clubs/pending-verification', { preHandler: app.authenticate }, async (req) => {
+    const { role } = req.user as { role: string };
+    if (role !== 'platform_admin') {
+      throw new ForbiddenError('Solo un administrador de la plataforma puede ver la cola de verificación');
+    }
+    return clubService.listPendingClubVerifications();
+  });
+
+  app.put('/clubs/:id/review', { preHandler: app.authenticate }, async (req) => {
+    const { id } = req.params as { id: string };
+    const { sub, role } = req.user as { sub: string; role: string };
+    if (role !== 'platform_admin') {
+      throw new ForbiddenError('Solo un administrador de la plataforma puede revisar clubes');
+    }
+    const parsed = reviewClubSchema.safeParse(req.body);
+    if (!parsed.success) throw new ValidationError(parsed.error.message);
+    return clubService.reviewClubVerification(id, { status: parsed.data.status, reviewedBy: sub });
   });
 }

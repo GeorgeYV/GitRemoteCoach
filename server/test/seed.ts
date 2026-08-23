@@ -46,8 +46,8 @@ export async function seedFixtures(pool: Pool): Promise<Fixtures> {
   );
 
   await pool.query(
-    `INSERT INTO clubs (id, name, type, city, default_commission_rate) VALUES
-     ($1, 'Club Deportivo Bosques', 'club', 'CDMX', 0.10)`,
+    `INSERT INTO clubs (id, name, type, city, default_commission_rate, verification_status) VALUES
+     ($1, 'Club Deportivo Bosques', 'club', 'CDMX', 0.10, 'approved')`,
     [CLUB_ID],
   );
 
@@ -77,8 +77,8 @@ export async function seedFixtures(pool: Pool): Promise<Fixtures> {
   // pasado). Prueba el descubrimiento de torneos (GET /tournaments): que el filtro de status
   // excluye al ya completado y que la búsqueda por ciudad funciona (Guadalajara vs CDMX).
   await pool.query(
-    `INSERT INTO clubs (id, name, type, city, default_commission_rate) VALUES
-     ($1, 'Club Guadalajara Tenis', 'club', 'Guadalajara', 0.10)`,
+    `INSERT INTO clubs (id, name, type, city, default_commission_rate, verification_status) VALUES
+     ($1, 'Club Guadalajara Tenis', 'club', 'Guadalajara', 0.10, 'approved')`,
     [CLUB_2_ID],
   );
   await pool.query(

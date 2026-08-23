@@ -1,9 +1,13 @@
 import type { Pool, PoolClient } from 'pg';
 import { pool } from '../lib/db.js';
 import { NotFoundError } from '../lib/errors.js';
-import type { Club, CountryCode } from '../types.js';
+import type { Club, ClubSearchResult, CountryCode } from '../types.js';
 
 type Queryable = Pool | PoolClient;
+
+function mapSearchRow(row: any): ClubSearchResult {
+  return { id: row.id, name: row.name, type: row.type, city: row.city, country: row.country };
+}
 
 /** Comisión por defecto para clubes creados vía onboarding — mismo valor que usan todos los
  * clubes de server/test/seed.ts; el club puede pedir que se ajuste manualmente más adelante,
@@ -20,6 +24,9 @@ function mapRow(row: any): Club {
     contactEmail: row.contact_email,
     contactPhone: row.contact_phone,
     defaultCommissionRate: row.default_commission_rate,
+    verificationStatus: row.verification_status,
+    verificationReviewedBy: row.verification_reviewed_by,
+    verificationReviewedAt: row.verification_reviewed_at,
     createdAt: row.created_at,
   };
 }
@@ -29,6 +36,21 @@ export async function getById(clubId: string, db: Queryable = pool): Promise<Clu
   const { rows } = await db.query(`SELECT * FROM clubs WHERE id = $1`, [clubId]);
   if (rows.length === 0) throw new NotFoundError('Club', clubId);
   return mapRow(rows[0]);
+}
+
+/** ClubJoinScreen: "buscar mi club" para pedir ser administrador de respaldo (ver decisión #42) —
+ * sin filtrar por verification_status, a diferencia de tournamentRepository.search: un club
+ * legítimo puede seguir 'pending' de revisión y su admin oficial igual necesita poder sumar un
+ * respaldo mientras tanto. Mismo patrón ILIKE que coachRepository.search. */
+export async function search(query: string, db: Queryable = pool): Promise<ClubSearchResult[]> {
+  const { rows } = await db.query(
+    `SELECT id, name, type, city, country FROM clubs
+     WHERE name ILIKE $1 OR city ILIKE $1
+     ORDER BY name
+     LIMIT 25`,
+    [`%${query}%`],
+  );
+  return rows.map(mapSearchRow);
 }
 
 /** El sentido inverso de club_admins (club_id, user_id): qué club administra este usuario.
@@ -64,6 +86,31 @@ export async function create(
 
 export async function addAdmin(clubId: string, userId: string, db: Queryable = pool): Promise<void> {
   await db.query(`INSERT INTO club_admins (club_id, user_id) VALUES ($1, $2)`, [clubId, userId]);
+}
+
+/** PlatformAdminClubVerificationScreen: cola de clubes recién autoregistrados, sin revisar
+ * todavía — mientras estén 'pending', tournamentRepository.search no muestra sus torneos. */
+export async function listPendingVerification(db: Queryable = pool): Promise<Club[]> {
+  const { rows } = await db.query(`SELECT * FROM clubs WHERE verification_status = 'pending' ORDER BY created_at`);
+  return rows.map(mapRow);
+}
+
+/** PlatformAdminClubVerificationScreen: aprobar o rechazar un club — a diferencia de
+ * coach_verification_documents, acá no hay documentos individuales, es una sola decisión sobre
+ * el club entero (ver decisión #41 en db/schema.sql). */
+export async function reviewVerification(
+  clubId: string,
+  input: { status: 'approved' | 'rejected'; reviewedBy: string },
+  db: Queryable = pool,
+): Promise<Club> {
+  const { rows } = await db.query(
+    `UPDATE clubs
+     SET verification_status = $2, verification_reviewed_by = $3, verification_reviewed_at = now()
+     WHERE id = $1 RETURNING *`,
+    [clubId, input.status, input.reviewedBy],
+  );
+  if (rows.length === 0) throw new NotFoundError('Club', clubId);
+  return mapRow(rows[0]);
 }
 
 /** ClubRegistrationScreen "Editar perfil" — mismos campos que create, sin tocar

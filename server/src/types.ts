@@ -197,6 +197,16 @@ export interface CoachSearchResult {
   specialty: string | null;
 }
 
+/** ClubJoinScreen: resultado liviano de "buscar mi club" — no expone contactEmail/Phone (a
+ * diferencia de Club completo), lo mínimo para reconocer el club antes de pedir acceso. */
+export interface ClubSearchResult {
+  id: string;
+  name: string;
+  type: 'club' | 'federation';
+  city: string;
+  country: CountryCode | null;
+}
+
 export interface Club {
   id: string;
   name: string;
@@ -206,6 +216,9 @@ export interface Club {
   contactEmail: string | null;
   contactPhone: string | null;
   defaultCommissionRate: string;
+  verificationStatus: VerificationStatus;
+  verificationReviewedBy: string | null;
+  verificationReviewedAt: string | null;
   createdAt: string;
 }
 
@@ -372,6 +385,48 @@ export interface ClubCoachInvitationWithNames extends ClubCoachInvitation {
 /** Lo que devuelve el listado por torneo (ClubTournamentDetailScreen) — nombre del entrenador viene de un JOIN. */
 export interface ClubCoachInvitationWithCoachName extends ClubCoachInvitation {
   coachName: string;
+}
+
+/** Admin invita por email a un administrador de respaldo (ver decisión #42 en db/schema.sql) —
+ * espeja club_admin_invitations. email en vez de userId: la persona invitada puede no tener
+ * cuenta todavía. */
+export interface ClubAdminInvitation {
+  id: string;
+  clubId: string;
+  email: string;
+  invitedBy: string;
+  status: ClubInvitationStatus;
+  invitedAt: string;
+  respondedAt: string | null;
+}
+
+/** ClubJoinScreen: "/club-admin-invitations/mine" necesita mostrar a qué club invitaron a esta
+ * persona antes de que decida aceptar — nombre viene de un JOIN. */
+export interface ClubAdminInvitationWithClubName extends ClubAdminInvitation {
+  clubName: string;
+}
+
+/** Alguien ya registrado pide unirse a un club existente en vez de crear uno nuevo (dirección
+ * inversa de ClubAdminInvitation, ver decisión #42) — espeja club_admin_join_requests. */
+export interface ClubAdminJoinRequest {
+  id: string;
+  clubId: string;
+  userId: string;
+  status: ClubInvitationStatus;
+  requestedAt: string;
+  respondedAt: string | null;
+}
+
+/** ClubHomeScreen "Solicitudes de acceso": nombre/email del solicitante vienen de un JOIN. */
+export interface ClubAdminJoinRequestWithUserName extends ClubAdminJoinRequest {
+  userName: string;
+  userEmail: string;
+}
+
+/** ClubJoinScreen: "/club-admin-join-requests/mine" necesita mostrar a qué club le pidió acceso
+ * esta persona — nombre viene de un JOIN. */
+export interface ClubAdminJoinRequestWithClubName extends ClubAdminJoinRequest {
+  clubName: string;
 }
 
 export interface CoachTournamentAvailability {

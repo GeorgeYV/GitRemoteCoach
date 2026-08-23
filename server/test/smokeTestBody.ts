@@ -1981,6 +1981,71 @@ console.log('\n=== Escenario 24: onboarding de club_admin (POST /clubs) ===');
     payload: { name: 'Otra Academia', type: 'federation', city: 'CDMX', country: 'EC' },
   });
   assertEqual(duplicateRes.statusCode, 409, 'un segundo POST /clubs para el mismo usuario devuelve 409');
+
+  assertEqual(createdClub.verificationStatus, 'pending', 'un club recién creado nace \'pending\' (decisión #41)');
+
+  const inDays = (n: number) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
+  const newClubTournamentRes = await app.inject({
+    method: 'POST',
+    url: `/clubs/${createdClub.id}/tournaments`,
+    headers: { authorization: `Bearer ${newAdminToken}` },
+    payload: { name: 'Copa Academia Nueva', venue: 'Cancha Central', startDate: inDays(30), endDate: inDays(33) },
+  });
+  assertEqual(newClubTournamentRes.statusCode, 201, 'el club recién creado igual puede armar su torneo');
+  const newClubTournamentId = newClubTournamentRes.json().id;
+
+  const beforeApprovalRes = await app.inject({ method: 'GET', url: '/tournaments?search=Academia Nueva' });
+  assertEqual(
+    beforeApprovalRes.json(),
+    [],
+    'el torneo de un club \'pending\' no aparece en el descubrimiento público',
+  );
+
+  const queueForbiddenRes = await app.inject({
+    method: 'GET',
+    url: '/clubs/pending-verification',
+    headers: { authorization: `Bearer ${newAdminToken}` },
+  });
+  assertEqual(queueForbiddenRes.statusCode, 403, 'un club_admin no puede ver la cola de verificación');
+
+  const queueRes = await app.inject({
+    method: 'GET',
+    url: '/clubs/pending-verification',
+    headers: { authorization: `Bearer ${platformAdminToken}` },
+  });
+  assertEqual(queueRes.statusCode, 200, 'GET /clubs/pending-verification (platform_admin) devuelve 200');
+  assertTrue(
+    queueRes.json().some((c: any) => c.id === createdClub.id),
+    'la cola incluye el club recién creado',
+  );
+
+  const reviewForbiddenRes = await app.inject({
+    method: 'PUT',
+    url: `/clubs/${createdClub.id}/review`,
+    headers: { authorization: `Bearer ${newAdminToken}` },
+    payload: { status: 'approved' },
+  });
+  assertEqual(reviewForbiddenRes.statusCode, 403, 'un club_admin no puede revisarse a sí mismo');
+
+  const approveRes = await app.inject({
+    method: 'PUT',
+    url: `/clubs/${createdClub.id}/review`,
+    headers: { authorization: `Bearer ${platformAdminToken}` },
+    payload: { status: 'approved' },
+  });
+  assertEqual(approveRes.statusCode, 200, 'PUT /clubs/:id/review (platform_admin) devuelve 200');
+  assertEqual(approveRes.json().verificationStatus, 'approved', 'el club queda \'approved\'');
+  assertEqual(
+    approveRes.json().verificationReviewedBy,
+    fixtures.platformAdminUserId,
+    'verificationReviewedBy queda en quien lo aprobó',
+  );
+
+  const afterApprovalRes = await app.inject({ method: 'GET', url: '/tournaments?search=Academia Nueva' });
+  assertTrue(
+    afterApprovalRes.json().some((t: any) => t.id === newClubTournamentId),
+    'una vez aprobado el club, su torneo ya aparece en el descubrimiento público',
+  );
 }
 
 console.log('\n=== Escenario 25: estadísticas agregadas de partidos de un coach (GET /coaches/:id/report-summary) ===');
@@ -3011,6 +3076,162 @@ console.log('\n=== Escenario 32: modo de captura \'detallada\' — lado y shot_t
   assertEqual(stored.shotType, 'volea_alta', 'el punto 2 vuelve con shotType=volea_alta');
   assertEqual(stored.errorDirection, 'larga', 'el punto 2 vuelve con errorDirection=larga');
   assertEqual(stored.netApproach, true, 'el punto 2 vuelve con netApproach=true');
+}
+
+console.log('\n=== Escenario 33: administrador de respaldo de un club (invitación por email) ===');
+{
+  const inviteEmail = 'backup.invitado@example.com';
+
+  const noAdminInviteRes = await app.inject({
+    method: 'POST',
+    url: `/clubs/${fixtures.clubId}/admin-invitations`,
+    headers: { authorization: `Bearer ${parentToken}` },
+    payload: { email: inviteEmail },
+  });
+  assertEqual(noAdminInviteRes.statusCode, 403, 'un usuario que no administra el club no puede invitar respaldo');
+
+  const clubAdminToken = app.jwt.sign({ sub: fixtures.clubAdminUserId, role: 'club_admin' });
+  const inviteRes = await app.inject({
+    method: 'POST',
+    url: `/clubs/${fixtures.clubId}/admin-invitations`,
+    headers: { authorization: `Bearer ${clubAdminToken}` },
+    payload: { email: inviteEmail },
+  });
+  assertEqual(inviteRes.statusCode, 201, 'POST /clubs/:id/admin-invitations (club_admin) devuelve 201');
+  const invitation = inviteRes.json();
+  assertEqual(invitation.status, 'pending', 'la invitación nace pending');
+
+  const duplicateInviteRes = await app.inject({
+    method: 'POST',
+    url: `/clubs/${fixtures.clubId}/admin-invitations`,
+    headers: { authorization: `Bearer ${clubAdminToken}` },
+    payload: { email: inviteEmail },
+  });
+  assertEqual(duplicateInviteRes.statusCode, 409, 'una segunda invitación pendiente al mismo email devuelve 409');
+
+  // El email invitado no tiene cuenta todavía — se registra recién ahora, mismo email.
+  const backupRegisterRes = await app.inject({
+    method: 'POST',
+    url: '/auth/register',
+    payload: { email: inviteEmail, password: 'super-secreta-123', fullName: 'Backup Invitado', primaryRole: 'club_admin' },
+  });
+  const { token: backupToken, user: backupUser } = backupRegisterRes.json();
+
+  const mineRes = await app.inject({
+    method: 'GET',
+    url: '/club-admin-invitations/mine',
+    headers: { authorization: `Bearer ${backupToken}` },
+  });
+  assertEqual(mineRes.statusCode, 200, 'GET /club-admin-invitations/mine devuelve 200');
+  assertTrue(
+    mineRes.json().some((i: any) => i.id === invitation.id && i.clubName === 'Club Deportivo Bosques'),
+    'la invitación pendiente aparece para el email recién registrado, con el nombre del club (JOIN)',
+  );
+
+  const wrongEmailRespondRes = await app.inject({
+    method: 'PUT',
+    url: `/club-admin-invitations/${invitation.id}/respond`,
+    headers: { authorization: `Bearer ${parentToken}` },
+    payload: { decision: 'accepted' },
+  });
+  assertEqual(wrongEmailRespondRes.statusCode, 403, 'responder con un email que no es el invitado devuelve 403');
+
+  const acceptRes = await app.inject({
+    method: 'PUT',
+    url: `/club-admin-invitations/${invitation.id}/respond`,
+    headers: { authorization: `Bearer ${backupToken}` },
+    payload: { decision: 'accepted' },
+  });
+  assertEqual(acceptRes.statusCode, 200, 'aceptar la invitación (dueño del email) devuelve 200');
+  assertEqual(acceptRes.json().status, 'accepted', 'la invitación queda accepted');
+
+  const backupClubRes = await app.inject({ method: 'GET', url: `/club-admins/${backupUser.id}/club` });
+  assertEqual(backupClubRes.json().id, fixtures.clubId, 'el backup ya resuelve al mismo club que el admin oficial');
+
+  const originalStillAdminRes = await app.inject({ method: 'GET', url: `/club-admins/${fixtures.clubAdminUserId}/club` });
+  assertEqual(
+    originalStillAdminRes.json().id,
+    fixtures.clubId,
+    'el admin oficial sigue teniendo acceso — sumar un respaldo no lo reemplaza',
+  );
+
+  const respondAgainRes = await app.inject({
+    method: 'PUT',
+    url: `/club-admin-invitations/${invitation.id}/respond`,
+    headers: { authorization: `Bearer ${backupToken}` },
+    payload: { decision: 'accepted' },
+  });
+  assertEqual(respondAgainRes.statusCode, 409, 'responder una invitación ya respondida devuelve 409');
+}
+
+console.log('\n=== Escenario 34: administrador de respaldo de un club (solicitud de acceso) ===');
+{
+  const searchNoAuthRes = await app.inject({ method: 'GET', url: '/clubs/search?q=Bosques' });
+  assertEqual(searchNoAuthRes.statusCode, 401, 'GET /clubs/search sin token devuelve 401');
+
+  const searchRes = await app.inject({
+    method: 'GET',
+    url: '/clubs/search?q=Bosques',
+    headers: { authorization: `Bearer ${platformAdminToken}` },
+  });
+  assertEqual(searchRes.statusCode, 200, 'GET /clubs/search devuelve 200');
+  assertTrue(
+    searchRes.json().some((c: any) => c.id === fixtures.clubId),
+    'la búsqueda por nombre encuentra el club sembrado',
+  );
+
+  const requesterRegisterRes = await app.inject({
+    method: 'POST',
+    url: '/auth/register',
+    payload: { email: 'backup.solicitante@example.com', password: 'super-secreta-123', fullName: 'Backup Solicitante', primaryRole: 'club_admin' },
+  });
+  const { token: requesterToken, user: requesterUser } = requesterRegisterRes.json();
+
+  const requestRes = await app.inject({
+    method: 'POST',
+    url: `/clubs/${fixtures.clubId}/admin-join-requests`,
+    headers: { authorization: `Bearer ${requesterToken}` },
+  });
+  assertEqual(requestRes.statusCode, 201, 'POST /clubs/:id/admin-join-requests devuelve 201');
+  const request = requestRes.json();
+
+  const duplicateRequestRes = await app.inject({
+    method: 'POST',
+    url: `/clubs/${fixtures.clubId}/admin-join-requests`,
+    headers: { authorization: `Bearer ${requesterToken}` },
+  });
+  assertEqual(duplicateRequestRes.statusCode, 409, 'una segunda solicitud pendiente del mismo usuario devuelve 409');
+
+  const clubAdminToken2 = app.jwt.sign({ sub: fixtures.clubAdminUserId, role: 'club_admin' });
+  const wrongAdminRespondRes = await app.inject({
+    method: 'PUT',
+    url: `/club-admin-join-requests/${request.id}/respond`,
+    headers: { authorization: `Bearer ${parentToken}` },
+    payload: { decision: 'accepted' },
+  });
+  assertEqual(wrongAdminRespondRes.statusCode, 403, 'quien no administra el club no puede aprobar la solicitud');
+
+  const listPendingRes = await app.inject({
+    method: 'GET',
+    url: `/clubs/${fixtures.clubId}/admin-join-requests`,
+    headers: { authorization: `Bearer ${clubAdminToken2}` },
+  });
+  assertEqual(listPendingRes.statusCode, 200, 'GET /clubs/:id/admin-join-requests devuelve 200');
+  assertTrue(
+    listPendingRes.json().some((r: any) => r.id === request.id && r.userName === 'Backup Solicitante'),
+    'la solicitud pendiente trae el nombre de quien la mandó (JOIN con users)',
+  );
+
+  const approveRes = await app.inject({
+    method: 'PUT',
+    url: `/club-admin-join-requests/${request.id}/respond`,
+    headers: { authorization: `Bearer ${clubAdminToken2}` },
+    payload: { decision: 'accepted' },
+  });
+  assertEqual(approveRes.statusCode, 200, 'aprobar la solicitud (club_admin del club) devuelve 200');
+
+  const requesterClubRes = await app.inject({ method: 'GET', url: `/club-admins/${requesterUser.id}/club` });
+  assertEqual(requesterClubRes.json().id, fixtures.clubId, 'quien pidió acceso ya resuelve al club aprobado');
 }
 
 console.log(`\n=== Resultado: ${passed} pasaron, ${failed} fallaron ===`);

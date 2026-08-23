@@ -993,6 +993,9 @@ export interface Club {
   contactEmail: string | null;
   contactPhone: string | null;
   defaultCommissionRate: string;
+  verificationStatus: VerificationStatus;
+  verificationReviewedBy: string | null;
+  verificationReviewedAt: string | null;
   createdAt: string;
 }
 
@@ -1044,6 +1047,151 @@ export function updateClub(
 /** GET /club-admins/:userId/club — ClubFlow, para resolver el club del club_admin logueado. */
 export function getClubForAdmin(userId: string): Promise<Club> {
   return request(`/club-admins/${userId}/club`);
+}
+
+/** GET /clubs/pending-verification — PlatformAdminClubVerificationScreen: cola de clubes
+ * autoregistrados sin revisar (ver decisión #41 en db/schema.sql), solo platform_admin. */
+export function listPendingClubVerifications(authToken: string): Promise<Club[]> {
+  return request('/clubs/pending-verification', {
+    headers: { Authorization: `Bearer ${authToken}` },
+  });
+}
+
+/** PUT /clubs/:id/review — PlatformAdminClubVerificationScreen: aprobar o rechazar un club. */
+export function reviewClubVerification(
+  authToken: string,
+  clubId: string,
+  status: Extract<VerificationStatus, 'approved' | 'rejected'>,
+): Promise<Club> {
+  return request(`/clubs/${clubId}/review`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${authToken}` },
+    body: JSON.stringify({ status }),
+  });
+}
+
+/** Espeja server/src/types.ts#ClubAdminInvitation. */
+export interface ClubAdminInvitation {
+  id: string;
+  clubId: string;
+  email: string;
+  invitedBy: string;
+  status: ClubInvitationStatus;
+  invitedAt: string;
+  respondedAt: string | null;
+}
+
+/** Espeja server/src/types.ts#ClubAdminInvitationWithClubName. */
+export interface ClubAdminInvitationWithClubName extends ClubAdminInvitation {
+  clubName: string;
+}
+
+/** Espeja server/src/types.ts#ClubAdminJoinRequest. */
+export interface ClubAdminJoinRequest {
+  id: string;
+  clubId: string;
+  userId: string;
+  status: ClubInvitationStatus;
+  requestedAt: string;
+  respondedAt: string | null;
+}
+
+/** Espeja server/src/types.ts#ClubAdminJoinRequestWithUserName. */
+export interface ClubAdminJoinRequestWithUserName extends ClubAdminJoinRequest {
+  userName: string;
+  userEmail: string;
+}
+
+/** Espeja server/src/types.ts#ClubAdminJoinRequestWithClubName. */
+export interface ClubAdminJoinRequestWithClubName extends ClubAdminJoinRequest {
+  clubName: string;
+}
+
+/** Espeja server/src/types.ts#ClubSearchResult. */
+export interface ClubSearchResult {
+  id: string;
+  name: string;
+  type: 'club' | 'federation';
+  city: string;
+  country: CountryCode | null;
+}
+
+/** POST /clubs/:id/admin-invitations — ClubHomeScreen "Invitar administrador de respaldo". */
+export function inviteClubAdmin(authToken: string, clubId: string, email: string): Promise<ClubAdminInvitation> {
+  return request(`/clubs/${clubId}/admin-invitations`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${authToken}` },
+    body: JSON.stringify({ email }),
+  });
+}
+
+/** GET /clubs/:id/admin-invitations — ClubHomeScreen: invitaciones ya enviadas por este club. */
+export function listClubAdminInvitations(authToken: string, clubId: string): Promise<ClubAdminInvitation[]> {
+  return request(`/clubs/${clubId}/admin-invitations`, {
+    headers: { Authorization: `Bearer ${authToken}` },
+  });
+}
+
+/** GET /club-admin-invitations/mine — ClubJoinScreen: invitaciones pendientes para mi email. */
+export function listMyClubAdminInvitations(authToken: string): Promise<ClubAdminInvitationWithClubName[]> {
+  return request('/club-admin-invitations/mine', {
+    headers: { Authorization: `Bearer ${authToken}` },
+  });
+}
+
+/** PUT /club-admin-invitations/:id/respond — ClubJoinScreen: aceptar o rechazar una invitación. */
+export function respondToClubAdminInvitation(
+  authToken: string,
+  invitationId: string,
+  decision: Extract<ClubInvitationStatus, 'accepted' | 'declined'>,
+): Promise<ClubAdminInvitation> {
+  return request(`/club-admin-invitations/${invitationId}/respond`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${authToken}` },
+    body: JSON.stringify({ decision }),
+  });
+}
+
+/** GET /clubs/search?q= — ClubJoinScreen "Buscar mi club". */
+export function searchClubs(authToken: string, query: string): Promise<ClubSearchResult[]> {
+  return request(`/clubs/search?q=${encodeURIComponent(query)}`, {
+    headers: { Authorization: `Bearer ${authToken}` },
+  });
+}
+
+/** POST /clubs/:id/admin-join-requests — ClubJoinScreen "Solicitar acceso". */
+export function requestToJoinClub(authToken: string, clubId: string): Promise<ClubAdminJoinRequest> {
+  return request(`/clubs/${clubId}/admin-join-requests`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${authToken}` },
+  });
+}
+
+/** GET /club-admin-join-requests/mine — ClubJoinScreen: mi solicitud pendiente, si hay una. */
+export function listMyClubAdminJoinRequests(authToken: string): Promise<ClubAdminJoinRequestWithClubName[]> {
+  return request('/club-admin-join-requests/mine', {
+    headers: { Authorization: `Bearer ${authToken}` },
+  });
+}
+
+/** GET /clubs/:id/admin-join-requests — ClubHomeScreen "Solicitudes de acceso". */
+export function listClubAdminJoinRequests(authToken: string, clubId: string): Promise<ClubAdminJoinRequestWithUserName[]> {
+  return request(`/clubs/${clubId}/admin-join-requests`, {
+    headers: { Authorization: `Bearer ${authToken}` },
+  });
+}
+
+/** PUT /club-admin-join-requests/:id/respond — ClubHomeScreen: aprobar o rechazar una solicitud. */
+export function respondToClubAdminJoinRequest(
+  authToken: string,
+  requestId: string,
+  decision: Extract<ClubInvitationStatus, 'accepted' | 'declined'>,
+): Promise<ClubAdminJoinRequest> {
+  return request(`/club-admin-join-requests/${requestId}/respond`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${authToken}` },
+    body: JSON.stringify({ decision }),
+  });
 }
 
 /** GET /clubs/:id/settlements — ClubSettlementsScreen. */
