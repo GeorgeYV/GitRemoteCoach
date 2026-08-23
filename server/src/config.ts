@@ -8,8 +8,14 @@ function required(name: string): string {
 
 export const env = {
   databaseUrl: required('DATABASE_URL'),
-  stripeSecretKey: required('STRIPE_SECRET_KEY'),
-  stripeWebhookSecret: required('STRIPE_WEBHOOK_SECRET'),
+  // Opcionales (a diferencia del resto de este objeto): Stripe está despriorizado para esta fase
+  // (el pago real es 100% manual, ver paymentService.submitPaymentProof) y no se sabe cuándo se
+  // va a reactivar — todo lo que llama a la API de Stripe está detrás de un chequeo de
+  // booking.paymentProvider que nunca da falso en un booking real, así que no arrancar sin estas
+  // dos variables sería un freno de deploy sin ningún beneficio real. Mismo criterio "opcional,
+  // sin required()" que ya usan r2Config/transcriptionConfig más abajo.
+  stripeSecretKey: process.env.STRIPE_SECRET_KEY,
+  stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
   jwtSecret: required('JWT_SECRET'),
   resendApiKey: required('RESEND_API_KEY'),
   emailFromAddress: required('EMAIL_FROM_ADDRESS'),
