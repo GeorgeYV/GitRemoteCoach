@@ -1,0 +1,75 @@
+# Blueprint de despliegue para Render (https://render.com) — fase de pruebas guiadas, sin
+# dominio propio. Define los 3 servicios que necesita la app: la base de datos, el backend
+# (Fastify) y el sitio estático (build web de Expo). Se usa desde el dashboard de Render con
+# "New > Blueprint", apuntando a este repo — Render lee este archivo y crea los 3 servicios solos.
+#
+# Los valores marcados con `sync: false` son secretos: Render los deja vacíos acá a propósito
+# (nunca hay que poner un valor real en este archivo, que está en el repo) y pide completarlos a
+# mano una sola vez en su dashboard, después del primer deploy.
+
+databases:
+  - name: remote-coach-db
+    plan: free
+    postgresMajorVersion: "16"
+
+services:
+  # Backend Fastify — server/ tiene su propio package.json, así que rootDir le dice a Render que
+  # solo mire esa carpeta (no reinstale las dependencias del cliente Expo, que viven en la raíz).
+  - name: remote-coach-api
+    type: web
+    runtime: node
+    plan: free
+    rootDir: server
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: remote-coach-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM_ADDRESS
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      # Opcionales — sin esto configurado, la subida de fotos/documentos/notas de voz responde 503
+      # en vez de romper el arranque (ver r2Config en server/src/config.ts). Se pueden dejar vacíos
+      # al principio y completar más adelante.
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET_NAME
+        sync: false
+      - key: R2_PUBLIC_URL
+        sync: false
+
+  # Build web de Expo (npx expo export --platform web) — salida estática en dist/, sin servidor
+  # Node propio (ver decisión de output "single" en app.json, el default de Expo Router).
+  - name: remote-coach-web
+    type: web
+    runtime: static
+    plan: free
+    buildCommand: npm install && npm run build:web
+    staticPublishPath: ./dist
+    envVars:
+      # Se completan a mano en el dashboard DESPUÉS de que remote-coach-api tenga su URL real
+      # (algo como https://remote-coach-api.onrender.com) — son variables de build, no de runtime,
+      # así que un cambio acá requiere un nuevo deploy del sitio (ver lib/api.ts#API_BASE_URL).
+      - key: EXPO_PUBLIC_API_URL
+        sync: false
+      - key: EXPO_PUBLIC_GOOGLE_CLIENT_ID
+        sync: false
+    routes:
+      # SPA de una sola página (expo.web.output "single") — cualquier ruta que no sea un archivo
+      # real debe caer en index.html para que expo-router maneje la navegación en el cliente.
+      - type: rewrite
+        source: /*
+        destination: /index.html
