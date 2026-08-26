@@ -56,7 +56,8 @@ services:
   - name: remote-coach-web
     type: web
     runtime: static
-    plan: free
+    # Sin `plan`: los sitios estáticos en Render no tienen el mismo tiering que un web service —
+    # `plan: free` acá rompe la validación del blueprint ("no such plan free for service type web").
     buildCommand: npm install && npm run build:web
     staticPublishPath: ./dist
     envVars:
