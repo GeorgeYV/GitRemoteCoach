@@ -723,6 +723,30 @@ export function uploadCoachPhoto(
   });
 }
 
+/** POST /coaches/:id/verification-documents/upload — CoachRegistrationScreen: sube el archivo
+ * real de un documento del checklist antes de enviar el registro. `coachId` es el propio userId
+ * autenticado (todavía no existe la fila en coach_profiles) — mismo patrón multipart que
+ * uploadCoachPhoto. */
+export function uploadCoachVerificationDocument(
+  authToken: string,
+  coachId: string,
+  docType: VerificationDocType,
+  file: { uri: string; name: string; type: string; file?: File },
+): Promise<{ fileUrl: string }> {
+  const formData = new FormData();
+  formData.append('docType', docType);
+  if (file.file) {
+    formData.append('file', file.file, file.name);
+  } else {
+    formData.append('file', { uri: file.uri, name: file.name, type: file.type } as any);
+  }
+  return request(`/coaches/${coachId}/verification-documents/upload`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${authToken}` },
+    body: formData,
+  });
+}
+
 /** GET /coaches/:id/verification-documents — CoachVerificationPendingScreen: checklist real del
  * propio entrenador (no público, requiere ser el dueño de la sesión). */
 export function listCoachVerificationDocuments(authToken: string, coachId: string): Promise<CoachVerificationDocument[]> {
@@ -1053,6 +1077,26 @@ export function registerClub(
     method: 'POST',
     headers: { Authorization: `Bearer ${authToken}` },
     body: JSON.stringify(params),
+  });
+}
+
+/** POST /clubs/identity-document/upload — ClubRegistrationScreen: sube el archivo real de
+ * identidad de quien registra el club, antes de enviar el registro (todavía no existe el club) —
+ * mismo patrón multipart que uploadCoachPhoto. */
+export function uploadClubIdentityDocument(
+  authToken: string,
+  file: { uri: string; name: string; type: string; file?: File },
+): Promise<{ fileUrl: string }> {
+  const formData = new FormData();
+  if (file.file) {
+    formData.append('file', file.file, file.name);
+  } else {
+    formData.append('file', { uri: file.uri, name: file.name, type: file.type } as any);
+  }
+  return request('/clubs/identity-document/upload', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${authToken}` },
+    body: formData,
   });
 }
 

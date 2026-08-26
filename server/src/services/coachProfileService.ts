@@ -138,6 +138,40 @@ export async function updateCoachPhoto(coachId: string, buffer: Buffer, mimeType
   return coachRepository.updatePhotoUrl(coachId, photoUrl);
 }
 
+const ALLOWED_DOCUMENT_MIME_TYPES: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'application/pdf': 'pdf',
+};
+const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024;
+
+/** CoachRegistrationScreen: sube el archivo real de un documento del checklist de verificación.
+ * Se llama ANTES de "Enviar para verificación" (todavía no existe la fila en coach_profiles), así
+ * que se guarda bajo el propio userId autenticado — mismo criterio de key determinística por
+ * (coach, tipo de doc) que la foto de perfil usa por coach, para que volver a elegir el archivo
+ * sobreescriba en R2 en vez de acumular huérfanos. Solo devuelve la URL: la fila real en
+ * coach_verification_documents se crea recién al enviar el registro completo (POST /coaches). */
+export async function uploadVerificationDocumentFile(
+  coachId: string,
+  docType: VerificationDocType,
+  buffer: Buffer,
+  mimeType: string,
+): Promise<{ fileUrl: string }> {
+  if (!isR2Configured()) {
+    throw new AppError(
+      'La subida de documentos todavía no está configurada en el servidor.',
+      503,
+      'document_upload_unavailable',
+    );
+  }
+  const ext = ALLOWED_DOCUMENT_MIME_TYPES[mimeType];
+  if (!ext) throw new ValidationError('Formato no soportado (usa JPG, PNG o PDF)');
+  if (buffer.byteLength > MAX_DOCUMENT_BYTES) throw new ValidationError('El archivo no puede pesar más de 10MB');
+
+  const fileUrl = await uploadObject(`coach-verification-docs/${coachId}/${docType}.${ext}`, buffer, mimeType);
+  return { fileUrl };
+}
+
 /**
  * CoachRegistrationScreen guarda categorías de edad y niveles de juego
  * juntos (un solo botón "Enviar para verificación"); se hacen atómicos para

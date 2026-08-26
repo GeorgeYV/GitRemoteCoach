@@ -17,6 +17,8 @@ import {
   updateCoachProfileDetails,
   updateCoachTraining,
   uploadCoachPhoto,
+  uploadCoachVerificationDocument,
+  VerificationDocType,
 } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
 import {
@@ -27,10 +29,6 @@ import {
   LEVEL_OPTIONS,
   VERIFICATION_DOC_CHECKLIST,
 } from '../../mock/coachFlow';
-
-/** No hay almacenamiento real de archivos todavía: el checklist sigue siendo interactivo, pero el
- * backend recibe un placeholder en vez de un archivo real por cada documento marcado como subido. */
-const PLACEHOLDER_FILE_URL_PREFIX = 'placeholder://';
 
 const LEVEL_LABEL_TO_VALUE: Record<string, PlayingLevel> = {
   Recreativo: 'recreativo',
@@ -67,6 +65,8 @@ export default function CoachRegistrationScreen({
   const [categories, setCategories] = useState<string[]>(profile?.ageCategories ?? []);
   const [levels, setLevels] = useState<string[]>(profile?.levels.map((l) => LEVEL_VALUE_TO_LABEL[l]) ?? []);
   const [documents, setDocuments] = useState<DocumentItem[]>(VERIFICATION_DOC_CHECKLIST);
+  const [uploadingDocId, setUploadingDocId] = useState<VerificationDocType | null>(null);
+  const [docError, setDocError] = useState<string | null>(null);
   const [photoUrl, setPhotoUrl] = useState<string | null>(profile?.profile.photoUrl ?? null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
@@ -77,8 +77,37 @@ export default function CoachRegistrationScreen({
     setList(list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
   }
 
-  function markUploaded(id: string) {
-    setDocuments((prev) => prev.map((d) => (d.id === id ? { ...d, status: 'uploaded' } : d)));
+  /** Sube el archivo real del documento a R2 antes de marcarlo "subido" — a diferencia de la foto
+   * de perfil, esto corre durante el registro inicial, cuando `user.id` (no `profile`) es la
+   * única identidad que existe todavía. */
+  async function handlePickDocument(docId: VerificationDocType) {
+    if (!token || !user) return;
+
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Permiso necesario', 'Activa el acceso a tus fotos para subir este documento.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8 });
+    if (result.canceled || result.assets.length === 0) return;
+    const asset = result.assets[0];
+
+    setDocError(null);
+    setUploadingDocId(docId);
+    try {
+      const { fileUrl } = await uploadCoachVerificationDocument(token, user.id, docId, {
+        uri: asset.uri,
+        name: asset.fileName ?? 'documento.jpg',
+        type: asset.mimeType ?? 'image/jpeg',
+        file: asset.file,
+      });
+      setDocuments((prev) => prev.map((d) => (d.id === docId ? { ...d, status: 'uploaded', fileUrl } : d)));
+    } catch (err) {
+      setDocError(err instanceof ApiError ? err.message : 'No se pudo subir el documento. Intenta de nuevo.');
+    } finally {
+      setUploadingDocId(null);
+    }
   }
 
   /** Solo disponible en modo edición: durante el registro inicial todavía no existe una fila en
@@ -163,8 +192,8 @@ export default function CoachRegistrationScreen({
           ageCategories: categories as AgeCategory[],
           levels: levels.map((label) => LEVEL_LABEL_TO_VALUE[label]),
           documents: documents
-            .filter((d) => d.status === 'uploaded')
-            .map((d) => ({ docType: d.id, fileUrl: `${PLACEHOLDER_FILE_URL_PREFIX}${d.id}` })),
+            .filter((d): d is DocumentItem & { fileUrl: string } => d.status === 'uploaded' && !!d.fileUrl)
+            .map((d) => ({ docType: d.id, fileUrl: d.fileUrl })),
         });
       }
       onSubmit?.();
@@ -284,9 +313,15 @@ export default function CoachRegistrationScreen({
             </Text>
             <View style={styles.documentsList}>
               {documents.map((doc) => (
-                <DocumentRow key={doc.id} doc={doc} onPressUpload={() => markUploaded(doc.id)} />
+                <DocumentRow
+                  key={doc.id}
+                  doc={doc}
+                  uploading={uploadingDocId === doc.id}
+                  onPressUpload={() => handlePickDocument(doc.id)}
+                />
               ))}
             </View>
+            {docError && <Text style={styles.errorText}>{docError}</Text>}
           </Section>
         )}
       </ScrollView>

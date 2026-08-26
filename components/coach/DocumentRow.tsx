@@ -1,10 +1,20 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors, radius, withOpacity } from '../../lib/theme';
 import { DocumentItem } from '../../mock/coachFlow';
 
 /** Upload row for a single verification document, used on the coach registration form. */
-export default function DocumentRow({ doc, onPressUpload }: { doc: DocumentItem; onPressUpload: () => void }) {
+export default function DocumentRow({
+  doc,
+  uploading,
+  onPressUpload,
+}: {
+  doc: DocumentItem;
+  /** El picker de archivo + la subida real a R2 toman tiempo — muestra un spinner y bloquea un
+   * segundo toque en vez de dejar que se disparen dos subidas en simultáneo. */
+  uploading?: boolean;
+  onPressUpload: () => void;
+}) {
   const uploaded = doc.status === 'uploaded';
 
   return (
@@ -19,8 +29,16 @@ export default function DocumentRow({ doc, onPressUpload }: { doc: DocumentItem;
         </View>
         <Text style={styles.subtitle}>{doc.subtitle}</Text>
       </View>
-      <Pressable style={[styles.uploadButton, uploaded && styles.uploadButtonDone]} onPress={onPressUpload}>
-        <Text style={[styles.uploadLabel, uploaded && styles.uploadLabelDone]}>{uploaded ? 'Subido' : 'Subir'}</Text>
+      <Pressable
+        style={[styles.uploadButton, uploaded && styles.uploadButtonDone]}
+        onPress={onPressUpload}
+        disabled={uploading}
+      >
+        {uploading ? (
+          <ActivityIndicator size="small" color={colors.courtBlue} />
+        ) : (
+          <Text style={[styles.uploadLabel, uploaded && styles.uploadLabelDone]}>{uploaded ? 'Subido' : 'Subir'}</Text>
+        )}
       </Pressable>
     </View>
   );

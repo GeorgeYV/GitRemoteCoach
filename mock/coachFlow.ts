@@ -6,6 +6,9 @@ export interface DocumentItem {
   subtitle: string;
   status: 'pending' | 'uploaded';
   optional?: boolean;
+  /** URL real en R2 una vez subido (ver lib/api.ts#uploadCoachVerificationDocument /
+   * uploadClubIdentityDocument) — solo tiene valor cuando status === 'uploaded'. */
+  fileUrl?: string;
 }
 
 export const AGE_CATEGORY_OPTIONS = ['U10', 'U12', 'U14', 'U16', 'U18'];
@@ -38,13 +41,13 @@ export const VERIFICATION_DOC_CHECKLIST: DocumentItem[] = [
     id: 'identity',
     title: 'Identificación oficial',
     subtitle: 'INE, pasaporte o cédula profesional',
-    status: 'uploaded',
+    status: 'pending',
   },
   {
     id: 'background_check',
     title: 'Certificado de antecedentes penales',
     subtitle: 'Opcional, pero se muestra como distintivo ante los padres',
-    status: 'uploaded',
+    status: 'pending',
     optional: true,
   },
   {

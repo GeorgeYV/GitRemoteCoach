@@ -25,8 +25,7 @@ const registerCoachSchema = z.object({
   hourlyRate: z.number().min(0),
   ageCategories: z.array(z.enum(AGE_CATEGORIES)),
   levels: z.array(z.enum(PLAYING_LEVELS)),
-  // file_url es un placeholder hasta que exista almacenamiento real de archivos — ver
-  // coachVerificationDocumentRepository.create.
+  // fileUrl viene de POST /coaches/:id/verification-documents/upload, ya subido a R2.
   documents: z.array(z.object({ docType: z.enum(VERIFICATION_DOC_TYPES), fileUrl: z.string().min(1) })).default([]),
 });
 
@@ -153,5 +152,32 @@ export async function coachRoutes(app: FastifyInstance): Promise<void> {
     const { sub } = req.user as { sub: string };
     if (sub !== id) throw new ForbiddenError('No puedes ver los documentos de otro entrenador');
     return coachProfileService.listVerificationDocuments(id);
+  });
+
+  // CoachRegistrationScreen: sube el archivo real de un documento del checklist — multipart
+  // (archivo + campo de texto docType), mismo patrón que POST /matches/:id/voice-notes ya que
+  // acá tampoco hay attachFieldsToBody global (ver app.ts). Se llama antes de existir la fila en
+  // coach_profiles, así que `id` es simplemente el propio userId autenticado (sub === id).
+  app.post('/coaches/:id/verification-documents/upload', { preHandler: app.authenticate }, async (req) => {
+    const { id } = req.params as { id: string };
+    const { sub } = req.user as { sub: string };
+    if (sub !== id) throw new ForbiddenError('No puedes subir documentos de otro entrenador');
+
+    let fileBuffer: Buffer | null = null;
+    let mimetype = '';
+    let docType = '';
+    for await (const part of req.parts()) {
+      if (part.type === 'file') {
+        fileBuffer = await part.toBuffer();
+        mimetype = part.mimetype;
+      } else if (part.fieldname === 'docType') {
+        docType = String(part.value);
+      }
+    }
+    if (!fileBuffer) throw new ValidationError('Falta el archivo');
+    const parsedDocType = z.enum(VERIFICATION_DOC_TYPES).safeParse(docType);
+    if (!parsedDocType.success) throw new ValidationError('Tipo de documento inválido');
+
+    return coachProfileService.uploadVerificationDocumentFile(id, parsedDocType.data, fileBuffer, mimetype);
   });
 }

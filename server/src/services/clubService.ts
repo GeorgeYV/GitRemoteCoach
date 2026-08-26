@@ -1,6 +1,7 @@
 import type { PoolClient } from 'pg';
 import { withTransaction } from '../lib/db.js';
-import { ConflictError, NotFoundError } from '../lib/errors.js';
+import { AppError, ConflictError, NotFoundError, ValidationError } from '../lib/errors.js';
+import { isR2Configured, uploadObject } from '../lib/r2.js';
 import * as clubRepository from '../repositories/clubRepository.js';
 import * as settlementRepository from '../repositories/settlementRepository.js';
 import * as tournamentRepository from '../repositories/tournamentRepository.js';
@@ -70,6 +71,39 @@ export async function registerClub(
     await clubRepository.addAdmin(club.id, adminUserId, client);
     return club;
   });
+}
+
+const ALLOWED_IDENTITY_DOCUMENT_MIME_TYPES: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'application/pdf': 'pdf',
+};
+const MAX_IDENTITY_DOCUMENT_BYTES = 10 * 1024 * 1024;
+
+/** ClubRegistrationScreen: sube el archivo real de identidad de quien registra el club. Se llama
+ * ANTES de "Registrar club" (todavía no existe el club), así que se guarda bajo el propio userId
+ * autenticado — mismo criterio de key determinística que coachProfileService.uploadVerificationDocumentFile
+ * (un usuario solo administra un club a la vez, ver assertUserHasNoClub, así que no hay riesgo de
+ * pisar el documento de un club distinto). Solo devuelve la URL: la fila real se crea recién al
+ * enviar el registro completo (POST /clubs). */
+export async function uploadIdentityDocumentFile(
+  userId: string,
+  buffer: Buffer,
+  mimeType: string,
+): Promise<{ fileUrl: string }> {
+  if (!isR2Configured()) {
+    throw new AppError(
+      'La subida de documentos todavía no está configurada en el servidor.',
+      503,
+      'document_upload_unavailable',
+    );
+  }
+  const ext = ALLOWED_IDENTITY_DOCUMENT_MIME_TYPES[mimeType];
+  if (!ext) throw new ValidationError('Formato no soportado (usa JPG, PNG o PDF)');
+  if (buffer.byteLength > MAX_IDENTITY_DOCUMENT_BYTES) throw new ValidationError('El archivo no puede pesar más de 10MB');
+
+  const fileUrl = await uploadObject(`club-identity-docs/${userId}.${ext}`, buffer, mimeType);
+  return { fileUrl };
 }
 
 /** ClubJoinScreen "Buscar mi club" — para pedir acceso a uno ya existente en vez de crear uno

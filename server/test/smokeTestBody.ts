@@ -3416,6 +3416,159 @@ console.log('\n=== Escenario 38: archivar/reactivar un jugador (decisión #44) =
   assertEqual(reactivateRes.json().active, true, 'el jugador vuelve a quedar active=true — reversible');
 }
 
+console.log('\n=== Escenario 39: subir el archivo real de un documento de verificación de coach ===');
+{
+  const registerRes = await app.inject({
+    method: 'POST',
+    url: '/auth/register',
+    payload: {
+      email: 'coach.docs@example.com',
+      password: 'super-secreta-123',
+      fullName: 'Coach Con Documentos',
+      primaryRole: 'coach',
+    },
+  });
+  const { token: docCoachToken, user: docCoach } = registerRes.json();
+
+  function documentForm(fields: Record<string, string>, fileByte = 1): FormData_ {
+    const form = new FormData_();
+    form.append('file', Buffer.from([fileByte, fileByte, fileByte]), { filename: 'id.jpg', contentType: 'image/jpeg' });
+    for (const [key, value] of Object.entries(fields)) form.append(key, value);
+    return form;
+  }
+
+  const noAuthForm = documentForm({ docType: 'identity' });
+  const noAuthRes = await app.inject({
+    method: 'POST',
+    url: `/coaches/${docCoach.id}/verification-documents/upload`,
+    headers: noAuthForm.getHeaders(),
+    payload: noAuthForm.getBuffer(),
+  });
+  assertEqual(noAuthRes.statusCode, 401, 'subir un documento sin Bearer token devuelve 401');
+
+  const wrongCoachForm = documentForm({ docType: 'identity' });
+  const wrongCoachRes = await app.inject({
+    method: 'POST',
+    url: `/coaches/${docCoach.id}/verification-documents/upload`,
+    headers: { authorization: `Bearer ${coachAToken}`, ...wrongCoachForm.getHeaders() },
+    payload: wrongCoachForm.getBuffer(),
+  });
+  assertEqual(wrongCoachRes.statusCode, 403, 'subir el documento de otro entrenador devuelve 403');
+
+  const badDocTypeForm = documentForm({ docType: 'not_a_real_type' });
+  const badDocTypeRes = await app.inject({
+    method: 'POST',
+    url: `/coaches/${docCoach.id}/verification-documents/upload`,
+    headers: { authorization: `Bearer ${docCoachToken}`, ...badDocTypeForm.getHeaders() },
+    payload: badDocTypeForm.getBuffer(),
+  });
+  assertEqual(badDocTypeRes.statusCode, 422, 'docType inválido devuelve 422');
+
+  const r2Baseline39 = r2State.objects.size;
+  const identityForm = documentForm({ docType: 'identity' }, 42);
+  const identityRes = await app.inject({
+    method: 'POST',
+    url: `/coaches/${docCoach.id}/verification-documents/upload`,
+    headers: { authorization: `Bearer ${docCoachToken}`, ...identityForm.getHeaders() },
+    payload: identityForm.getBuffer(),
+  });
+  assertEqual(identityRes.statusCode, 200, 'subir el archivo real devuelve 200');
+  const { fileUrl } = identityRes.json();
+  assertEqual(
+    fileUrl,
+    `https://fake-r2.example.com/coach-verification-docs/${docCoach.id}/identity.jpg`,
+    'devuelve la URL real en R2 (fake)',
+  );
+  assertEqual(r2State.objects.size, r2Baseline39 + 1, 'quedó "subido" en R2 (fake)');
+
+  // El registro completo usa ese fileUrl real (no un placeholder) para el documento.
+  const registerCoachRes = await app.inject({
+    method: 'POST',
+    url: '/coaches',
+    headers: { authorization: `Bearer ${docCoachToken}` },
+    payload: {
+      city: 'Quito',
+      country: 'EC',
+      yearsExperience: 3,
+      hourlyRate: 20,
+      ageCategories: ['U12'],
+      levels: ['competitivo'],
+      documents: [{ docType: 'identity', fileUrl }],
+    },
+  });
+  assertEqual(registerCoachRes.statusCode, 201, 'POST /coaches con el fileUrl real devuelve 201');
+
+  const savedDocsRes = await app.inject({
+    method: 'GET',
+    url: `/coaches/${docCoach.id}/verification-documents`,
+    headers: { authorization: `Bearer ${docCoachToken}` },
+  });
+  const savedDoc = savedDocsRes.json().find((d: { docType: string }) => d.docType === 'identity');
+  assertEqual(savedDoc.fileUrl, fileUrl, 'el documento guardado tiene la URL real, no un placeholder');
+}
+
+console.log('\n=== Escenario 40: subir el archivo real de identidad de quien registra un club ===');
+{
+  const registerRes = await app.inject({
+    method: 'POST',
+    url: '/auth/register',
+    payload: {
+      email: 'club.admin.docs@example.com',
+      password: 'super-secreta-123',
+      fullName: 'Admin De Club Con Documentos',
+      primaryRole: 'club_admin',
+    },
+  });
+  const { token: docAdminToken, user: docAdmin } = registerRes.json();
+
+  function identityDocForm(fileByte = 1): FormData_ {
+    const form = new FormData_();
+    form.append('file', Buffer.from([fileByte, fileByte, fileByte]), { filename: 'id.jpg', contentType: 'image/jpeg' });
+    return form;
+  }
+
+  const noAuthForm = identityDocForm();
+  const noAuthRes = await app.inject({
+    method: 'POST',
+    url: '/clubs/identity-document/upload',
+    headers: noAuthForm.getHeaders(),
+    payload: noAuthForm.getBuffer(),
+  });
+  assertEqual(noAuthRes.statusCode, 401, 'subir el documento de identidad sin Bearer token devuelve 401');
+
+  const r2Baseline40 = r2State.objects.size;
+  const uploadForm = identityDocForm(77);
+  const uploadRes = await app.inject({
+    method: 'POST',
+    url: '/clubs/identity-document/upload',
+    headers: { authorization: `Bearer ${docAdminToken}`, ...uploadForm.getHeaders() },
+    payload: uploadForm.getBuffer(),
+  });
+  assertEqual(uploadRes.statusCode, 200, 'subir el archivo real devuelve 200');
+  const { fileUrl: clubFileUrl } = uploadRes.json();
+  assertEqual(
+    clubFileUrl,
+    `https://fake-r2.example.com/club-identity-docs/${docAdmin.id}.jpg`,
+    'devuelve la URL real en R2 (fake)',
+  );
+  assertEqual(r2State.objects.size, r2Baseline40 + 1, 'quedó "subido" en R2 (fake)');
+
+  const registerClubRes = await app.inject({
+    method: 'POST',
+    url: '/clubs',
+    headers: { authorization: `Bearer ${docAdminToken}` },
+    payload: {
+      name: 'Club Con Documento Real',
+      type: 'club',
+      city: 'Guayaquil',
+      country: 'EC',
+      identityDocumentUrl: clubFileUrl,
+    },
+  });
+  assertEqual(registerClubRes.statusCode, 201, 'POST /clubs con el fileUrl real devuelve 201');
+  assertEqual(registerClubRes.json().identityDocumentUrl, clubFileUrl, 'el club creado tiene la URL real, no un placeholder');
+}
+
 console.log(`\n=== Resultado: ${passed} pasaron, ${failed} fallaron ===`);
 await app.close();
 process.exit(failed > 0 ? 1 : 0);

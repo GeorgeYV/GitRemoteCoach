@@ -51,6 +51,18 @@ export async function clubRoutes(app: FastifyInstance): Promise<void> {
     return club;
   });
 
+  // ClubRegistrationScreen: sube el archivo real de identidad de quien registra el club —
+  // multipart de un solo archivo, mismo patrón que POST /coaches/:id/photo. Se llama antes de
+  // que el club exista, así que se guarda bajo el propio usuario autenticado. Ruta fija (no
+  // /clubs/:id/...) porque todavía no hay id de club en este punto del flujo.
+  app.post('/clubs/identity-document/upload', { preHandler: app.authenticate }, async (req) => {
+    const { sub } = req.user as { sub: string };
+    const data = await req.file();
+    if (!data) throw new ValidationError('Falta el archivo');
+    const buffer = await data.toBuffer();
+    return clubService.uploadIdentityDocumentFile(sub, buffer, data.mimetype);
+  });
+
   // ClubJoinScreen "Buscar mi club" — para pedir administrar un club ya existente en vez de
   // crear uno nuevo (ver decisión #42 en db/schema.sql). Ruta fija ANTES de /clubs/:id para que
   // Fastify no confunda "search" con un :id.

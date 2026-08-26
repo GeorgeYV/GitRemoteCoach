@@ -1,11 +1,12 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import * as ImagePicker from 'expo-image-picker';
 import React, { useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DocumentRow from '../../components/coach/DocumentRow';
 import IconTextInput from '../../components/shared/IconTextInput';
 import { useAuth } from '../../context/AuthContext';
-import { ApiError, Club, CountryCode, registerClub, updateClub } from '../../lib/api';
+import { ApiError, Club, CountryCode, registerClub, updateClub, uploadClubIdentityDocument } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
 import { isValidEmail } from '../../lib/validation';
 import { COUNTRY_LABELS, COUNTRY_OPTIONS, DocumentItem } from '../../mock/coachFlow';
@@ -14,10 +15,6 @@ const TYPE_OPTIONS: { value: 'club' | 'federation'; label: string }[] = [
   { value: 'club', label: 'Club' },
   { value: 'federation', label: 'Federación' },
 ];
-
-// Mismo criterio "sin almacenamiento real todavía" que CoachRegistrationScreen — el checklist es
-// interactivo, pero el backend recibe un placeholder en vez de un archivo real.
-const PLACEHOLDER_IDENTITY_URL = 'placeholder://identity';
 
 const IDENTITY_DOC: DocumentItem = {
   id: 'identity',
@@ -49,6 +46,8 @@ export default function ClubRegistrationScreen({
   // identidad, mismo criterio que ClubRegistrationScreen "Editar perfil" no toca documentos de
   // coach tampoco (ver decisión #43 en db/schema.sql).
   const [identityDoc, setIdentityDoc] = useState<DocumentItem>(IDENTITY_DOC);
+  const [uploadingIdentityDoc, setUploadingIdentityDoc] = useState(false);
+  const [identityDocError, setIdentityDocError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -57,8 +56,41 @@ export default function ClubRegistrationScreen({
     type !== null &&
     city.trim().length > 0 &&
     !!country &&
-    (!!club || identityDoc.status === 'uploaded') &&
+    (!!club || (identityDoc.status === 'uploaded' && !!identityDoc.fileUrl)) &&
     !submitting;
+
+  /** Sube el archivo real de identidad a R2 antes de marcarlo "subido" — se llama antes de que el
+   * club exista, así que el server lo guarda bajo el propio usuario autenticado (ver
+   * clubService.uploadIdentityDocumentFile). */
+  async function handlePickIdentityDocument() {
+    if (!token) return;
+
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Permiso necesario', 'Activa el acceso a tus fotos para subir este documento.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8 });
+    if (result.canceled || result.assets.length === 0) return;
+    const asset = result.assets[0];
+
+    setIdentityDocError(null);
+    setUploadingIdentityDoc(true);
+    try {
+      const { fileUrl } = await uploadClubIdentityDocument(token, {
+        uri: asset.uri,
+        name: asset.fileName ?? 'documento.jpg',
+        type: asset.mimeType ?? 'image/jpeg',
+        file: asset.file,
+      });
+      setIdentityDoc((prev) => ({ ...prev, status: 'uploaded', fileUrl }));
+    } catch (err) {
+      setIdentityDocError(err instanceof ApiError ? err.message : 'No se pudo subir el documento. Intenta de nuevo.');
+    } finally {
+      setUploadingIdentityDoc(false);
+    }
+  }
 
   async function handleSubmit() {
     if (!token || !type || !country) {
@@ -78,7 +110,7 @@ export default function ClubRegistrationScreen({
       country,
       contactEmail: contactEmail.trim() || undefined,
       contactPhone: contactPhone.trim() || undefined,
-      identityDocumentUrl: PLACEHOLDER_IDENTITY_URL,
+      identityDocumentUrl: identityDoc.fileUrl ?? '',
     };
     try {
       const result = club ? await updateClub(token, club.id, params) : await registerClub(token, params);
@@ -153,10 +185,8 @@ export default function ClubRegistrationScreen({
         {!club && (
           <>
             <Text style={styles.sectionLabel}>Identidad</Text>
-            <DocumentRow
-              doc={identityDoc}
-              onPressUpload={() => setIdentityDoc((prev) => ({ ...prev, status: 'uploaded' }))}
-            />
+            <DocumentRow doc={identityDoc} uploading={uploadingIdentityDoc} onPressUpload={handlePickIdentityDocument} />
+            {identityDocError && <Text style={styles.errorText}>{identityDocError}</Text>}
           </>
         )}
 

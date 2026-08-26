@@ -27,7 +27,8 @@ function mapRowWithCoachName(row: any): CoachVerificationDocumentWithCoachName {
 }
 
 /** CoachRegistrationScreen "Enviar para verificación": una fila 'pending' por documento marcado
- * como subido — file_url es un placeholder hasta que exista almacenamiento real de archivos. */
+ * como subido — file_url ya es la URL real en R2 (ver coachProfileService.uploadVerificationDocumentFile),
+ * subida aparte antes de este insert. */
 export async function create(
   params: { coachId: string; docType: VerificationDocType; fileUrl: string },
   db: Queryable = pool,
