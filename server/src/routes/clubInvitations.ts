@@ -40,7 +40,7 @@ export async function clubInvitationRoutes(app: FastifyInstance): Promise<void> 
   app.get('/coaches/:id/club-invitations', { preHandler: app.authenticate }, async (req) => {
     const { id } = req.params as { id: string };
     const { sub } = req.user as { sub: string };
-    if (sub !== id) throw new ForbiddenError('No podés ver las invitaciones de otro entrenador');
+    if (sub !== id) throw new ForbiddenError('No puedes ver las invitaciones de otro entrenador');
     return clubInvitationService.listPendingInvitationsForCoach(id);
   });
 
@@ -51,7 +51,7 @@ export async function clubInvitationRoutes(app: FastifyInstance): Promise<void> 
     const { sub } = req.user as { sub: string };
 
     const invitation = await clubInvitationRepository.getInvitationById(id);
-    if (invitation.coachId !== sub) throw new ForbiddenError('No podés responder la invitación de otro entrenador');
+    if (invitation.coachId !== sub) throw new ForbiddenError('No puedes responder la invitación de otro entrenador');
 
     return clubInvitationService.respondToInvitation(id, parsed.data.decision);
   });

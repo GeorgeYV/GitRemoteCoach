@@ -34,7 +34,7 @@ const setRateSchema = z.object({
 });
 
 function assertOwnsCoachId(coachId: string, sub: string): void {
-  if (sub !== coachId) throw new ForbiddenError('No podés modificar la disponibilidad de otro entrenador');
+  if (sub !== coachId) throw new ForbiddenError('No puedes modificar la disponibilidad de otro entrenador');
 }
 
 /** Disponibilidad y tarifa que el entrenador fija por torneo (CoachAvailabilityScreen). */
