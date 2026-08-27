@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ClubTagBadge from '../../components/coach/ClubTagBadge';
+import ReportTournamentModal from '../../components/shared/ReportTournamentModal';
 import { useAuth } from '../../context/AuthContext';
 import {
   ApiError,
@@ -39,13 +40,14 @@ export default function CoachTournamentSearchScreen({
   onBack?: () => void;
   tabBar?: React.ReactNode;
 }) {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<TournamentSearchResult[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [clubTags, setClubTags] = useState<CoachClubTag[]>([]);
   const [defaultCountry, setDefaultCountry] = useState<CountryCode | null>(null);
   const [countryFilterOn, setCountryFilterOn] = useState(true);
+  const [reportTarget, setReportTarget] = useState<{ id: string; name: string } | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -156,6 +158,7 @@ export default function CoachTournamentSearchScreen({
               tournament={tournament}
               clubTags={clubTags}
               onPress={() => onSelect(tournament)}
+              onReport={() => setReportTarget({ id: tournament.id, name: tournament.name })}
             />
           ))}
 
@@ -165,6 +168,16 @@ export default function CoachTournamentSearchScreen({
         </ScrollView>
       )}
       {tabBar}
+
+      {token && (
+        <ReportTournamentModal
+          visible={reportTarget !== null}
+          tournamentId={reportTarget?.id ?? null}
+          tournamentName={reportTarget?.name ?? ''}
+          authToken={token}
+          onClose={() => setReportTarget(null)}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -173,10 +186,12 @@ function TournamentCard({
   tournament,
   clubTags,
   onPress,
+  onReport,
 }: {
   tournament: TournamentSearchResult;
   clubTags: CoachClubTag[];
   onPress: () => void;
+  onReport: () => void;
 }) {
   const tagging = clubTags.find((t) => t.tournamentId === tournament.id);
   const countdown = daysUntilCountdown(tournament.startDate);
@@ -184,8 +199,15 @@ function TournamentCard({
   return (
     <Pressable style={styles.card} onPress={onPress}>
       <View style={styles.cardTopRow}>
-        <Text style={styles.tournamentName}>{tournament.name}</Text>
-        {tagging && <ClubTagBadge clubName={tagging.clubName} />}
+        <View style={styles.cardTitleWrap}>
+          <Text style={styles.tournamentName}>{tournament.name}</Text>
+          {tagging && <ClubTagBadge clubName={tagging.clubName} />}
+        </View>
+        {/* Pressable anidado dentro del Pressable de la tarjeta — RN prioriza el más interno,
+           así que no dispara onPress de la tarjeta (mismo criterio que ParentHomeScreen). */}
+        <Pressable style={styles.reportButton} onPress={onReport} hitSlop={8}>
+          <Ionicons name="flag-outline" size={16} color={colors.textDim} />
+        </Pressable>
       </View>
       <Text style={styles.tournamentMeta}>
         {tournament.venue} · <Text style={styles.tournamentCity}>{tournament.city}</Text>
@@ -297,6 +319,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 8,
     marginBottom: 4,
+  },
+  cardTitleWrap: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  reportButton: {
+    paddingHorizontal: 4,
   },
   tournamentName: {
     color: colors.lineWhite,

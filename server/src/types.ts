@@ -343,6 +343,22 @@ export interface TournamentSearchResult {
   endDate: string;
 }
 
+/** tournament_reports (decisión #46) — un padre o entrenador avisa de un posible error en los
+ * datos de un torneo. tournamentName/clubName vienen de un JOIN — se usa tanto en la cola del
+ * propio club (ClubTournamentListScreen) como en la de platform_admin (todos los clubes, de
+ * respaldo), y clubName solo aporta algo en esta última. */
+export interface TournamentReport {
+  id: string;
+  tournamentId: string;
+  tournamentName: string;
+  clubId: string | null;
+  clubName: string | null;
+  reportedBy: string;
+  reporterName: string;
+  message: string;
+  createdAt: string;
+}
+
 /** Torneo sembrado por platform_admin sin club todavía (PlatformAdminTournamentScreen,
  * ClubTournamentListScreen — sección "Torneos disponibles para reclamar"). */
 export interface UnclaimedTournament {

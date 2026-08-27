@@ -179,6 +179,20 @@ export async function listByClub(clubId: string, db: Queryable = pool): Promise<
   return rows.map((row) => mapSummaryRow(row, ageCategoriesByTournament.get(row.id) ?? []));
 }
 
+export interface TournamentBasicInfo {
+  id: string;
+  name: string;
+  clubId: string | null;
+}
+
+/** tournamentReportService: validar que el torneo exista y saber a qué club avisarle (si tiene
+ * uno) al crear un reporte — no hace falta traer más que esto. */
+export async function getBasicInfo(tournamentId: string, db: Queryable = pool): Promise<TournamentBasicInfo | null> {
+  const { rows } = await db.query(`SELECT id, name, club_id FROM tournaments WHERE id = $1`, [tournamentId]);
+  if (rows.length === 0) return null;
+  return { id: rows[0].id, name: rows[0].name, clubId: rows[0].club_id };
+}
+
 export interface TournamentCommissionInfo {
   tournamentId: string;
   clubId: string | null;

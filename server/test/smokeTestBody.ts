@@ -3617,6 +3617,187 @@ console.log('\n=== Escenario 40: subir el archivo real de identidad de quien reg
   assertEqual(registerClubRes.json().identityDocumentUrl, clubFileUrl, 'el club creado tiene la URL real, no un placeholder');
 }
 
+console.log('\n=== Escenario 42: reportar un posible error en un torneo (decisión #46) ===');
+{
+  // --- Club aprobado, con torneo, y un push token registrado para poder medir la notificación ---
+  const reportAdminReg = await app.inject({
+    method: 'POST',
+    url: '/auth/register',
+    payload: {
+      email: 'club.reports@example.com',
+      password: 'super-secreta-123',
+      fullName: 'Admin De Reportes',
+      primaryRole: 'club_admin',
+    },
+  });
+  const { token: reportAdminToken, user: reportAdmin } = reportAdminReg.json();
+
+  const reportClubRes = await app.inject({
+    method: 'POST',
+    url: '/clubs',
+    headers: { authorization: `Bearer ${reportAdminToken}` },
+    payload: {
+      name: 'Club De Reportes',
+      type: 'club',
+      city: 'Manta',
+      country: 'EC',
+      identityDocumentUrl: 'placeholder://identity',
+    },
+  });
+  const reportClub = reportClubRes.json();
+
+  await app.inject({
+    method: 'PUT',
+    url: `/clubs/${reportClub.id}/review`,
+    headers: { authorization: `Bearer ${platformAdminToken}` },
+    payload: { status: 'approved' },
+  });
+
+  const reportAdminDeviceToken = 'ExponentPushToken[smoke-test-report-admin]';
+  await app.inject({
+    method: 'POST',
+    url: '/push-tokens',
+    headers: { authorization: `Bearer ${reportAdminToken}` },
+    payload: { token: reportAdminDeviceToken },
+  });
+
+  const inDaysReport = (n: number) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
+  const reportTournamentRes = await app.inject({
+    method: 'POST',
+    url: `/clubs/${reportClub.id}/tournaments`,
+    headers: { authorization: `Bearer ${reportAdminToken}` },
+    payload: {
+      name: 'Copa Con Posible Error',
+      venue: 'Cancha 1',
+      city: 'Manta',
+      ageCategories: ['U12'],
+      startDate: inDaysReport(40),
+      endDate: inDaysReport(42),
+    },
+  });
+  const reportTournament = reportTournamentRes.json();
+
+  // --- Un club_admin no puede reportar (solo padre/entrenador) ---
+  const wrongRoleReportRes = await app.inject({
+    method: 'POST',
+    url: `/tournaments/${reportTournament.id}/reports`,
+    headers: { authorization: `Bearer ${reportAdminToken}` },
+    payload: { message: 'Esto no debería funcionar' },
+  });
+  assertEqual(wrongRoleReportRes.statusCode, 403, 'un club_admin no puede reportar un torneo');
+
+  // --- Un padre reporta — dispara exactamente un push al admin del club ---
+  pushState.sent.length = 0;
+  const parentReportRes = await app.inject({
+    method: 'POST',
+    url: `/tournaments/${reportTournament.id}/reports`,
+    headers: { authorization: `Bearer ${parentToken}` },
+    payload: { message: 'La fecha de inicio no coincide con la que anunciaron en redes.' },
+  });
+  assertEqual(parentReportRes.statusCode, 201, 'un padre puede reportar un torneo');
+  const parentReport = parentReportRes.json();
+  assertEqual(parentReport.tournamentName, 'Copa Con Posible Error', 'el reporte trae el nombre del torneo');
+  assertEqual(parentReport.clubName, 'Club De Reportes', 'el reporte trae el nombre del club');
+  assertEqual(pushState.sent.length, 1, 'reportar dispara exactamente un push al admin del club');
+  assertEqual(pushState.sent[0]?.to, reportAdminDeviceToken, 'el push va al device token del admin del club');
+  assertEqual(pushState.sent[0]?.title, 'Posible error en un torneo', 'el título del push es el esperado');
+
+  // --- Un segundo reporte abierto de la misma persona sobre el mismo torneo no se permite ---
+  const duplicateReportRes = await app.inject({
+    method: 'POST',
+    url: `/tournaments/${reportTournament.id}/reports`,
+    headers: { authorization: `Bearer ${parentToken}` },
+    payload: { message: 'Otra vez lo mismo' },
+  });
+  assertEqual(duplicateReportRes.statusCode, 409, 'un segundo reporte abierto de la misma persona devuelve 409');
+
+  // --- Un entrenador también puede reportar (mismo torneo, persona distinta) ---
+  const coachReportRes = await app.inject({
+    method: 'POST',
+    url: `/tournaments/${reportTournament.id}/reports`,
+    headers: { authorization: `Bearer ${coachAToken}` },
+    payload: { message: 'La sede que figura ya no existe.' },
+  });
+  assertEqual(coachReportRes.statusCode, 201, 'un entrenador también puede reportar un torneo');
+  const coachReport = coachReportRes.json();
+
+  // --- Cola del propio club — solo su admin, con los 2 reportes abiertos ---
+  const wrongClubQueueRes = await app.inject({
+    method: 'GET',
+    url: `/clubs/${reportClub.id}/tournament-reports`,
+    headers: { authorization: `Bearer ${coachAToken}` },
+  });
+  assertEqual(wrongClubQueueRes.statusCode, 403, 'un usuario ajeno no puede ver la cola de reportes del club');
+
+  const clubQueueRes = await app.inject({
+    method: 'GET',
+    url: `/clubs/${reportClub.id}/tournament-reports`,
+    headers: { authorization: `Bearer ${reportAdminToken}` },
+  });
+  assertEqual(clubQueueRes.statusCode, 200, 'GET /clubs/:id/tournament-reports (su propio admin) devuelve 200');
+  assertEqual(clubQueueRes.json().length, 2, 'la cola del club trae los 2 reportes abiertos');
+
+  // --- Cola global del platform_admin — respaldo, ve los mismos reportes ---
+  const forbiddenAdminQueueRes = await app.inject({
+    method: 'GET',
+    url: '/tournament-reports/pending',
+    headers: { authorization: `Bearer ${reportAdminToken}` },
+  });
+  assertEqual(forbiddenAdminQueueRes.statusCode, 403, 'un club_admin no puede ver la cola global de platform_admin');
+
+  const adminQueueRes = await app.inject({
+    method: 'GET',
+    url: '/tournament-reports/pending',
+    headers: { authorization: `Bearer ${platformAdminToken}` },
+  });
+  assertEqual(adminQueueRes.statusCode, 200, 'GET /tournament-reports/pending (platform_admin) devuelve 200');
+  assertTrue(
+    adminQueueRes.json().some((r: any) => r.id === parentReport.id) &&
+      adminQueueRes.json().some((r: any) => r.id === coachReport.id),
+    'la cola global incluye ambos reportes',
+  );
+
+  // --- Resolver: un actor sin rol de admin no puede ---
+  const wrongActorResolveRes = await app.inject({
+    method: 'PUT',
+    url: `/tournament-reports/${parentReport.id}/resolve`,
+    headers: { authorization: `Bearer ${coachAToken}` },
+  });
+  assertEqual(wrongActorResolveRes.statusCode, 403, 'un entrenador no puede resolver un reporte');
+
+  // --- El propio club_admin resuelve el reporte del padre ---
+  const resolveByClubRes = await app.inject({
+    method: 'PUT',
+    url: `/tournament-reports/${parentReport.id}/resolve`,
+    headers: { authorization: `Bearer ${reportAdminToken}` },
+  });
+  assertEqual(resolveByClubRes.statusCode, 200, 'el admin del club resuelve el reporte del padre');
+
+  // --- Resolver de nuevo el mismo reporte ya no funciona (guard del trigger) ---
+  const resolveAgainRes = await app.inject({
+    method: 'PUT',
+    url: `/tournament-reports/${parentReport.id}/resolve`,
+    headers: { authorization: `Bearer ${reportAdminToken}` },
+  });
+  assertEqual(resolveAgainRes.statusCode, 404, 'resolver un reporte ya resuelto devuelve 404');
+
+  // --- platform_admin resuelve el reporte del entrenador (sin ser admin de ese club) ---
+  const resolveByAdminRes = await app.inject({
+    method: 'PUT',
+    url: `/tournament-reports/${coachReport.id}/resolve`,
+    headers: { authorization: `Bearer ${platformAdminToken}` },
+  });
+  assertEqual(resolveByAdminRes.statusCode, 200, 'platform_admin puede resolver el reporte de cualquier club');
+
+  // --- Ambas colas quedan vacías para este club/torneo tras resolver los 2 reportes ---
+  const clubQueueAfterRes = await app.inject({
+    method: 'GET',
+    url: `/clubs/${reportClub.id}/tournament-reports`,
+    headers: { authorization: `Bearer ${reportAdminToken}` },
+  });
+  assertEqual(clubQueueAfterRes.json(), [], 'la cola del club queda vacía tras resolver ambos reportes');
+}
+
 console.log(`\n=== Resultado: ${passed} pasaron, ${failed} fallaron ===`);
 await app.close();
 process.exit(failed > 0 ? 1 : 0);

@@ -63,6 +63,14 @@ export async function getClubIdForAdminUser(userId: string, db: Queryable = pool
   return rows[0].club_id;
 }
 
+/** tournamentReportService: a quién avisarle (push) cuando alguien reporta un posible error en
+ * un torneo de este club — puede haber más de un admin desde el administrador de respaldo
+ * (decisión #42), así que se notifica a todos, no solo al primero. */
+export async function listAdminUserIds(clubId: string, db: Queryable = pool): Promise<string[]> {
+  const { rows } = await db.query(`SELECT user_id FROM club_admins WHERE club_id = $1`, [clubId]);
+  return rows.map((r) => r.user_id);
+}
+
 /** ClubRegistrationScreen: crea el club nuevo. Vincular al admin (club_admins) es
  * responsabilidad del caller — clubService.registerClub llama a esto y a addAdmin dentro
  * de una misma transacción (withTransaction). */

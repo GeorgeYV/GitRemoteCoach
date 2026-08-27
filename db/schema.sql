@@ -425,6 +425,51 @@ CREATE TABLE tournament_age_categories (
 CREATE INDEX idx_tournament_age_categories_age_category
   ON tournament_age_categories (age_category);
 
+-- Un padre o entrenador avisa de un posible error en los datos del torneo (fecha, ciudad, etc.)
+-- — ver decisión #46. No modifica el torneo: es una señal para que el club/federación que lo
+-- creó (o platform_admin, como respaldo si el club no reacciona) lo corrija a mano. Deliberado no
+-- dejar editar libremente las fechas de un torneo con reservas activas — silenciar ese riesgo con
+-- una notificación humana es más seguro que una edición que le cambie la fecha a un padre que ya
+-- pagó sin avisarle.
+CREATE TABLE tournament_reports (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tournament_id UUID NOT NULL REFERENCES tournaments (id) ON DELETE CASCADE,
+  reported_by   UUID NOT NULL REFERENCES users (id),
+  message       TEXT NOT NULL,
+  status        TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'resolved')),
+  resolved_by   UUID REFERENCES users (id),
+  resolved_at   TIMESTAMPTZ,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  CONSTRAINT chk_tournament_reports_resolved_at
+    CHECK ((status = 'open') = (resolved_at IS NULL))
+);
+
+CREATE INDEX idx_tournament_reports_tournament_id ON tournament_reports (tournament_id);
+-- Cola del club (sus propios torneos) y del platform_admin (todos, de respaldo) — ambas filtran
+-- por status = 'open'.
+CREATE INDEX idx_tournament_reports_status ON tournament_reports (status) WHERE status = 'open';
+-- Evita que la misma persona deje varios reportes abiertos duplicados sobre el mismo torneo.
+CREATE UNIQUE INDEX idx_tournament_reports_no_duplicate_open
+  ON tournament_reports (tournament_id, reported_by)
+  WHERE status = 'open';
+
+CREATE OR REPLACE FUNCTION fn_tournament_reports_guard_resolve() RETURNS TRIGGER AS $$
+BEGIN
+  IF OLD.status <> 'open' THEN
+    RAISE EXCEPTION 'el reporte % ya fue resuelto, no puede volver a cambiar de status', OLD.id;
+  END IF;
+  NEW.resolved_at := now();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_tournament_reports_guard_resolve
+BEFORE UPDATE OF status ON tournament_reports
+FOR EACH ROW
+WHEN (NEW.status IS DISTINCT FROM OLD.status)
+EXECUTE FUNCTION fn_tournament_reports_guard_resolve();
+
 -- ---------------------------------------------------------------------
 -- Trigger: un torneo en estado terminal ('completed'/'cancelled') no
 -- puede volver a cambiar de status — evita reabrir por error un torneo
@@ -2146,4 +2191,17 @@ CREATE INDEX idx_push_tokens_user_id ON push_tokens (user_id);
 --     mismo patrón que coach_age_categories) para que el padre pueda
 --     filtrar torneos por categoría de su hijo/a en vez de tener que
 --     abrir cada uno para averiguarlo.
+-- 46. tournament_reports: un padre o entrenador avisa de un posible
+--     error en los datos de un torneo — sin edición libre todavía
+--     (bookings no guarda una copia de las fechas del torneo, las trae
+--     con JOIN en vivo a tournaments, así que editar la fecha de un
+--     torneo con reservas activas le cambiaría la fecha a un padre que
+--     ya pagó, sin avisarle — riesgo real, no hipotético). El reporte
+--     resuelve la mayoría del problema sin ese riesgo: llega al club/
+--     federación que creó el torneo (push, mismo patrón que el resto de
+--     notificaciones) y queda visible para platform_admin como
+--     respaldo si el club no reacciona. Ningún dato del torneo se toca
+--     solo — un humano decide qué hacer, con contexto de quién ya
+--     reservó. Edición con las fechas bloqueadas post-reserva queda
+--     como una etapa aparte, todavía no construida.
 -- =====================================================================

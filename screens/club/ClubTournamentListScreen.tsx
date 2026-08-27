@@ -7,12 +7,15 @@ import { useAuth } from '../../context/AuthContext';
 import {
   ApiError,
   claimTournament,
+  listClubTournamentReports,
   listClubTournaments,
   listUnclaimedTournaments,
+  resolveTournamentReport,
+  TournamentReport,
   TournamentSummary,
   UnclaimedTournament,
 } from '../../lib/api';
-import { colors, radius } from '../../lib/theme';
+import { colors, radius, withOpacity } from '../../lib/theme';
 
 function dateRangeLabel(startIso: string, endIso: string): string {
   const start = new Date(startIso).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' });
@@ -44,6 +47,9 @@ export default function ClubTournamentListScreen({
   const [unclaimed, setUnclaimed] = useState<UnclaimedTournament[] | null>(null);
   const [claimingId, setClaimingId] = useState<string | null>(null);
   const [claimError, setClaimError] = useState<string | null>(null);
+  const [reports, setReports] = useState<TournamentReport[]>([]);
+  const [resolvingReportId, setResolvingReportId] = useState<string | null>(null);
+  const [resolveError, setResolveError] = useState<string | null>(null);
   // Se incrementa tras reclamar un torneo con éxito, para refrescar ambas listas — separado del
   // refreshKey del padre (que solo se usa tras crear un torneo nuevo).
   const [localRefreshKey, setLocalRefreshKey] = useState(0);
@@ -78,6 +84,36 @@ export default function ClubTournamentListScreen({
       cancelled = true;
     };
   }, [clubId, localRefreshKey]);
+
+  // Reportes de un padre/entrenador sobre torneos de este club (decisión #46) — sección propia,
+  // separada de la lista de torneos, para que salte a la vista antes de que el admin tenga que
+  // abrir cada torneo a buscar si algo anda mal.
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+    listClubTournamentReports(token, clubId)
+      .then((result) => {
+        if (!cancelled) setReports(result);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [token, clubId, refreshKey, localRefreshKey]);
+
+  async function handleResolveReport(reportId: string) {
+    if (!token) return;
+    setResolvingReportId(reportId);
+    setResolveError(null);
+    try {
+      await resolveTournamentReport(token, reportId);
+      setReports((prev) => prev.filter((r) => r.id !== reportId));
+    } catch (err) {
+      setResolveError(err instanceof ApiError ? err.message : 'No se pudo marcar como resuelto. Intenta de nuevo.');
+    } finally {
+      setResolvingReportId(null);
+    }
+  }
 
   async function handleClaim(tournamentId: string) {
     if (!token) {
@@ -126,6 +162,23 @@ export default function ClubTournamentListScreen({
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.list}>
+          {reports.length > 0 && (
+            <View style={styles.reportsSection}>
+              <Text style={styles.reportsLabel}>
+                {reports.length === 1 ? 'Reporte abierto' : `${reports.length} reportes abiertos`}
+              </Text>
+              {resolveError && <Text style={styles.claimErrorText}>{resolveError}</Text>}
+              {reports.map((report) => (
+                <ReportCard
+                  key={report.id}
+                  report={report}
+                  resolving={resolvingReportId === report.id}
+                  onResolve={() => handleResolveReport(report.id)}
+                />
+              ))}
+            </View>
+          )}
+
           {tournaments.map((tournament) => (
             <TournamentCard key={tournament.id} tournament={tournament} onPress={() => onSelect(tournament)} />
           ))}
@@ -152,6 +205,37 @@ export default function ClubTournamentListScreen({
       )}
       {tabBar}
     </SafeAreaView>
+  );
+}
+
+function ReportCard({
+  report,
+  resolving,
+  onResolve,
+}: {
+  report: TournamentReport;
+  resolving: boolean;
+  onResolve: () => void;
+}) {
+  return (
+    <View style={styles.reportCard}>
+      <View style={styles.reportTopRow}>
+        <Ionicons name="alert-circle-outline" size={16} color={colors.amber} />
+        <Text style={styles.reportTournamentName}>{report.tournamentName}</Text>
+      </View>
+      <Text style={styles.reportMeta}>Reportado por {report.reporterName}</Text>
+      <Text style={styles.reportMessage}>{report.message}</Text>
+      <Pressable style={styles.resolveButton} onPress={onResolve} disabled={resolving}>
+        {resolving ? (
+          <ActivityIndicator color={colors.courtBlueDeep} size="small" />
+        ) : (
+          <View style={styles.buttonContent}>
+            <Ionicons name="checkmark-outline" size={14} color={colors.courtBlueDeep} />
+            <Text style={styles.resolveButtonLabel}>Marcar resuelto</Text>
+          </View>
+        )}
+      </Pressable>
+    </View>
   );
 }
 
@@ -328,6 +412,58 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 20,
     textAlign: 'center',
+  },
+  reportsSection: {
+    gap: 12,
+    marginBottom: 4,
+  },
+  reportsLabel: {
+    color: colors.amber,
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  reportCard: {
+    backgroundColor: colors.panel,
+    borderRadius: radius,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: withOpacity(colors.amber, 0.4),
+  },
+  reportTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 6,
+  },
+  reportTournamentName: {
+    color: colors.lineWhite,
+    fontSize: 14,
+    fontWeight: '800',
+    flexShrink: 1,
+  },
+  reportMeta: {
+    color: colors.textDim,
+    fontSize: 11,
+    marginBottom: 6,
+  },
+  reportMessage: {
+    color: colors.textSoft,
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 12,
+  },
+  resolveButton: {
+    backgroundColor: colors.ballLime,
+    borderRadius: 16,
+    paddingVertical: 9,
+    alignItems: 'center',
+  },
+  resolveButtonLabel: {
+    color: colors.courtBlueDeep,
+    fontSize: 12,
+    fontWeight: '800',
   },
   unclaimedSection: {
     marginTop: 8,

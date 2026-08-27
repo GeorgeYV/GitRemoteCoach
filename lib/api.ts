@@ -1384,6 +1384,55 @@ export function claimTournament(authToken: string, clubId: string, tournamentId:
   });
 }
 
+/** Espeja server/src/types.ts#TournamentReport — un padre o entrenador avisa de un posible error
+ * en los datos de un torneo (decisión #46). No modifica el torneo. */
+export interface TournamentReport {
+  id: string;
+  tournamentId: string;
+  tournamentName: string;
+  clubId: string | null;
+  clubName: string | null;
+  reportedBy: string;
+  reporterName: string;
+  message: string;
+  createdAt: string;
+}
+
+/** POST /tournaments/:id/reports — ParentHomeScreen/CoachTournamentSearchScreen "Reportar un
+ * posible error". Solo padre o entrenador; 409 si ya tenés un reporte abierto sobre este torneo. */
+export function reportTournament(authToken: string, tournamentId: string, message: string): Promise<TournamentReport> {
+  return request(`/tournaments/${tournamentId}/reports`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${authToken}` },
+    body: JSON.stringify({ message }),
+  });
+}
+
+/** GET /clubs/:id/tournament-reports — ClubTournamentListScreen: reportes abiertos sobre torneos
+ * de este club, solo para su propio admin. */
+export function listClubTournamentReports(authToken: string, clubId: string): Promise<TournamentReport[]> {
+  return request(`/clubs/${clubId}/tournament-reports`, {
+    headers: { Authorization: `Bearer ${authToken}` },
+  });
+}
+
+/** GET /tournament-reports/pending — PlatformAdminTournamentScreen: todos los reportes abiertos,
+ * de cualquier club, de respaldo si el club no reacciona. */
+export function listPendingTournamentReports(authToken: string): Promise<TournamentReport[]> {
+  return request('/tournament-reports/pending', {
+    headers: { Authorization: `Bearer ${authToken}` },
+  });
+}
+
+/** PUT /tournament-reports/:id/resolve — marcarlo resuelto, desde ClubTournamentListScreen (su
+ * propio club) o PlatformAdminTournamentScreen (cualquiera). */
+export function resolveTournamentReport(authToken: string, reportId: string): Promise<TournamentReport> {
+  return request(`/tournament-reports/${reportId}/resolve`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${authToken}` },
+  });
+}
+
 /** Espeja server/src/types.ts#CoachClubTag — insignias de "oficial" del propio entrenador. */
 export interface CoachClubTag {
   tournamentId: string;

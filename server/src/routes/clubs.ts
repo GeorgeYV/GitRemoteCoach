@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import * as clubService from '../services/clubService.js';
 import * as clubRepository from '../repositories/clubRepository.js';
+import * as tournamentReportService from '../services/tournamentReportService.js';
 import * as tournamentService from '../services/tournamentService.js';
 import { ForbiddenError, ValidationError } from '../lib/errors.js';
 
@@ -141,6 +142,25 @@ export async function clubRoutes(app: FastifyInstance): Promise<void> {
     }
 
     return clubService.listTournamentsForClub(id);
+  });
+
+  // ClubTournamentListScreen: reportes abiertos de un padre/entrenador sobre torneos de este
+  // club (decisión #46) — solo el propio admin del club los ve.
+  app.get('/clubs/:id/tournament-reports', { preHandler: app.authenticate }, async (req) => {
+    const { id } = req.params as { id: string };
+    const { sub } = req.user as { sub: string };
+
+    let adminClubId: string;
+    try {
+      adminClubId = await clubRepository.getClubIdForAdminUser(sub);
+    } catch {
+      throw new ForbiddenError('Solo un administrador del club puede ver sus reportes');
+    }
+    if (adminClubId !== id) {
+      throw new ForbiddenError('Solo un administrador del club puede ver sus reportes');
+    }
+
+    return tournamentReportService.listOpenReportsForClub(id);
   });
 
   // ClubCreateTournamentScreen: solo un admin del club puede registrar torneos para ese club.
