@@ -6,14 +6,13 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
 import { dateRangeLabel } from '../../lib/dateSlots';
-import { buildTournamentShareMessage, buildTournamentShareUrl, SHARE_BASE_URL } from '../../lib/shareLinks';
+import { buildTournamentShareMessage, buildTournamentShareUrl } from '../../lib/shareLinks';
 import { TournamentSummary } from '../../lib/api';
 import { colors, radius } from '../../lib/theme';
 
 /** Publicidad para atraer padres nuevos a un torneo puntual: enlace + QR + texto listo para
- * copiar en WhatsApp/correo. El enlace usa SHARE_BASE_URL (dominio placeholder, ver
- * lib/shareLinks.ts) — no resuelve todavía porque la app no está publicada, pero el resto del
- * feature (generación de QR, texto armado) ya queda listo para cuando exista un dominio real. */
+ * copiar en WhatsApp/correo. El enlace (ver lib/shareLinks.ts) lleva al inicio de la app en
+ * general, no a una pantalla de este torneo puntual — todavía no existe esa pantalla pública. */
 export default function ClubTournamentShareScreen({
   tournament,
   onBack,
@@ -87,14 +86,6 @@ export default function ClubTournamentShareScreen({
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.placeholderNotice}>
-          <Ionicons name="information-circle-outline" size={16} color={colors.textDim} />
-          <Text style={styles.placeholderNoticeText}>
-            El enlace usa un dominio de ejemplo ({SHARE_BASE_URL}) porque la app todavía no está publicada — vas a poder
-            usarlo apenas exista un despliegue real, sin cambiar nada más acá.
-          </Text>
-        </View>
-
         {copyError && <Text style={styles.copyErrorText}>{copyError}</Text>}
 
         <View style={styles.card}>
@@ -184,22 +175,6 @@ const styles = StyleSheet.create({
   content: {
     padding: 20,
     paddingBottom: 32,
-  },
-  placeholderNotice: {
-    flexDirection: 'row',
-    gap: 8,
-    backgroundColor: colors.panelLight,
-    borderRadius: radius,
-    padding: 12,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  placeholderNoticeText: {
-    flex: 1,
-    color: colors.textDim,
-    fontSize: 12,
-    lineHeight: 17,
   },
   copyErrorText: {
     color: colors.errorCoral,
