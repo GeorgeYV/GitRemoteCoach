@@ -99,7 +99,11 @@ export default function ClubCreateTournamentScreen({
         </Section>
 
         <Section label="Categorías de edad">
-          <Text style={styles.categoriesHint}>Así el padre puede filtrar torneos por la categoría de su hijo/a.</Text>
+          <Text style={styles.categoriesHint}>
+            Así el padre puede filtrar torneos por la categoría de su hijo/a. Todas las categorías que elijas acá
+            comparten las mismas fechas de inicio y fin — si alguna categoría empieza en una fecha distinta, creá un
+            torneo aparte para ella.
+          </Text>
           <View style={styles.chipRow}>
             {AGE_CATEGORY_OPTIONS.map((option) => {
               const active = ageCategories.includes(option as AgeCategory);
