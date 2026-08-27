@@ -24,6 +24,9 @@ a mano contra la base real — editar el archivo solo no alcanza. Los smoke test
 esto: cargan `db/schema.sql` entero en una base en memoria (`pg-mem`) en cada corrida, ver
 `test/setupDb.ts`.
 
+Para cargar `db/schema.sql` completo por primera vez contra una base nueva (ej. un Postgres recién
+creado en Render), ver `scripts/load-schema.ts`.
+
 ### Variables de entorno
 
 Todas documentadas con comentarios en `.env.example`. Las obligatorias (`DATABASE_URL`,
