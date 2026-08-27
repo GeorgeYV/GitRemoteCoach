@@ -30,7 +30,7 @@ pool
   .query(`UPDATE users SET primary_role = 'platform_admin' WHERE email = $1 RETURNING id, email, primary_role`, [email])
   .then(({ rows }) => {
     if (rows.length === 0) {
-      console.error(`No existe ninguna cuenta con ese correo. Registrala primero desde la app y volvé a correr esto.`);
+      console.error(`No existe ninguna cuenta con ese correo. Registrala primero desde la app y vuelve a correr esto.`);
       process.exitCode = 1;
       return;
     }

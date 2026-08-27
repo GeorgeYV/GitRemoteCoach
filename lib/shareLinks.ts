@@ -17,7 +17,7 @@ export function buildTournamentShareMessage(params: {
 }): string {
   return (
     `¡Hola! Te invito a conocer Remote Coach para el torneo "${params.tournamentName}" ` +
-    `(${params.venue}, ${params.dateRangeLabel}). Desde ahí podés reservar un entrenador para tu hijo/a:\n\n` +
+    `(${params.venue}, ${params.dateRangeLabel}). Desde ahí puedes reservar un entrenador para tu hijo/a:\n\n` +
     `${params.shareUrl}`
   );
 }

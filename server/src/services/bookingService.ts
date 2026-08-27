@@ -33,7 +33,7 @@ export async function requestBooking(params: RequestBookingParams): Promise<Book
   // diferencia del parentUserId de accept/reject que sí necesita resolverse vía player.guardian.
   await notificationService.notifyUser(params.coachId, {
     title: 'Nueva solicitud de reserva',
-    body: 'Un padre quiere reservar contigo — respondé antes de que expire la solicitud.',
+    body: 'Un padre quiere reservar contigo — responde antes de que expire la solicitud.',
     data: { bookingId: booking.id },
   });
 
