@@ -9,6 +9,7 @@ import IconTextInput from '../../components/shared/IconTextInput';
 import InitialAvatar from '../../components/shared/InitialAvatar';
 import { useAuth } from '../../context/AuthContext';
 import {
+  AgeCategory,
   BookingForParent,
   CountryCode,
   listParentBookings,
@@ -18,7 +19,7 @@ import {
 } from '../../lib/api';
 import { dateRangeLabel } from '../../lib/dateSlots';
 import { colors, radius, withOpacity } from '../../lib/theme';
-import { COUNTRY_LABELS, COUNTRY_OPTIONS } from '../../mock/coachFlow';
+import { AGE_CATEGORY_OPTIONS, COUNTRY_LABELS, COUNTRY_OPTIONS } from '../../mock/coachFlow';
 
 /** País del dispositivo (Region de iOS/Android) si está entre los soportados, si no Ecuador —
  * usado como arranque del toggle "mi país" antes de saber el país de los hijos del padre. */
@@ -69,6 +70,9 @@ function bookedTournamentsFeatured(bookings: BookingForParent[]): TournamentSear
       venue: next.tournamentVenue,
       city: next.tournamentCity,
       country: null,
+      // BookingForParent no trae las categorías del torneo — no hace falta acá, esta sección no
+      // pasa por el filtro de categoría (el padre ya reservó, no está descubriendo).
+      ageCategories: [],
       startDate: next.tournamentStartDate,
       endDate: next.tournamentEndDate,
     }));
@@ -82,6 +86,7 @@ export default function ParentHomeScreen() {
   // registrados aún, o tiene hijos en países distintos, cae al país del dispositivo (o Ecuador).
   const [defaultCountry, setDefaultCountry] = useState<CountryCode>(() => localeDefaultCountry());
   const [countryFilterOn, setCountryFilterOn] = useState(true);
+  const [ageCategoryFilter, setAgeCategoryFilter] = useState<AgeCategory | null>(null);
   const [tournaments, setTournaments] = useState<TournamentSearchResult[] | null>(null);
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState<TournamentSearchResult[] | null>(null);
@@ -125,10 +130,10 @@ export default function ParentHomeScreen() {
   // mostrar el mismo torneo destacado sin importar qué esté escribiendo el padre en el buscador.
   // Sí depende del país activo: cambiar el toggle "mi país"/"todos" debe actualizar el destacado.
   useEffect(() => {
-    searchTournaments(undefined, activeCountry)
+    searchTournaments(undefined, activeCountry, ageCategoryFilter ?? undefined)
       .then(setTournaments)
       .catch(() => setTournaments([]));
-  }, [activeCountry]);
+  }, [activeCountry, ageCategoryFilter]);
 
   // "Torneos activos" sí busca de verdad contra el backend (igual que CoachTournamentSearchScreen)
   // en vez de filtrar en el cliente los primeros 25 que trajo la carga fija de arriba — si no, un
@@ -142,7 +147,7 @@ export default function ParentHomeScreen() {
     }
     let cancelled = false;
     const handle = setTimeout(() => {
-      searchTournaments(trimmed, activeCountry)
+      searchTournaments(trimmed, activeCountry, ageCategoryFilter ?? undefined)
         .then((result) => {
           if (!cancelled) setSearchResults(result);
         })
@@ -154,7 +159,7 @@ export default function ParentHomeScreen() {
       cancelled = true;
       clearTimeout(handle);
     };
-  }, [query, activeCountry]);
+  }, [query, activeCountry, ageCategoryFilter]);
 
   function goToTrainers(tournamentId?: string) {
     if (tournamentId) {
@@ -254,6 +259,29 @@ export default function ParentHomeScreen() {
           </Pressable>
         </View>
 
+        <View style={styles.countryToggleRow}>
+          <Pressable
+            style={[styles.countryToggleChip, ageCategoryFilter === null && styles.countryToggleChipActive]}
+            onPress={() => setAgeCategoryFilter(null)}
+          >
+            <Text style={[styles.countryToggleLabel, ageCategoryFilter === null && styles.countryToggleLabelActive]}>
+              Todas las categorías
+            </Text>
+          </Pressable>
+          {AGE_CATEGORY_OPTIONS.map((option) => {
+            const active = ageCategoryFilter === option;
+            return (
+              <Pressable
+                key={option}
+                style={[styles.countryToggleChip, active && styles.countryToggleChipActive]}
+                onPress={() => setAgeCategoryFilter(active ? null : (option as AgeCategory))}
+              >
+                <Text style={[styles.countryToggleLabel, active && styles.countryToggleLabelActive]}>{option}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
         <Text style={styles.sectionLabel}>Torneos activos</Text>
         {visibleList === null ? (
           <Text style={styles.tournamentMeta}>{isSearching ? 'Buscando…' : 'Cargando torneos…'}</Text>
@@ -289,6 +317,9 @@ function TournamentRow({ tournament, onPress }: { tournament: TournamentSearchRe
         <Text style={styles.tournamentMeta}>
           {tournament.venue} · <Text style={styles.tournamentCity}>{tournament.city}</Text>
         </Text>
+        {tournament.ageCategories.length > 0 && (
+          <Text style={styles.tournamentMeta}>{tournament.ageCategories.join(' · ')}</Text>
+        )}
         <Text style={styles.tournamentDateLine}>
           {dateRangeLabel(tournament.startDate, tournament.endDate)}
           {countdown && <Text style={[styles.countdown, { color: countdown.color }]}> · {countdown.text}</Text>}
@@ -432,6 +463,7 @@ const styles = StyleSheet.create({
   },
   countryToggleRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
     marginBottom: 20,
   },

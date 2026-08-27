@@ -197,7 +197,12 @@ function TournamentCard({
         <Text style={styles.tournamentName}>{tournament.name}</Text>
         <TournamentStatusPill status={tournament.status} />
       </View>
-      <Text style={styles.tournamentMeta}>{tournament.venue}</Text>
+      <Text style={styles.tournamentMeta}>
+        {tournament.venue} · {tournament.city}
+      </Text>
+      {tournament.ageCategories.length > 0 && (
+        <Text style={styles.tournamentMeta}>{tournament.ageCategories.join(' · ')}</Text>
+      )}
       <Text style={styles.tournamentMeta}>{dateRangeLabel(tournament.startDate, tournament.endDate)}</Text>
       <View style={styles.selectRow}>
         <Text style={styles.selectLabel}>

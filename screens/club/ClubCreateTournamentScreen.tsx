@@ -5,8 +5,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import DatePickerField from '../../components/shared/DatePickerField';
 import IconTextInput from '../../components/shared/IconTextInput';
 import { useAuth } from '../../context/AuthContext';
-import { ApiError, createTournament, TournamentSummary } from '../../lib/api';
+import { AgeCategory, ApiError, createTournament, TournamentSummary } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
+import { AGE_CATEGORY_OPTIONS } from '../../mock/coachFlow';
 
 export default function ClubCreateTournamentScreen({
   clubId,
@@ -20,13 +21,27 @@ export default function ClubCreateTournamentScreen({
   const { token } = useAuth();
   const [name, setName] = useState('');
   const [venue, setVenue] = useState('');
+  // Sede real del torneo — no se hereda de la ciudad registrada del club/federación, porque un
+  // club puede organizar en una ciudad distinta a la suya (ver decisión #45).
+  const [city, setCity] = useState('');
+  const [ageCategories, setAgeCategories] = useState<AgeCategory[]>([]);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  function toggleAgeCategory(category: AgeCategory) {
+    setAgeCategories((prev) => (prev.includes(category) ? prev.filter((c) => c !== category) : [...prev, category]));
+  }
+
   const canSubmit =
-    name.trim().length > 0 && venue.trim().length > 0 && startDate.trim().length > 0 && endDate.trim().length > 0 && !submitting;
+    name.trim().length > 0 &&
+    venue.trim().length > 0 &&
+    city.trim().length > 0 &&
+    ageCategories.length > 0 &&
+    startDate.trim().length > 0 &&
+    endDate.trim().length > 0 &&
+    !submitting;
 
   async function handleSubmit() {
     if (!canSubmit) return;
@@ -46,6 +61,8 @@ export default function ClubCreateTournamentScreen({
       const tournament = await createTournament(token, clubId, {
         name: name.trim(),
         venue: venue.trim(),
+        city: city.trim(),
+        ageCategories,
         startDate,
         endDate,
       });
@@ -73,6 +90,30 @@ export default function ClubCreateTournamentScreen({
         <Section label="Datos del torneo">
           <IconTextInput icon="trophy-outline" placeholder="Nombre del torneo" value={name} onChangeText={setName} />
           <IconTextInput icon="location-outline" placeholder="Sede" value={venue} onChangeText={setVenue} />
+          <IconTextInput
+            icon="business-outline"
+            placeholder="Ciudad donde se juega"
+            value={city}
+            onChangeText={setCity}
+          />
+        </Section>
+
+        <Section label="Categorías de edad">
+          <Text style={styles.categoriesHint}>Así el padre puede filtrar torneos por la categoría de su hijo/a.</Text>
+          <View style={styles.chipRow}>
+            {AGE_CATEGORY_OPTIONS.map((option) => {
+              const active = ageCategories.includes(option as AgeCategory);
+              return (
+                <Pressable
+                  key={option}
+                  onPress={() => toggleAgeCategory(option as AgeCategory)}
+                  style={[styles.chip, active && styles.chipActive]}
+                >
+                  <Text style={[styles.chipLabel, active && styles.chipLabelActive]}>{option}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
         </Section>
 
         <Section label="Fechas">
@@ -177,6 +218,34 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.8,
     marginBottom: 12,
+  },
+  categoriesHint: {
+    color: colors.textDim,
+    fontSize: 12,
+    lineHeight: 17,
+    marginBottom: 10,
+  },
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  chip: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+  },
+  chipActive: {
+    backgroundColor: colors.ballLime,
+  },
+  chipLabel: {
+    color: colors.textSoft,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  chipLabelActive: {
+    color: colors.courtBlueDeep,
   },
   footer: {
     borderTopWidth: 1,

@@ -2,6 +2,7 @@ import type { Pool, PoolClient } from 'pg';
 import { pool } from '../lib/db.js';
 import { NotFoundError } from '../lib/errors.js';
 import type {
+  AgeCategory,
   CountryCode,
   TournamentReadyForCoachPayout,
   TournamentSearchResult,
@@ -11,13 +12,49 @@ import type {
 
 type Queryable = Pool | PoolClient;
 
-function mapSearchRow(row: any): TournamentSearchResult {
+async function setAgeCategories(tournamentId: string, ageCategories: AgeCategory[], db: Queryable): Promise<void> {
+  if (ageCategories.length === 0) return;
+  const values = ageCategories.map((_, i) => `($1, $${i + 2})`).join(', ');
+  await db.query(`INSERT INTO tournament_age_categories (tournament_id, age_category) VALUES ${values}`, [
+    tournamentId,
+    ...ageCategories,
+  ]);
+}
+
+/** Segunda consulta + merge en memoria en vez de una subconsulta correlacionada dentro del SELECT
+ * (array_agg(...) WHERE tac.tournament_id = t.id): pg-mem, que usan los smoke tests, no resuelve
+ * una referencia a la tabla externa (t.id) dentro de una subconsulta, ni en el SELECT ni en el
+ * WHERE (un JOIN normal sí — ver el filtro de ageCategory en search, más abajo). Con listas de a
+ * lo sumo 25 torneos esto no pesa. IN (...) con un placeholder por id en vez de "= ANY($1)" —
+ * mismo motivo/precedente que bookingRepository.transitionStatus. */
+async function fetchAgeCategoriesByTournament(
+  tournamentIds: string[],
+  db: Queryable,
+): Promise<Map<string, AgeCategory[]>> {
+  const byTournament = new Map<string, AgeCategory[]>();
+  if (tournamentIds.length === 0) return byTournament;
+  const placeholders = tournamentIds.map((_, i) => `$${i + 1}`).join(', ');
+  const { rows } = await db.query(
+    `SELECT tournament_id, age_category FROM tournament_age_categories
+     WHERE tournament_id IN (${placeholders}) ORDER BY age_category`,
+    tournamentIds,
+  );
+  for (const row of rows) {
+    const existing = byTournament.get(row.tournament_id) ?? [];
+    existing.push(row.age_category);
+    byTournament.set(row.tournament_id, existing);
+  }
+  return byTournament;
+}
+
+function mapSearchRow(row: any, ageCategories: AgeCategory[]): TournamentSearchResult {
   return {
     id: row.id,
     name: row.name,
     venue: row.venue,
     city: row.city,
     country: row.country,
+    ageCategories,
     startDate: row.start_date,
     endDate: row.end_date,
   };
@@ -35,9 +72,17 @@ function mapSearchRow(row: any): TournamentSearchResult {
  * (t.club_id IS NULL OR c.verification_status = 'approved'): mismo filtro que ya aplica
  * coachRepository.search sobre coach_profiles.verification_status — un club recién autoregistrado
  * y sin revisar puede existir y hasta tener torneos, pero no aparecen acá hasta que un
- * platform_admin lo apruebe (ver decisión #41). Un torneo sin reclamar sigue visible igual. */
+ * platform_admin lo apruebe (ver decisión #41). Un torneo sin reclamar sigue visible igual.
+ * ageCategory filtra con un INNER JOIN a tournament_age_categories (ver decisión #45) — opcional,
+ * sin él devuelve torneos de cualquier categoría (incluyendo los que todavía no declaran
+ * ninguna). Es un JOIN y no un EXISTS/subconsulta correlacionada porque pg-mem (usado por los
+ * smoke tests) no resuelve una referencia a la tabla externa (t.id) dentro de una subconsulta,
+ * ni en el SELECT ni en el WHERE — un JOIN normal sí, igual que los de listByClub. COALESCE
+ * (t.city, c.city) — no al revés — porque la sede real de un torneo puede no ser la ciudad
+ * registrada del club que lo organiza; t.city queda poblada siempre para un torneo nuevo
+ * (obligatoria al crear) y solo cae al club para las filas de antes de esa decisión. */
 export async function search(
-  params: { query?: string; country?: CountryCode },
+  params: { query?: string; country?: CountryCode; ageCategory?: AgeCategory },
   db: Queryable = pool,
 ): Promise<TournamentSearchResult[]> {
   const conditions: string[] = [
@@ -50,7 +95,7 @@ export async function search(
   if (params.query) {
     values.push(`%${params.query}%`);
     conditions.push(
-      `(t.name ILIKE $${values.length} OR t.venue ILIKE $${values.length} OR COALESCE(c.city, t.city) ILIKE $${values.length})`,
+      `(t.name ILIKE $${values.length} OR t.venue ILIKE $${values.length} OR COALESCE(t.city, c.city) ILIKE $${values.length})`,
     );
   }
 
@@ -59,25 +104,39 @@ export async function search(
     conditions.push(`COALESCE(c.country, t.country) = $${values.length}`);
   }
 
+  let ageCategoryJoin = '';
+  if (params.ageCategory) {
+    values.push(params.ageCategory);
+    ageCategoryJoin = `JOIN tournament_age_categories tac_filter
+       ON tac_filter.tournament_id = t.id AND tac_filter.age_category = $${values.length}`;
+  }
+
   const { rows } = await db.query(
-    `SELECT t.id, t.name, t.venue, COALESCE(c.city, t.city) AS city, COALESCE(c.country, t.country) AS country,
+    `SELECT t.id, t.name, t.venue, COALESCE(t.city, c.city) AS city, COALESCE(c.country, t.country) AS country,
             t.start_date, t.end_date
      FROM tournaments t
      LEFT JOIN clubs c ON c.id = t.club_id
+     ${ageCategoryJoin}
      WHERE ${conditions.join(' AND ')}
      ORDER BY t.start_date
      LIMIT 25`,
     values,
   );
-  return rows.map(mapSearchRow);
+  const ageCategoriesByTournament = await fetchAgeCategoriesByTournament(
+    rows.map((r) => r.id),
+    db,
+  );
+  return rows.map((row) => mapSearchRow(row, ageCategoriesByTournament.get(row.id) ?? []));
 }
 
-function mapSummaryRow(row: any): TournamentSummary {
+function mapSummaryRow(row: any, ageCategories: AgeCategory[]): TournamentSummary {
   return {
     id: row.id,
     clubId: row.club_id,
     name: row.name,
     venue: row.venue,
+    city: row.city,
+    ageCategories,
     startDate: row.start_date,
     endDate: row.end_date,
     status: row.status,
@@ -89,13 +148,15 @@ function mapSummaryRow(row: any): TournamentSummary {
 /** ClubTournamentListScreen: torneos del club con conteo de coaches oficiales y comisión
  * pendiente de liquidar por torneo. JOINs a subconsultas derivadas (ya agregadas) en vez de
  * JOIN directo + GROUP BY, para no inflar la suma de comisiones con el producto cartesiano
- * de tags × bookings. */
+ * de tags × bookings. COALESCE(t.city, c.city) — mismo motivo que search — solo cae al club
+ * para torneos creados antes de la decisión #45. */
 export async function listByClub(clubId: string, db: Queryable = pool): Promise<TournamentSummary[]> {
   const { rows } = await db.query(
-    `SELECT t.id, t.club_id, t.name, t.venue, t.start_date, t.end_date, t.status,
+    `SELECT t.id, t.club_id, t.name, t.venue, COALESCE(t.city, c.city) AS city, t.start_date, t.end_date, t.status,
             COALESCE(tag_counts.official_coach_count, 0) AS official_coach_count,
             COALESCE(commission_totals.pending_commission_amount, 0) AS pending_commission_amount
      FROM tournaments t
+     LEFT JOIN clubs c ON c.id = t.club_id
      LEFT JOIN (
        SELECT tournament_id, COUNT(*) AS official_coach_count
        FROM tournament_coach_tags
@@ -111,7 +172,11 @@ export async function listByClub(clubId: string, db: Queryable = pool): Promise<
      ORDER BY t.start_date DESC`,
     [clubId],
   );
-  return rows.map(mapSummaryRow);
+  const ageCategoriesByTournament = await fetchAgeCategoriesByTournament(
+    rows.map((r) => r.id),
+    db,
+  );
+  return rows.map((row) => mapSummaryRow(row, ageCategoriesByTournament.get(row.id) ?? []));
 }
 
 export interface TournamentCommissionInfo {
@@ -161,23 +226,26 @@ export async function getPendingCommissionAmount(tournamentId: string, db: Query
 
 /** ClubCreateTournamentScreen: un torneo nuevo siempre arranca 'scheduled' y sin coaches oficiales
  * ni comisión pendiente todavía, así que no hace falta ir a buscarlos con las subqueries de
- * listByClub. */
+ * listByClub. city es la sede real del torneo (ver decisión #45), no la ciudad del club. */
 export async function create(
-  params: { clubId: string; name: string; venue: string; startDate: string; endDate: string },
+  params: { clubId: string; name: string; venue: string; city: string; ageCategories: AgeCategory[]; startDate: string; endDate: string },
   db: Queryable = pool,
 ): Promise<TournamentSummary> {
   const { rows } = await db.query(
-    `INSERT INTO tournaments (club_id, name, venue, start_date, end_date, status)
-     VALUES ($1, $2, $3, $4, $5, 'scheduled')
-     RETURNING id, club_id, name, venue, start_date, end_date, status`,
-    [params.clubId, params.name, params.venue, params.startDate, params.endDate],
+    `INSERT INTO tournaments (club_id, name, venue, city, start_date, end_date, status)
+     VALUES ($1, $2, $3, $4, $5, $6, 'scheduled')
+     RETURNING id, club_id, name, venue, city, start_date, end_date, status`,
+    [params.clubId, params.name, params.venue, params.city, params.startDate, params.endDate],
   );
   const row = rows[0];
+  await setAgeCategories(row.id, params.ageCategories, db);
   return {
     id: row.id,
     clubId: row.club_id,
     name: row.name,
     venue: row.venue,
+    city: row.city,
+    ageCategories: params.ageCategories,
     startDate: row.start_date,
     endDate: row.end_date,
     status: row.status,

@@ -1286,6 +1286,8 @@ export interface TournamentSummary {
   clubId: string;
   name: string;
   venue: string;
+  city: string;
+  ageCategories: AgeCategory[];
   startDate: string;
   endDate: string;
   status: TournamentStatus;
@@ -1302,11 +1304,12 @@ export function listClubTournaments(authToken: string, clubId: string): Promise<
 }
 
 /** POST /clubs/:id/tournaments — ClubCreateTournamentScreen. Solo un admin del club (derivado de
- * la sesión en el server) puede crear torneos para ese club. */
+ * la sesión en el server) puede crear torneos para ese club. city es la sede real del torneo, no
+ * necesariamente la ciudad registrada del club/federación (ver decisión #45). */
 export function createTournament(
   authToken: string,
   clubId: string,
-  params: { name: string; venue: string; startDate: string; endDate: string },
+  params: { name: string; venue: string; city: string; ageCategories: AgeCategory[]; startDate: string; endDate: string },
 ): Promise<TournamentSummary> {
   return request(`/clubs/${clubId}/tournaments`, {
     method: 'POST',
@@ -1322,15 +1325,21 @@ export interface TournamentSearchResult {
   venue: string;
   city: string;
   country: CountryCode | null;
+  ageCategories: AgeCategory[];
   startDate: string;
   endDate: string;
 }
 
-/** GET /tournaments?search=&country= — CoachTournamentSearchScreen/ParentHomeScreen. */
-export function searchTournaments(query?: string, country?: CountryCode): Promise<TournamentSearchResult[]> {
+/** GET /tournaments?search=&country=&ageCategory= — CoachTournamentSearchScreen/ParentHomeScreen. */
+export function searchTournaments(
+  query?: string,
+  country?: CountryCode,
+  ageCategory?: AgeCategory,
+): Promise<TournamentSearchResult[]> {
   const qs = new URLSearchParams();
   if (query) qs.set('search', query);
   if (country) qs.set('country', country);
+  if (ageCategory) qs.set('ageCategory', ageCategory);
   const suffix = qs.toString();
   return request(`/tournaments${suffix ? `?${suffix}` : ''}`);
 }

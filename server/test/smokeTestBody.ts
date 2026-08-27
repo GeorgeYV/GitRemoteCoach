@@ -2021,11 +2021,35 @@ console.log('\n=== Escenario 24: onboarding de club_admin (POST /clubs) ===');
   );
 
   const inDays = (n: number) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
+
+  const missingCityRes = await app.inject({
+    method: 'POST',
+    url: `/clubs/${createdClub.id}/tournaments`,
+    headers: { authorization: `Bearer ${newAdminToken}` },
+    payload: { name: 'Copa Academia Nueva', venue: 'Cancha Central', ageCategories: ['U12'], startDate: inDays(30), endDate: inDays(33) },
+  });
+  assertEqual(missingCityRes.statusCode, 422, 'crear un torneo sin city devuelve 422 (decisión #45)');
+
+  const missingAgeCategoriesRes = await app.inject({
+    method: 'POST',
+    url: `/clubs/${createdClub.id}/tournaments`,
+    headers: { authorization: `Bearer ${newAdminToken}` },
+    payload: { name: 'Copa Academia Nueva', venue: 'Cancha Central', city: 'Quito', ageCategories: [], startDate: inDays(30), endDate: inDays(33) },
+  });
+  assertEqual(missingAgeCategoriesRes.statusCode, 422, 'crear un torneo sin ninguna categoría de edad devuelve 422');
+
   const newClubTournamentRes = await app.inject({
     method: 'POST',
     url: `/clubs/${createdClub.id}/tournaments`,
     headers: { authorization: `Bearer ${newAdminToken}` },
-    payload: { name: 'Copa Academia Nueva', venue: 'Cancha Central', startDate: inDays(30), endDate: inDays(33) },
+    payload: {
+      name: 'Copa Academia Nueva',
+      venue: 'Cancha Central',
+      city: 'Quito',
+      ageCategories: ['U12'],
+      startDate: inDays(30),
+      endDate: inDays(33),
+    },
   });
   assertEqual(newClubTournamentRes.statusCode, 201, 'el club recién creado igual puede armar su torneo');
   const newClubTournamentId = newClubTournamentRes.json().id;
@@ -2078,10 +2102,34 @@ console.log('\n=== Escenario 24: onboarding de club_admin (POST /clubs) ===');
   );
 
   const afterApprovalRes = await app.inject({ method: 'GET', url: '/tournaments?search=Academia Nueva' });
+  const foundTournament = afterApprovalRes.json().find((t: any) => t.id === newClubTournamentId);
+  assertTrue(!!foundTournament, 'una vez aprobado el club, su torneo ya aparece en el descubrimiento público');
+
+  // Decisión #45: la sede real del torneo ('Quito') gana sobre la ciudad registrada del club
+  // ('Monterrey') — y trae las categorías de edad que se le asignaron al crear.
+  assertEqual(foundTournament.city, 'Quito', 'el torneo muestra su propia ciudad, no la del club');
+  assertEqual(foundTournament.ageCategories, ['U12'], 'el torneo trae las categorías de edad que se le asignaron');
+
+  const matchingCategoryRes = await app.inject({ method: 'GET', url: '/tournaments?search=Academia Nueva&ageCategory=U12' });
   assertTrue(
-    afterApprovalRes.json().some((t: any) => t.id === newClubTournamentId),
-    'una vez aprobado el club, su torneo ya aparece en el descubrimiento público',
+    matchingCategoryRes.json().some((t: any) => t.id === newClubTournamentId),
+    '?ageCategory=U12 incluye el torneo (coincide)',
   );
+
+  const otherCategoryRes = await app.inject({ method: 'GET', url: '/tournaments?search=Academia Nueva&ageCategory=U16' });
+  assertTrue(
+    !otherCategoryRes.json().some((t: any) => t.id === newClubTournamentId),
+    '?ageCategory=U16 no incluye el torneo (no coincide)',
+  );
+
+  const clubOwnListRes = await app.inject({
+    method: 'GET',
+    url: `/clubs/${createdClub.id}/tournaments`,
+    headers: { authorization: `Bearer ${newAdminToken}` },
+  });
+  const ownTournament = clubOwnListRes.json().find((t: any) => t.id === newClubTournamentId);
+  assertEqual(ownTournament.city, 'Quito', 'GET /clubs/:id/tournaments también muestra la ciudad propia del torneo');
+  assertEqual(ownTournament.ageCategories, ['U12'], 'GET /clubs/:id/tournaments también trae las categorías de edad');
 }
 
 console.log('\n=== Escenario 25: estadísticas agregadas de partidos de un coach (GET /coaches/:id/report-summary) ===');

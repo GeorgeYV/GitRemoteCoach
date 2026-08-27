@@ -157,6 +157,7 @@ const PREVIEW_TOURNAMENT: TournamentSearchResult = {
   venue: '—',
   city: '—',
   country: null,
+  ageCategories: [],
   startDate: new Date().toISOString(),
   endDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
 };

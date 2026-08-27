@@ -5,7 +5,7 @@ import { isR2Configured, uploadObject } from '../lib/r2.js';
 import * as clubRepository from '../repositories/clubRepository.js';
 import * as settlementRepository from '../repositories/settlementRepository.js';
 import * as tournamentRepository from '../repositories/tournamentRepository.js';
-import type { Club, ClubSearchResult, ClubSettlementWithTournamentName, CountryCode, TournamentSummary } from '../types.js';
+import type { AgeCategory, Club, ClubSearchResult, ClubSettlementWithTournamentName, CountryCode, TournamentSummary } from '../types.js';
 
 // GET /clubs/:id y GET /club-admins/:userId/club son públicas, sin sesión (ver comentario en
 // routes/clubs.ts) — identityDocumentUrl es la identidad de la persona que registró el club (ver
@@ -170,7 +170,9 @@ export async function listTournamentsForClub(clubId: string): Promise<Tournament
  * invitar coaches y (una vez 'scheduled') aparece en el descubrimiento público (GET /tournaments). */
 export async function createTournamentForClub(
   clubId: string,
-  input: { name: string; venue: string; startDate: string; endDate: string },
+  input: { name: string; venue: string; city: string; ageCategories: AgeCategory[]; startDate: string; endDate: string },
 ): Promise<TournamentSummary> {
-  return tournamentRepository.create({ clubId, ...input });
+  // Transacción: el INSERT del torneo y el de tournament_age_categories no deben quedar a medias
+  // (mismo criterio que registerCoachProfile con coach_age_categories).
+  return withTransaction((client) => tournamentRepository.create({ clubId, ...input }, client));
 }

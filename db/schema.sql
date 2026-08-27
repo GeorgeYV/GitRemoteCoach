@@ -388,9 +388,13 @@ CREATE TABLE tournaments (
   end_date                 DATE NOT NULL CHECK (end_date >= start_date),
   status                   tournament_status NOT NULL DEFAULT 'scheduled',
   commission_rate_override NUMERIC(5, 4) CHECK (commission_rate_override BETWEEN 0 AND 1),
-  -- Solo se usan mientras club_id es NULL — un torneo sin club sigue teniendo una ubicación
-  -- real y conocida. Una vez reclamado, la ciudad/país mostrados siguen viniendo del club
-  -- (JOIN, ver tournamentRepository.search) igual que siempre; estas columnas no se limpian.
+  -- city: la sede real del torneo, no necesariamente la ciudad registrada del club/federación que
+  -- lo organiza (un club puede llevar un torneo a otra ciudad) — ver decisión #45. Obligatoria al
+  -- crear (tanto para un torneo sin club como para uno de club, ver createTournamentSchema),
+  -- así que en la práctica siempre queda poblada; sigue siendo NULLABLE por las filas de antes de
+  -- la decisión #45, que se resuelven con COALESCE(t.city, c.city) en tournamentRepository.
+  -- country si NO se pisa acá siempre sale del club (no se pide en el alta, sería redundante en
+  -- casi todos los casos).
   city                     TEXT,
   country                  TEXT,
   created_at               TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -406,6 +410,20 @@ CREATE INDEX idx_tournaments_status ON tournaments (status);
 CREATE INDEX idx_tournaments_active
   ON tournaments (start_date)
   WHERE status IN ('scheduled', 'in_progress');
+
+-- Categorías de edad para las que es el torneo (selección múltiple al crearlo) — ver decisión
+-- #45. N:M como coach_age_categories, mismo motivo: un torneo suele albergar más de una
+-- categoría (ej. U12 y U14 el mismo fin de semana).
+CREATE TABLE tournament_age_categories (
+  tournament_id UUID NOT NULL REFERENCES tournaments (id) ON DELETE CASCADE,
+  age_category  age_category NOT NULL,
+  PRIMARY KEY (tournament_id, age_category)
+);
+
+-- Patrón de búsqueda principal (filtro del padre/tutor en ParentHomeScreen): "torneos de esta
+-- categoría", igual que idx_coach_age_categories_age_category.
+CREATE INDEX idx_tournament_age_categories_age_category
+  ON tournament_age_categories (age_category);
 
 -- ---------------------------------------------------------------------
 -- Trigger: un torneo en estado terminal ('completed'/'cancelled') no
@@ -2116,4 +2134,16 @@ CREATE INDEX idx_push_tokens_user_id ON push_tokens (user_id);
 --     sigue apareciendo en ParentProfileScreen (marcado "Archivado") y
 --     su historial de partidos/reportes queda intacto — reversible, el
 --     padre puede reactivarlo cuando quiera.
+-- 45. Un torneo de club ahora pide su propia ciudad al crearse, en vez
+--     de heredar siempre la del club/federación (COALESCE(c.city, t.city)
+--     hacía que t.city, ya en el schema, nunca se poblara para un torneo
+--     con club_id — solo servía para los sembrados sin club). Un club
+--     puede organizar en una sede distinta a su ciudad registrada, así
+--     que ahora es t.city quien gana si está seteada
+--     (COALESCE(t.city, c.city), invertido) — las filas de antes de esta
+--     decisión, con t.city NULL, siguen resolviendo a la ciudad del club
+--     como siempre. También se agregó tournament_age_categories (N:M,
+--     mismo patrón que coach_age_categories) para que el padre pueda
+--     filtrar torneos por categoría de su hijo/a en vez de tener que
+--     abrir cada uno para averiguarlo.
 -- =====================================================================

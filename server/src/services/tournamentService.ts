@@ -4,6 +4,7 @@ import * as tournamentCoachTagRepository from '../repositories/tournamentCoachTa
 import * as tournamentRepository from '../repositories/tournamentRepository.js';
 import { ConflictError } from '../lib/errors.js';
 import type {
+  AgeCategory,
   ClubCoachInvitationWithCoachName,
   CoachClubTag,
   CountryCode,
@@ -30,9 +31,13 @@ export async function getTournamentRoster(tournamentId: string): Promise<Tournam
 }
 
 /** CoachTournamentSearchScreen/ParentHomeScreen: torneos activos, opcionalmente filtrados por
- * texto y/o país del club organizador. */
-export async function searchTournaments(query?: string, country?: CountryCode): Promise<TournamentSearchResult[]> {
-  return tournamentRepository.search({ query, country });
+ * texto, país del club organizador, y/o categoría de edad (ver decisión #45). */
+export async function searchTournaments(
+  query?: string,
+  country?: CountryCode,
+  ageCategory?: AgeCategory,
+): Promise<TournamentSearchResult[]> {
+  return tournamentRepository.search({ query, country, ageCategory });
 }
 
 /** CoachAvailabilityScreen, CoachTournamentSearchScreen, CoachReputationScreen: insignias de

@@ -311,6 +311,8 @@ export interface TournamentSummary {
   clubId: string;
   name: string;
   venue: string;
+  city: string;
+  ageCategories: AgeCategory[];
   startDate: string;
   endDate: string;
   status: TournamentStatus;
@@ -336,6 +338,7 @@ export interface TournamentSearchResult {
   venue: string;
   city: string;
   country: CountryCode | null;
+  ageCategories: AgeCategory[];
   startDate: string;
   endDate: string;
 }

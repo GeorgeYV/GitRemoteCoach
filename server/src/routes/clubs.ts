@@ -5,10 +5,16 @@ import * as clubRepository from '../repositories/clubRepository.js';
 import * as tournamentService from '../services/tournamentService.js';
 import { ForbiddenError, ValidationError } from '../lib/errors.js';
 
+const AGE_CATEGORIES = ['U10', 'U12', 'U14', 'U16', 'U18'] as const;
+
 const createTournamentSchema = z
   .object({
     name: z.string().min(1),
     venue: z.string().min(1),
+    // Sede real del torneo (ver decisión #45) — puede ser distinta a la ciudad registrada del
+    // club/federación, así que se pide siempre, no se hereda.
+    city: z.string().min(1),
+    ageCategories: z.array(z.enum(AGE_CATEGORIES)).min(1),
     startDate: z.string().date(),
     endDate: z.string().date(),
   })

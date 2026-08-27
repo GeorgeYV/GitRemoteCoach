@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import * as tournamentService from '../services/tournamentService.js';
 import { ForbiddenError, ValidationError } from '../lib/errors.js';
-import type { CountryCode } from '../types.js';
+import type { AgeCategory, CountryCode } from '../types.js';
 
 const COUNTRY_CODES = ['EC', 'PE', 'CO', 'CL', 'BO', 'AR', 'VE', 'BR', 'PY', 'UY'] as const;
 
@@ -22,11 +22,15 @@ const createUnclaimedTournamentSchema = z
 
 export async function tournamentRoutes(app: FastifyInstance): Promise<void> {
   // CoachTournamentSearchScreen/ParentHomeScreen: descubrimiento público, igual que GET /coaches.
-  // country sin validar contra la lista — un valor inválido simplemente no matchea ninguna fila
-  // (comparación de texto plano contra la columna, el DOMAIN solo valida en INSERT/UPDATE).
+  // country/ageCategory sin validar contra su lista de valores — uno inválido simplemente no
+  // matchea ninguna fila (comparación de texto plano, el DOMAIN/ENUM solo valida en INSERT/UPDATE).
   app.get('/tournaments', async (req) => {
-    const { search, country } = req.query as { search?: string; country?: CountryCode };
-    return tournamentService.searchTournaments(search, country);
+    const { search, country, ageCategory } = req.query as {
+      search?: string;
+      country?: CountryCode;
+      ageCategory?: AgeCategory;
+    };
+    return tournamentService.searchTournaments(search, country, ageCategory);
   });
 
   // ClubTournamentDetailScreen
