@@ -3798,6 +3798,144 @@ console.log('\n=== Escenario 42: reportar un posible error en un torneo (decisi�
   assertEqual(clubQueueAfterRes.json(), [], 'la cola del club queda vacía tras resolver ambos reportes');
 }
 
+console.log('\n=== Escenario 43: editar un torneo — fechas bloqueadas con reservas activas (decisión #47) ===');
+{
+  const editAdminReg = await app.inject({
+    method: 'POST',
+    url: '/auth/register',
+    payload: {
+      email: 'club.edits@example.com',
+      password: 'super-secreta-123',
+      fullName: 'Admin Que Edita',
+      primaryRole: 'club_admin',
+    },
+  });
+  const { token: editAdminToken } = editAdminReg.json();
+
+  const editClubRes = await app.inject({
+    method: 'POST',
+    url: '/clubs',
+    headers: { authorization: `Bearer ${editAdminToken}` },
+    payload: {
+      name: 'Club Que Edita',
+      type: 'club',
+      city: 'Ambato',
+      country: 'EC',
+      identityDocumentUrl: 'placeholder://identity',
+    },
+  });
+  const editClub = editClubRes.json();
+
+  const inDaysEdit = (n: number) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
+  const createRes = await app.inject({
+    method: 'POST',
+    url: `/clubs/${editClub.id}/tournaments`,
+    headers: { authorization: `Bearer ${editAdminToken}` },
+    payload: {
+      name: 'Copa Editable',
+      venue: 'Cancha Vieja',
+      city: 'Ambato',
+      ageCategories: ['U10'],
+      startDate: inDaysEdit(50),
+      endDate: inDaysEdit(52),
+    },
+  });
+  const editTournament = createRes.json();
+  assertEqual(editTournament.hasActiveBookings, false, 'un torneo recién creado no tiene reservas activas');
+
+  // --- Sin reservas todavía: nombre Y fechas se pueden cambiar libremente ---
+  const firstEditRes = await app.inject({
+    method: 'PUT',
+    url: `/clubs/${editClub.id}/tournaments/${editTournament.id}`,
+    headers: { authorization: `Bearer ${editAdminToken}` },
+    payload: {
+      name: 'Copa Editable (renombrada)',
+      venue: 'Cancha Nueva',
+      city: 'Riobamba',
+      ageCategories: ['U10', 'U12'],
+      startDate: inDaysEdit(60),
+      endDate: inDaysEdit(62),
+    },
+  });
+  assertEqual(firstEditRes.statusCode, 200, 'editar sin reservas activas devuelve 200 (incl. fechas)');
+  assertEqual(firstEditRes.json().name, 'Copa Editable (renombrada)', 'el nombre quedó actualizado');
+  assertEqual(firstEditRes.json().city, 'Riobamba', 'la ciudad quedó actualizada');
+  assertEqual(firstEditRes.json().ageCategories, ['U10', 'U12'], 'las categorías quedaron actualizadas');
+  assertEqual(firstEditRes.json().startDate, inDaysEdit(60), 'la fecha de inicio quedó actualizada');
+
+  // --- Un usuario que no administra este club no puede editar ---
+  const foreignEditRes = await app.inject({
+    method: 'PUT',
+    url: `/clubs/${editClub.id}/tournaments/${editTournament.id}`,
+    headers: { authorization: `Bearer ${coachAToken}` },
+    payload: {
+      name: 'Intento Ajeno',
+      venue: 'Cancha Vieja',
+      city: 'Riobamba',
+      ageCategories: ['U10'],
+      startDate: inDaysEdit(60),
+      endDate: inDaysEdit(62),
+    },
+  });
+  assertEqual(foreignEditRes.statusCode, 403, 'un usuario que no administra este club no puede editar el torneo');
+
+  // --- Una reserva 'requested' (no descartada) activa el bloqueo de fechas ---
+  const bookingRes = await app.inject({
+    method: 'POST',
+    url: '/bookings',
+    headers: { authorization: `Bearer ${parentToken}` },
+    payload: {
+      playerId: fixtures.playerId,
+      coachId: fixtures.coachAUserId,
+      tournamentId: editTournament.id,
+      matchDatetime: inFuture(61 * 24),
+      agreedRate: 1000,
+    },
+  });
+  assertEqual(bookingRes.statusCode, 201, 'la reserva contra este torneo se crea con 201');
+
+  const afterBookingListRes = await app.inject({
+    method: 'GET',
+    url: `/clubs/${editClub.id}/tournaments`,
+    headers: { authorization: `Bearer ${editAdminToken}` },
+  });
+  const listedTournament = afterBookingListRes.json().find((t: any) => t.id === editTournament.id);
+  assertEqual(listedTournament.hasActiveBookings, true, 'con una reserva activa, hasActiveBookings pasa a true');
+
+  // --- Con reservas activas: nombre/ciudad SÍ se pueden cambiar, fechas NO ---
+  const nameOnlyEditRes = await app.inject({
+    method: 'PUT',
+    url: `/clubs/${editClub.id}/tournaments/${editTournament.id}`,
+    headers: { authorization: `Bearer ${editAdminToken}` },
+    payload: {
+      name: 'Copa Editable (con reservas)',
+      venue: 'Cancha Nueva',
+      city: 'Riobamba',
+      ageCategories: ['U10', 'U12'],
+      startDate: inDaysEdit(60),
+      endDate: inDaysEdit(62),
+    },
+  });
+  assertEqual(nameOnlyEditRes.statusCode, 200, 'editar sin tocar las fechas devuelve 200 aunque haya reservas activas');
+  assertEqual(nameOnlyEditRes.json().name, 'Copa Editable (con reservas)', 'el nombre se actualizó igual');
+
+  const dateEditRes = await app.inject({
+    method: 'PUT',
+    url: `/clubs/${editClub.id}/tournaments/${editTournament.id}`,
+    headers: { authorization: `Bearer ${editAdminToken}` },
+    payload: {
+      name: 'Copa Editable (con reservas)',
+      venue: 'Cancha Nueva',
+      city: 'Riobamba',
+      ageCategories: ['U10', 'U12'],
+      startDate: inDaysEdit(70),
+      endDate: inDaysEdit(72),
+    },
+  });
+  assertEqual(dateEditRes.statusCode, 409, 'cambiar las fechas con reservas activas devuelve 409');
+  assertEqual(dateEditRes.json().error, 'tournament_dates_locked', 'el código de error es el esperado');
+}
+
 console.log(`\n=== Resultado: ${passed} pasaron, ${failed} fallaron ===`);
 await app.close();
 process.exit(failed > 0 ? 1 : 0);

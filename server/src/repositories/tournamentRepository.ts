@@ -12,7 +12,11 @@ import type {
 
 type Queryable = Pool | PoolClient;
 
+/** create() Y update() la usan — DELETE primero (no-op para un torneo recién insertado, real
+ * reemplazo al editar) para que sea un "set" de verdad, mismo patrón que
+ * coachRepository.setCoachAgeCategories. */
 async function setAgeCategories(tournamentId: string, ageCategories: AgeCategory[], db: Queryable): Promise<void> {
+  await db.query(`DELETE FROM tournament_age_categories WHERE tournament_id = $1`, [tournamentId]);
   if (ageCategories.length === 0) return;
   const values = ageCategories.map((_, i) => `($1, $${i + 2})`).join(', ');
   await db.query(`INSERT INTO tournament_age_categories (tournament_id, age_category) VALUES ${values}`, [
@@ -20,6 +24,20 @@ async function setAgeCategories(tournamentId: string, ageCategories: AgeCategory
     ...ageCategories,
   ]);
 }
+
+/** pg devuelve un objeto Date para columnas DATE (no hay setTypeParser registrado, ver el mismo
+ * comentario en playerRepository.mapPlayerRow) — normaliza a 'YYYY-MM-DD' tanto si llega como
+ * Date (Postgres real) como si ya llega string (pg-mem, usado por los smoke tests). Sin esto,
+ * comparar tournaments.start_date recién leído contra un 'YYYY-MM-DD' tipeado a mano (ver
+ * clubService.updateTournamentForClub) nunca daría igual aunque no haya cambiado nada. */
+function normalizeDate(value: unknown): string {
+  return value instanceof Date ? value.toISOString().slice(0, 10) : String(value).slice(0, 10);
+}
+
+// Un torneo con al menos una reserva que no fue descartada (rechazada/expirada/fallida/cancelada)
+// tiene una fecha real de la que depende un padre — ver decisión #47 y
+// clubService.updateTournamentForClub, que bloquea el cambio de fechas mientras esto sea cierto.
+const NON_BLOCKING_BOOKING_STATUSES = ['rejected', 'expired', 'payment_failed', 'cancelled'];
 
 /** Segunda consulta + merge en memoria en vez de una subconsulta correlacionada dentro del SELECT
  * (array_agg(...) WHERE tac.tournament_id = t.id): pg-mem, que usan los smoke tests, no resuelve
@@ -137,46 +155,71 @@ function mapSummaryRow(row: any, ageCategories: AgeCategory[]): TournamentSummar
     venue: row.venue,
     city: row.city,
     ageCategories,
-    startDate: row.start_date,
-    endDate: row.end_date,
+    startDate: normalizeDate(row.start_date),
+    endDate: normalizeDate(row.end_date),
     status: row.status,
     officialCoachCount: Number(row.official_coach_count),
     pendingCommissionAmount: row.pending_commission_amount,
+    hasActiveBookings: !!row.has_active_bookings,
   };
 }
 
+// Compartido por listByClub y getSummaryById — mismo torneo, la única diferencia es el WHERE.
+// JOINs a subconsultas derivadas (ya agregadas) en vez de JOIN directo + GROUP BY, para no
+// inflar la suma de comisiones con el producto cartesiano de tags × bookings.
+// COALESCE(t.city, c.city) — mismo motivo que search — solo cae al club para torneos creados
+// antes de la decisión #45. has_active_bookings alimenta el bloqueo de fechas de la decisión #47.
+const SUMMARY_SELECT = `
+  SELECT t.id, t.club_id, t.name, t.venue, COALESCE(t.city, c.city) AS city, t.start_date, t.end_date, t.status,
+         COALESCE(tag_counts.official_coach_count, 0) AS official_coach_count,
+         COALESCE(commission_totals.pending_commission_amount, 0) AS pending_commission_amount,
+         (active_bookings.tournament_id IS NOT NULL) AS has_active_bookings
+  FROM tournaments t
+  LEFT JOIN clubs c ON c.id = t.club_id
+  LEFT JOIN (
+    SELECT tournament_id, COUNT(*) AS official_coach_count
+    FROM tournament_coach_tags
+    GROUP BY tournament_id
+  ) tag_counts ON tag_counts.tournament_id = t.id
+  LEFT JOIN (
+    SELECT tournament_id, SUM(club_commission_amount) AS pending_commission_amount
+    FROM bookings
+    WHERE status = 'completed' AND club_commission_status = 'generated'
+    GROUP BY tournament_id
+  ) commission_totals ON commission_totals.tournament_id = t.id
+  LEFT JOIN (
+    SELECT DISTINCT tournament_id
+    FROM bookings
+    WHERE status NOT IN (${NON_BLOCKING_BOOKING_STATUSES.map((_, i) => `$${i + 1}`).join(', ')})
+  ) active_bookings ON active_bookings.tournament_id = t.id
+`;
+
 /** ClubTournamentListScreen: torneos del club con conteo de coaches oficiales y comisión
- * pendiente de liquidar por torneo. JOINs a subconsultas derivadas (ya agregadas) en vez de
- * JOIN directo + GROUP BY, para no inflar la suma de comisiones con el producto cartesiano
- * de tags × bookings. COALESCE(t.city, c.city) — mismo motivo que search — solo cae al club
- * para torneos creados antes de la decisión #45. */
+ * pendiente de liquidar por torneo. */
 export async function listByClub(clubId: string, db: Queryable = pool): Promise<TournamentSummary[]> {
   const { rows } = await db.query(
-    `SELECT t.id, t.club_id, t.name, t.venue, COALESCE(t.city, c.city) AS city, t.start_date, t.end_date, t.status,
-            COALESCE(tag_counts.official_coach_count, 0) AS official_coach_count,
-            COALESCE(commission_totals.pending_commission_amount, 0) AS pending_commission_amount
-     FROM tournaments t
-     LEFT JOIN clubs c ON c.id = t.club_id
-     LEFT JOIN (
-       SELECT tournament_id, COUNT(*) AS official_coach_count
-       FROM tournament_coach_tags
-       GROUP BY tournament_id
-     ) tag_counts ON tag_counts.tournament_id = t.id
-     LEFT JOIN (
-       SELECT tournament_id, SUM(club_commission_amount) AS pending_commission_amount
-       FROM bookings
-       WHERE status = 'completed' AND club_commission_status = 'generated'
-       GROUP BY tournament_id
-     ) commission_totals ON commission_totals.tournament_id = t.id
-     WHERE t.club_id = $1
-     ORDER BY t.start_date DESC`,
-    [clubId],
+    `${SUMMARY_SELECT} WHERE t.club_id = $${NON_BLOCKING_BOOKING_STATUSES.length + 1} ORDER BY t.start_date DESC`,
+    [...NON_BLOCKING_BOOKING_STATUSES, clubId],
   );
   const ageCategoriesByTournament = await fetchAgeCategoriesByTournament(
     rows.map((r) => r.id),
     db,
   );
   return rows.map((row) => mapSummaryRow(row, ageCategoriesByTournament.get(row.id) ?? []));
+}
+
+/** ClubCreateTournamentScreen (editar): estado actual de un torneo puntual — create()/update() lo
+ * usan para devolver el TournamentSummary completo después de escribir, y
+ * clubService.updateTournamentForClub lo usa antes de escribir para decidir si el cambio de
+ * fechas está permitido (ver decisión #47). null si no existe. */
+export async function getSummaryById(tournamentId: string, db: Queryable = pool): Promise<TournamentSummary | null> {
+  const { rows } = await db.query(
+    `${SUMMARY_SELECT} WHERE t.id = $${NON_BLOCKING_BOOKING_STATUSES.length + 1}`,
+    [...NON_BLOCKING_BOOKING_STATUSES, tournamentId],
+  );
+  if (rows.length === 0) return null;
+  const ageCategoriesByTournament = await fetchAgeCategoriesByTournament([rows[0].id], db);
+  return mapSummaryRow(rows[0], ageCategoriesByTournament.get(rows[0].id) ?? []);
 }
 
 export interface TournamentBasicInfo {
@@ -238,9 +281,10 @@ export async function getPendingCommissionAmount(tournamentId: string, db: Query
   return rows[0].amount;
 }
 
-/** ClubCreateTournamentScreen: un torneo nuevo siempre arranca 'scheduled' y sin coaches oficiales
- * ni comisión pendiente todavía, así que no hace falta ir a buscarlos con las subqueries de
- * listByClub. city es la sede real del torneo (ver decisión #45), no la ciudad del club. */
+/** ClubCreateTournamentScreen: un torneo nuevo siempre arranca 'scheduled'. city es la sede real
+ * del torneo (ver decisión #45), no la ciudad del club. Devuelve vía getSummaryById en vez de
+ * armar el objeto a mano (como antes) — mismo camino que update(), así ambos quedan consistentes
+ * (fechas normalizadas, hasActiveBookings) sin duplicar esa lógica. */
 export async function create(
   params: { clubId: string; name: string; venue: string; city: string; ageCategories: AgeCategory[]; startDate: string; endDate: string },
   db: Queryable = pool,
@@ -248,24 +292,32 @@ export async function create(
   const { rows } = await db.query(
     `INSERT INTO tournaments (club_id, name, venue, city, start_date, end_date, status)
      VALUES ($1, $2, $3, $4, $5, $6, 'scheduled')
-     RETURNING id, club_id, name, venue, city, start_date, end_date, status`,
+     RETURNING id`,
     [params.clubId, params.name, params.venue, params.city, params.startDate, params.endDate],
   );
-  const row = rows[0];
-  await setAgeCategories(row.id, params.ageCategories, db);
-  return {
-    id: row.id,
-    clubId: row.club_id,
-    name: row.name,
-    venue: row.venue,
-    city: row.city,
-    ageCategories: params.ageCategories,
-    startDate: row.start_date,
-    endDate: row.end_date,
-    status: row.status,
-    officialCoachCount: 0,
-    pendingCommissionAmount: '0',
-  };
+  const tournamentId = rows[0].id;
+  await setAgeCategories(tournamentId, params.ageCategories, db);
+  const summary = await getSummaryById(tournamentId, db);
+  if (!summary) throw new NotFoundError('Tournament', tournamentId);
+  return summary;
+}
+
+/** ClubCreateTournamentScreen (editar) — clubService.updateTournamentForClub ya validó que las
+ * fechas se puedan cambiar (o que no cambiaron) antes de llamar acá; este repositorio no repite
+ * esa validación (ver decisión #47). */
+export async function update(
+  tournamentId: string,
+  params: { name: string; venue: string; city: string; ageCategories: AgeCategory[]; startDate: string; endDate: string },
+  db: Queryable = pool,
+): Promise<TournamentSummary> {
+  await db.query(
+    `UPDATE tournaments SET name = $2, venue = $3, city = $4, start_date = $5, end_date = $6 WHERE id = $1`,
+    [tournamentId, params.name, params.venue, params.city, params.startDate, params.endDate],
+  );
+  await setAgeCategories(tournamentId, params.ageCategories, db);
+  const summary = await getSummaryById(tournamentId, db);
+  if (!summary) throw new NotFoundError('Tournament', tournamentId);
+  return summary;
 }
 
 function mapUnclaimedRow(row: any): UnclaimedTournament {

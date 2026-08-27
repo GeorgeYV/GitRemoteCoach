@@ -5,30 +5,42 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import DatePickerField from '../../components/shared/DatePickerField';
 import IconTextInput from '../../components/shared/IconTextInput';
 import { useAuth } from '../../context/AuthContext';
-import { AgeCategory, ApiError, createTournament, TournamentSummary } from '../../lib/api';
+import { AgeCategory, ApiError, createTournament, TournamentSummary, updateTournament } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
 import { AGE_CATEGORY_OPTIONS } from '../../mock/coachFlow';
 
+function dateRangeLabel(startIso: string, endIso: string): string {
+  const start = new Date(startIso).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' });
+  const end = new Date(endIso).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' });
+  return `${start} – ${end}`;
+}
+
 export default function ClubCreateTournamentScreen({
   clubId,
+  tournament,
   onBack,
-  onCreated,
+  onSaved,
 }: {
   clubId: string;
+  /** Si viene seteado, la pantalla edita este torneo (PUT) en vez de crear uno nuevo (POST) —
+   * las fechas quedan de solo lectura si tournament.hasActiveBookings (ver decisión #47). */
+  tournament?: TournamentSummary;
   onBack: () => void;
-  onCreated: (tournament: TournamentSummary) => void;
+  onSaved: (tournament: TournamentSummary) => void;
 }) {
   const { token } = useAuth();
-  const [name, setName] = useState('');
-  const [venue, setVenue] = useState('');
+  const [name, setName] = useState(tournament?.name ?? '');
+  const [venue, setVenue] = useState(tournament?.venue ?? '');
   // Sede real del torneo — no se hereda de la ciudad registrada del club/federación, porque un
   // club puede organizar en una ciudad distinta a la suya (ver decisión #45).
-  const [city, setCity] = useState('');
-  const [ageCategories, setAgeCategories] = useState<AgeCategory[]>([]);
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const [city, setCity] = useState(tournament?.city ?? '');
+  const [ageCategories, setAgeCategories] = useState<AgeCategory[]>(tournament?.ageCategories ?? []);
+  const [startDate, setStartDate] = useState(tournament?.startDate ?? '');
+  const [endDate, setEndDate] = useState(tournament?.endDate ?? '');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const datesLocked = tournament?.hasActiveBookings ?? false;
 
   function toggleAgeCategory(category: AgeCategory) {
     setAgeCategories((prev) => (prev.includes(category) ? prev.filter((c) => c !== category) : [...prev, category]));
@@ -57,18 +69,25 @@ export default function ClubCreateTournamentScreen({
     }
     setSubmitting(true);
     setError(null);
+    const params = {
+      name: name.trim(),
+      venue: venue.trim(),
+      city: city.trim(),
+      ageCategories,
+      startDate,
+      endDate,
+    };
     try {
-      const tournament = await createTournament(token, clubId, {
-        name: name.trim(),
-        venue: venue.trim(),
-        city: city.trim(),
-        ageCategories,
-        startDate,
-        endDate,
-      });
-      onCreated(tournament);
+      const saved = tournament
+        ? await updateTournament(token, clubId, tournament.id, params)
+        : await createTournament(token, clubId, params);
+      onSaved(saved);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'No se pudo crear el torneo. Intenta de nuevo.');
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : `No se pudo ${tournament ? 'guardar los cambios' : 'crear el torneo'}. Intenta de nuevo.`,
+      );
     } finally {
       setSubmitting(false);
     }
@@ -81,8 +100,12 @@ export default function ClubCreateTournamentScreen({
           <Text style={styles.backIcon}>←</Text>
         </Pressable>
         <View style={styles.headerText}>
-          <Text style={styles.headerTitle}>Crear torneo</Text>
-          <Text style={styles.headerSubtitle}>Regístralo para poder invitar entrenadores oficiales y liquidar comisiones.</Text>
+          <Text style={styles.headerTitle}>{tournament ? 'Editar torneo' : 'Crear torneo'}</Text>
+          <Text style={styles.headerSubtitle}>
+            {tournament
+              ? 'Corrige nombre, sede, ciudad o categorías cuando haga falta.'
+              : 'Regístralo para poder invitar entrenadores oficiales y liquidar comisiones.'}
+          </Text>
         </View>
       </View>
 
@@ -120,24 +143,39 @@ export default function ClubCreateTournamentScreen({
         </Section>
 
         <Section label="Fechas">
-          <DatePickerField
-            icon="calendar-outline"
-            placeholder="Fecha de inicio"
-            value={startDate}
-            onChange={(iso) => {
-              setStartDate(iso);
-              // Si ya había un fin elegido y quedó antes del nuevo inicio, se limpia — el picker
-              // de fin usa minDate={startDate} así que no lo iba a dejar elegido de nuevo así.
-              if (endDate && endDate < iso) setEndDate('');
-            }}
-          />
-          <DatePickerField
-            icon="calendar-outline"
-            placeholder="Fecha de fin"
-            value={endDate}
-            onChange={setEndDate}
-            minDate={startDate || undefined}
-          />
+          {datesLocked ? (
+            <View style={styles.lockedDates}>
+              <Ionicons name="lock-closed-outline" size={16} color={colors.textDim} />
+              <View style={styles.lockedDatesTextWrap}>
+                <Text style={styles.lockedDatesValue}>{dateRangeLabel(startDate, endDate)}</Text>
+                <Text style={styles.lockedDatesHint}>
+                  Este torneo ya tiene reservas — las fechas no se pueden cambiar. Si hay un error real, contacta a
+                  soporte.
+                </Text>
+              </View>
+            </View>
+          ) : (
+            <>
+              <DatePickerField
+                icon="calendar-outline"
+                placeholder="Fecha de inicio"
+                value={startDate}
+                onChange={(iso) => {
+                  setStartDate(iso);
+                  // Si ya había un fin elegido y quedó antes del nuevo inicio, se limpia — el
+                  // picker de fin usa minDate={startDate} así que no lo iba a dejar elegido así.
+                  if (endDate && endDate < iso) setEndDate('');
+                }}
+              />
+              <DatePickerField
+                icon="calendar-outline"
+                placeholder="Fecha de fin"
+                value={endDate}
+                onChange={setEndDate}
+                minDate={startDate || undefined}
+              />
+            </>
+          )}
         </Section>
       </ScrollView>
 
@@ -152,8 +190,8 @@ export default function ClubCreateTournamentScreen({
             <ActivityIndicator color={colors.courtBlueDeep} />
           ) : (
             <View style={styles.submitContent}>
-              <Ionicons name="add-circle-outline" size={18} color={colors.courtBlueDeep} />
-              <Text style={styles.submitLabel}>Crear torneo</Text>
+              <Ionicons name={tournament ? 'checkmark-circle-outline' : 'add-circle-outline'} size={18} color={colors.courtBlueDeep} />
+              <Text style={styles.submitLabel}>{tournament ? 'Guardar cambios' : 'Crear torneo'}</Text>
             </View>
           )}
         </Pressable>
@@ -249,6 +287,29 @@ const styles = StyleSheet.create({
   },
   chipLabelActive: {
     color: colors.courtBlueDeep,
+  },
+  lockedDates: {
+    flexDirection: 'row',
+    gap: 10,
+    backgroundColor: colors.panel,
+    borderRadius: radius,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  lockedDatesTextWrap: {
+    flex: 1,
+  },
+  lockedDatesValue: {
+    color: colors.lineWhite,
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  lockedDatesHint: {
+    color: colors.textDim,
+    fontSize: 12,
+    lineHeight: 17,
   },
   footer: {
     borderTopWidth: 1,

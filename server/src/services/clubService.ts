@@ -176,3 +176,31 @@ export async function createTournamentForClub(
   // (mismo criterio que registerCoachProfile con coach_age_categories).
   return withTransaction((client) => tournamentRepository.create({ clubId, ...input }, client));
 }
+
+/** ClubCreateTournamentScreen (editar) — decisión #47: nombre/sede/ciudad/categorías se pueden
+ * corregir siempre, pero las fechas NO si el torneo ya tiene una reserva no descartada — bookings
+ * trae las fechas del torneo con un JOIN en vivo (no una copia propia), así que cambiarlas acá le
+ * movería la fecha a un padre que ya reservó/pagó sin avisarle. El chequeo se hace acá (no en el
+ * repositorio) porque es una regla de negocio, no de integridad de datos — y se repite del lado
+ * del server aunque el cliente ya deshabilite las fechas en la UI cuando hasActiveBookings es
+ * true, para no confiar solo en eso. */
+export async function updateTournamentForClub(
+  clubId: string,
+  tournamentId: string,
+  input: { name: string; venue: string; city: string; ageCategories: AgeCategory[]; startDate: string; endDate: string },
+): Promise<TournamentSummary> {
+  return withTransaction(async (client) => {
+    const current = await tournamentRepository.getSummaryById(tournamentId, client);
+    if (!current || current.clubId !== clubId) throw new NotFoundError('Tournament', tournamentId);
+
+    const datesChanged = current.startDate !== input.startDate || current.endDate !== input.endDate;
+    if (datesChanged && current.hasActiveBookings) {
+      throw new ConflictError(
+        'Este torneo ya tiene reservas activas — no se pueden cambiar sus fechas. Si hay un error real en la fecha, contacta a soporte.',
+        'tournament_dates_locked',
+      );
+    }
+
+    return tournamentRepository.update(tournamentId, input, client);
+  });
+}

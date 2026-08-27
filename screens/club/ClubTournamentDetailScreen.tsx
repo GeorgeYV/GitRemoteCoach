@@ -23,11 +23,13 @@ export default function ClubTournamentDetailScreen({
   onBack,
   onInvite,
   onShare,
+  onEdit,
 }: {
   tournament: TournamentSummary;
   onBack: () => void;
   onInvite: () => void;
   onShare?: () => void;
+  onEdit?: () => void;
 }) {
   const { token } = useAuth();
   const [roster, setRoster] = useState<TournamentRoster | null>(null);
@@ -88,14 +90,24 @@ export default function ClubTournamentDetailScreen({
         </View>
         <Text style={styles.headerSubtitle}>{tournament.venue}</Text>
         <Text style={styles.headerSubtitle}>{dateRangeLabel(tournament.startDate, tournament.endDate)}</Text>
-        {onShare && (
-          <Pressable style={styles.shareButton} onPress={onShare}>
-            <View style={styles.buttonContent}>
-              <Ionicons name="share-social-outline" size={14} color={colors.textSoft} />
-              <Text style={styles.shareButtonLabel}>Compartir</Text>
-            </View>
-          </Pressable>
-        )}
+        <View style={styles.headerActionsRow}>
+          {onEdit && (
+            <Pressable style={styles.shareButton} onPress={onEdit}>
+              <View style={styles.buttonContent}>
+                <Ionicons name="create-outline" size={14} color={colors.textSoft} />
+                <Text style={styles.shareButtonLabel}>Editar</Text>
+              </View>
+            </Pressable>
+          )}
+          {onShare && (
+            <Pressable style={styles.shareButton} onPress={onShare}>
+              <View style={styles.buttonContent}>
+                <Ionicons name="share-social-outline" size={14} color={colors.textSoft} />
+                <Text style={styles.shareButtonLabel}>Compartir</Text>
+              </View>
+            </Pressable>
+          )}
+        </View>
       </View>
 
       {loadError ? (
@@ -204,6 +216,11 @@ const styles = StyleSheet.create({
     color: colors.textDim,
     fontSize: 13,
   },
+  headerActionsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 10,
+  },
   shareButton: {
     alignSelf: 'flex-start',
     backgroundColor: colors.panelLight,
@@ -212,7 +229,6 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     paddingVertical: 7,
     paddingHorizontal: 12,
-    marginTop: 10,
   },
   shareButtonLabel: {
     color: colors.textSoft,

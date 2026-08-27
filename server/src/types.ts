@@ -318,6 +318,9 @@ export interface TournamentSummary {
   status: TournamentStatus;
   officialCoachCount: number;
   pendingCommissionAmount: string;
+  /** Al menos una reserva no descartada (ver decisión #47) — el cliente usa esto para bloquear la
+   * edición de fechas; el server lo vuelve a chequear de verdad en clubService.updateTournamentForClub. */
+  hasActiveBookings: boolean;
 }
 
 /** Lo que devuelve GET /tournaments/ready-for-coach-payout (PlatformAdminPayoutsScreen) — torneos

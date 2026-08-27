@@ -185,6 +185,27 @@ export async function clubRoutes(app: FastifyInstance): Promise<void> {
     return tournament;
   });
 
+  // ClubCreateTournamentScreen (editar) — mismo body que crear; la fecha queda bloqueada del lado
+  // del servicio si el torneo ya tiene reservas activas (ver decisión #47 en db/schema.sql).
+  app.put('/clubs/:id/tournaments/:tournamentId', { preHandler: app.authenticate }, async (req) => {
+    const { id, tournamentId } = req.params as { id: string; tournamentId: string };
+    const parsed = createTournamentSchema.safeParse(req.body);
+    if (!parsed.success) throw new ValidationError(parsed.error.message);
+    const { sub } = req.user as { sub: string };
+
+    let adminClubId: string;
+    try {
+      adminClubId = await clubRepository.getClubIdForAdminUser(sub);
+    } catch {
+      throw new ForbiddenError('Solo un administrador del club puede editar torneos');
+    }
+    if (adminClubId !== id) {
+      throw new ForbiddenError('Solo un administrador del club puede editar torneos');
+    }
+
+    return clubService.updateTournamentForClub(id, tournamentId, parsed.data);
+  });
+
   // ClubTournamentListScreen, sección "Torneos disponibles para reclamar" — torneos sin club
   // en el mismo país que este club (ver decisión #36 en db/schema.sql).
   app.get('/clubs/:id/unclaimed-tournaments', async (req) => {

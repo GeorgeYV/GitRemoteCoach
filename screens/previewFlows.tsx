@@ -847,6 +847,7 @@ export function ClubTournamentFlow({
   const [inviting, setInviting] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
   if (creating) {
@@ -854,8 +855,23 @@ export function ClubTournamentFlow({
       <ClubCreateTournamentScreen
         clubId={clubId}
         onBack={() => setCreating(false)}
-        onCreated={() => {
+        onSaved={() => {
           setCreating(false);
+          setRefreshKey((k) => k + 1);
+        }}
+      />
+    );
+  }
+
+  if (editing && tournament) {
+    return (
+      <ClubCreateTournamentScreen
+        clubId={clubId}
+        tournament={tournament}
+        onBack={() => setEditing(false)}
+        onSaved={(saved) => {
+          setTournament(saved);
+          setEditing(false);
           setRefreshKey((k) => k + 1);
         }}
       />
@@ -896,6 +912,7 @@ export function ClubTournamentFlow({
       onBack={() => setTournament(null)}
       onInvite={() => setInviting(true)}
       onShare={() => setSharing(true)}
+      onEdit={() => setEditing(true)}
     />
   );
 }

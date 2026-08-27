@@ -1293,6 +1293,9 @@ export interface TournamentSummary {
   status: TournamentStatus;
   officialCoachCount: number;
   pendingCommissionAmount: string;
+  /** Al menos una reserva no descartada (ver decisión #47) — ClubCreateTournamentScreen (editar)
+   * bloquea los date pickers cuando esto es true; el server lo vuelve a chequear de verdad. */
+  hasActiveBookings: boolean;
 }
 
 /** GET /clubs/:id/tournaments — ClubTournamentListScreen. Incluye pendingCommissionAmount (dato
@@ -1313,6 +1316,22 @@ export function createTournament(
 ): Promise<TournamentSummary> {
   return request(`/clubs/${clubId}/tournaments`, {
     method: 'POST',
+    headers: { Authorization: `Bearer ${authToken}` },
+    body: JSON.stringify(params),
+  });
+}
+
+/** PUT /clubs/:id/tournaments/:tournamentId — ClubCreateTournamentScreen (editar). Mismo body que
+ * crear; el server responde 409 (código 'tournament_dates_locked') si intentás cambiar las fechas
+ * de un torneo que ya tiene reservas activas (ver decisión #47). */
+export function updateTournament(
+  authToken: string,
+  clubId: string,
+  tournamentId: string,
+  params: { name: string; venue: string; city: string; ageCategories: AgeCategory[]; startDate: string; endDate: string },
+): Promise<TournamentSummary> {
+  return request(`/clubs/${clubId}/tournaments/${tournamentId}`, {
+    method: 'PUT',
     headers: { Authorization: `Bearer ${authToken}` },
     body: JSON.stringify(params),
   });

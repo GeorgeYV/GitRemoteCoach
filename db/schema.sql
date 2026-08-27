@@ -2204,4 +2204,16 @@ CREATE INDEX idx_push_tokens_user_id ON push_tokens (user_id);
 --     solo — un humano decide qué hacer, con contexto de quién ya
 --     reservó. Edición con las fechas bloqueadas post-reserva queda
 --     como una etapa aparte, todavía no construida.
+-- 47. La "etapa aparte" de la decisión #46: el club/federación ya puede
+--     editar nombre/sede/ciudad/categorías de un torneo propio en
+--     cualquier momento, pero las fechas quedan bloqueadas apenas el
+--     torneo tiene alguna reserva no descartada (no 'rejected'/
+--     'expired'/'payment_failed'/'cancelled') — mismo motivo que la
+--     decisión #46: bookings no guarda copia propia de las fechas del
+--     torneo (JOIN en vivo a tournaments), así que cambiarlas le movería
+--     la fecha a un padre que ya reservó/pagó sin avisarle. No hay
+--     columna ni CONSTRAINT nuevos — es una regla de negocio, chequeada
+--     en clubService.updateTournamentForClub (server) y reflejada en la
+--     UI vía TournamentSummary.hasActiveBookings (cliente deshabilita
+--     los date pickers, pero el server la vuelve a chequear de verdad).
 -- =====================================================================
