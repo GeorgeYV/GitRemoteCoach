@@ -224,8 +224,13 @@ export default function LoginScreen({
         </View>
 
         <Pressable
-          style={[styles.googleButton, (!request || submitting) && styles.googleButtonDisabled]}
-          disabled={!request || submitting}
+          // request.url se arma async (useGoogleAuthRequest > makeAuthUrlAsync) apenas discovery
+          // está listo — si se llega a tocar antes de que esté, promptAsync tiene que esperar esa
+          // promesa antes de abrir el popup, y esa demora es justo lo que hace que el navegador
+          // bloquee el popup por "no fue un gesto reciente del usuario". Exigir request.url (no
+          // solo request) evita ese hueco.
+          style={[styles.googleButton, (!request?.url || submitting) && styles.googleButtonDisabled]}
+          disabled={!request?.url || submitting}
           onPress={() => promptAsync()}
         >
           <Ionicons name="logo-google" size={18} color={colors.lineWhite} />

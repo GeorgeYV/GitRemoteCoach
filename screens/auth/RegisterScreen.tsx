@@ -160,8 +160,11 @@ export default function RegisterScreen({
         </View>
 
         <Pressable
-          style={[styles.googleButton, (!request || !primaryRole || submitting) && styles.googleButtonDisabled]}
-          disabled={!request || !primaryRole || submitting}
+          // Mismo motivo que LoginScreen.tsx: exigir request.url (no solo request) evita tocar el
+          // botón mientras la URL de auth todavía se arma async, que es lo que hace que el
+          // navegador bloquee el popup por no ser un gesto reciente del usuario.
+          style={[styles.googleButton, (!request?.url || !primaryRole || submitting) && styles.googleButtonDisabled]}
+          disabled={!request?.url || !primaryRole || submitting}
           onPress={() => promptAsync()}
         >
           <Ionicons name="logo-google" size={18} color={colors.lineWhite} />
