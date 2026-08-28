@@ -1101,6 +1101,12 @@ console.log('\n=== Escenario 13b: recuperación de contraseña (forgot/reset) ==
   const forgotEmail = 'nueva.mama@example.com'; // registrado en el Escenario 13
   const forgotPassword = 'super-secreta-123';
 
+  // emailState es compartido por todo el archivo — otros escenarios ya mandaron correos a
+  // platform_admin (documentos/clubes/pagos pendientes de revisar, ver notificationService) antes
+  // de llegar acá, así que hay que limpiar antes de medir "exactamente 1 envío" más abajo (mismo
+  // criterio que pushState.sent.length = 0 en otros escenarios).
+  emailState.sent.length = 0;
+
   const unknownRes = await app.inject({
     method: 'POST',
     url: '/auth/forgot-password',
@@ -3934,6 +3940,153 @@ console.log('\n=== Escenario 43: editar un torneo — fechas bloqueadas con rese
   });
   assertEqual(dateEditRes.statusCode, 409, 'cambiar las fechas con reservas activas devuelve 409');
   assertEqual(dateEditRes.json().error, 'tournament_dates_locked', 'el código de error es el esperado');
+}
+
+console.log('\n=== Escenario 44: correos de aviso — "algo pendiente de aprobar/responder" ===');
+{
+  const PLATFORM_ADMIN_EMAIL = 'admin@example.com'; // fixtures.platformAdminUserId, ver test/seed.ts
+  const CLUB_BOSQUES_ADMIN_EMAIL = 'club.bosques@example.com'; // fixtures.clubAdminUserId
+
+  // --- 1) Documentos de un coach nuevo -> correo a platform_admin ---
+  emailState.sent.length = 0;
+  const emailCoachReg = await app.inject({
+    method: 'POST',
+    url: '/auth/register',
+    payload: {
+      email: 'coach.avisos@example.com',
+      password: 'super-secreta-123',
+      fullName: 'Coach De Avisos',
+      primaryRole: 'coach',
+    },
+  });
+  const { token: emailCoachToken } = emailCoachReg.json();
+  await app.inject({
+    method: 'POST',
+    url: '/coaches',
+    headers: { authorization: `Bearer ${emailCoachToken}` },
+    payload: {
+      city: 'Cuenca',
+      country: 'EC',
+      yearsExperience: 3,
+      hourlyRate: 20,
+      ageCategories: ['U12'],
+      levels: ['competitivo'],
+      documents: [{ docType: 'identity', fileUrl: 'placeholder://identity' }],
+    },
+  });
+  assertEqual(emailState.sent.length, 1, 'un coach con documentos dispara exactamente un correo');
+  assertEqual(emailState.sent[0].to, PLATFORM_ADMIN_EMAIL, 'el correo de coach nuevo va a platform_admin');
+
+  // --- Un coach SIN documentos no dispara nada (nada que revisar todavía) ---
+  emailState.sent.length = 0;
+  const noDocsCoachReg = await app.inject({
+    method: 'POST',
+    url: '/auth/register',
+    payload: {
+      email: 'coach.sin.docs@example.com',
+      password: 'super-secreta-123',
+      fullName: 'Coach Sin Docs',
+      primaryRole: 'coach',
+    },
+  });
+  await app.inject({
+    method: 'POST',
+    url: '/coaches',
+    headers: { authorization: `Bearer ${noDocsCoachReg.json().token}` },
+    payload: { city: 'Cuenca', country: 'EC', yearsExperience: 1, hourlyRate: 15, ageCategories: [], levels: [] },
+  });
+  assertEqual(emailState.sent.length, 0, 'un coach sin documentos no dispara ningún correo');
+
+  // --- 2) Club nuevo -> correo a platform_admin ---
+  emailState.sent.length = 0;
+  const emailClubAdminReg = await app.inject({
+    method: 'POST',
+    url: '/auth/register',
+    payload: {
+      email: 'club.avisos@example.com',
+      password: 'super-secreta-123',
+      fullName: 'Admin De Avisos',
+      primaryRole: 'club_admin',
+    },
+  });
+  await app.inject({
+    method: 'POST',
+    url: '/clubs',
+    headers: { authorization: `Bearer ${emailClubAdminReg.json().token}` },
+    payload: {
+      name: 'Club De Avisos',
+      type: 'club',
+      city: 'Cuenca',
+      country: 'EC',
+      identityDocumentUrl: 'placeholder://identity',
+    },
+  });
+  assertEqual(emailState.sent.length, 1, 'un club nuevo dispara exactamente un correo');
+  assertEqual(emailState.sent[0].to, PLATFORM_ADMIN_EMAIL, 'el correo de club nuevo va a platform_admin');
+
+  // --- 3) Nueva solicitud de reserva -> correo (además del push) al entrenador ---
+  emailState.sent.length = 0;
+  pushState.sent.length = 0;
+  const emailBookingReq = await requestBooking(fixtures.coachAUserId, inFuture(70));
+  const emailBooking = emailBookingReq.json();
+  assertEqual(emailState.sent.length, 1, 'una solicitud de reserva dispara exactamente un correo');
+  assertTrue(pushState.sent.length >= 1, 'una solicitud de reserva sigue disparando el push de siempre');
+
+  // --- 4) Comprobante de pago enviado -> correo a platform_admin ---
+  await app.inject({
+    method: 'POST',
+    url: `/bookings/${emailBooking.id}/accept`,
+    headers: { authorization: `Bearer ${coachAToken}` },
+  });
+  emailState.sent.length = 0;
+  await app.inject({
+    method: 'POST',
+    url: '/bookings/submit-payment-proof-batch',
+    headers: { authorization: `Bearer ${parentToken}` },
+    payload: { bookingIds: [emailBooking.id], provider: 'deuna', referenceCode: 'REF-AVISO-001' },
+  });
+  assertEqual(emailState.sent.length, 1, 'un comprobante de pago dispara exactamente un correo');
+  assertEqual(emailState.sent[0].to, PLATFORM_ADMIN_EMAIL, 'el correo de comprobante de pago va a platform_admin');
+
+  // --- 5) Solicitud de administrador de respaldo -> correo al/a los admin(s) actuales del club ---
+  emailState.sent.length = 0;
+  const backupRequesterReg = await app.inject({
+    method: 'POST',
+    url: '/auth/register',
+    payload: {
+      email: 'backup.avisos@example.com',
+      password: 'super-secreta-123',
+      fullName: 'Backup De Avisos',
+      primaryRole: 'club_admin',
+    },
+  });
+  await app.inject({
+    method: 'POST',
+    url: `/clubs/${fixtures.clubId}/admin-join-requests`,
+    headers: { authorization: `Bearer ${backupRequesterReg.json().token}` },
+  });
+  // >= 1, no exactamente 1: fixtures.clubId ya puede tener administradores de respaldo sumados
+  // por otros escenarios (33/34) para cuando se llega acá — a todos les toca avisarles.
+  assertTrue(emailState.sent.length >= 1, 'una solicitud de respaldo dispara al menos un correo');
+  assertTrue(
+    emailState.sent.some((m) => m.to === CLUB_BOSQUES_ADMIN_EMAIL),
+    'el correo de solicitud de respaldo incluye al admin original del club',
+  );
+
+  // --- 6) Reportar un torneo -> correo (además del push, ya probado en el Escenario 42) al/a
+  // los admin(s) del club dueño ---
+  emailState.sent.length = 0;
+  await app.inject({
+    method: 'POST',
+    url: `/tournaments/${fixtures.tournamentId}/reports`,
+    headers: { authorization: `Bearer ${parentToken}` },
+    payload: { message: 'Correo de prueba — Escenario 44' },
+  });
+  assertTrue(emailState.sent.length >= 1, 'reportar un torneo dispara al menos un correo');
+  assertTrue(
+    emailState.sent.some((m) => m.to === CLUB_BOSQUES_ADMIN_EMAIL),
+    'el correo de reporte incluye al admin original del club dueño del torneo',
+  );
 }
 
 console.log(`\n=== Resultado: ${passed} pasaron, ${failed} fallaron ===`);

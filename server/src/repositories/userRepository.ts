@@ -32,6 +32,14 @@ export async function findById(id: string, db: Queryable = pool): Promise<UserRe
   return mapRow(rows[0]);
 }
 
+/** notificationService.notifyRoleByEmail — platform_admin no es 1:1 (se puede promover a más de
+ * una cuenta, ver scripts/set-platform-admin.ts), así que "avisarle al admin" en la práctica es
+ * avisarle a todos los que tengan ese rol. */
+export async function listEmailsByRole(role: UserRole, db: Queryable = pool): Promise<string[]> {
+  const { rows } = await db.query(`SELECT email FROM users WHERE primary_role = $1`, [role]);
+  return rows.map((r) => r.email);
+}
+
 export async function create(
   params: { email: string; passwordHash: string | null; fullName: string; primaryRole: UserRole },
   db: Queryable = pool,

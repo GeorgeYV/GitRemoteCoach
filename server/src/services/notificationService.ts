@@ -1,5 +1,8 @@
 import * as pushTokenRepository from '../repositories/pushTokenRepository.js';
+import * as userRepository from '../repositories/userRepository.js';
 import { sendPushNotifications } from '../lib/pushNotifications.js';
+import { sendEmail } from '../lib/emailClient.js';
+import type { UserRole } from '../types.js';
 
 export async function registerPushToken(userId: string, token: string): Promise<void> {
   await pushTokenRepository.upsert(userId, token);
@@ -23,4 +26,38 @@ export async function notifyUser(
   } catch (err) {
     console.error(`No se pudo notificar al usuario ${userId}:`, err);
   }
+}
+
+/**
+ * Igual criterio que notifyUser (push): un correo que falla nunca debe tumbar el flujo que lo
+ * dispara — se loguea y se sigue. A diferencia del push (dispositivo → 0 o más tokens), un
+ * usuario siempre tiene exactamente un correo, así que esto es 0 o 1 envío.
+ */
+export async function notifyUserByEmail(
+  userId: string,
+  email: { subject: string; html: string },
+): Promise<void> {
+  try {
+    const user = await userRepository.findById(userId);
+    await sendEmail({ to: user.email, ...email });
+  } catch (err) {
+    console.error(`No se pudo mandar el correo al usuario ${userId}:`, err);
+  }
+}
+
+/**
+ * Para avisos que no son de un usuario puntual sino de un rol entero (platform_admin — no es
+ * 1:1, puede haber más de una cuenta con ese rol, ver userRepository.listEmailsByRole). Cada
+ * destinatario se manda por separado y con su propio try/catch: uno que falle no debe frenar a
+ * los demás.
+ */
+export async function notifyRoleByEmail(role: UserRole, email: { subject: string; html: string }): Promise<void> {
+  const emails = await userRepository.listEmailsByRole(role);
+  await Promise.all(
+    emails.map((to) =>
+      sendEmail({ to, ...email }).catch((err) => {
+        console.error(`No se pudo mandar el correo a ${to} (rol ${role}):`, err);
+      }),
+    ),
+  );
 }

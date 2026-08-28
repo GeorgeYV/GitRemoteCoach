@@ -36,6 +36,10 @@ export async function requestBooking(params: RequestBookingParams): Promise<Book
     body: 'Un padre quiere reservar contigo — responde antes de que expire la solicitud.',
     data: { bookingId: booking.id },
   });
+  await notificationService.notifyUserByEmail(params.coachId, {
+    subject: 'Nueva solicitud de reserva — Remote Coach',
+    html: '<p>Un padre quiere reservar contigo — responde desde la app antes de que expire la solicitud.</p>',
+  });
 
   return booking;
 }

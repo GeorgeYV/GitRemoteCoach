@@ -25,13 +25,17 @@ export async function reportTournament(
   if (tournament.clubId) {
     const adminUserIds = await clubRepository.listAdminUserIds(tournament.clubId);
     await Promise.all(
-      adminUserIds.map((adminUserId) =>
+      adminUserIds.flatMap((adminUserId) => [
         notificationService.notifyUser(adminUserId, {
           title: 'Posible error en un torneo',
           body: `Alguien reportó un problema en "${tournament.name}" — revísalo cuando puedas.`,
           data: { tournamentId, tournamentReportId: report.id },
         }),
-      ),
+        notificationService.notifyUserByEmail(adminUserId, {
+          subject: 'Posible error en un torneo — Remote Coach',
+          html: `<p>Alguien reportó un problema en <strong>${tournament.name}</strong>: "${message}"</p>`,
+        }),
+      ]),
     );
   }
 

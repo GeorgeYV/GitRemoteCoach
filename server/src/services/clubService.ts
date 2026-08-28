@@ -5,6 +5,7 @@ import { isR2Configured, uploadObject } from '../lib/r2.js';
 import * as clubRepository from '../repositories/clubRepository.js';
 import * as settlementRepository from '../repositories/settlementRepository.js';
 import * as tournamentRepository from '../repositories/tournamentRepository.js';
+import * as notificationService from './notificationService.js';
 import type { AgeCategory, Club, ClubSearchResult, ClubSettlementWithTournamentName, CountryCode, TournamentSummary } from '../types.js';
 
 // GET /clubs/:id y GET /club-admins/:userId/club son públicas, sin sesión (ver comentario en
@@ -55,8 +56,8 @@ export async function registerClub(
   },
 ): Promise<Club> {
   await assertUserHasNoClub(adminUserId);
-  return withTransaction(async (client) => {
-    const club = await clubRepository.create(
+  const club = await withTransaction(async (client) => {
+    const created = await clubRepository.create(
       {
         name: input.name,
         type: input.type,
@@ -68,9 +69,16 @@ export async function registerClub(
       },
       client,
     );
-    await clubRepository.addAdmin(club.id, adminUserId, client);
-    return club;
+    await clubRepository.addAdmin(created.id, adminUserId, client);
+    return created;
   });
+
+  await notificationService.notifyRoleByEmail('platform_admin', {
+    subject: 'Nuevo club para verificar — Remote Coach',
+    html: `<p><strong>${club.name}</strong> (${club.city}) se registró y está pendiente de verificación.</p>`,
+  });
+
+  return club;
 }
 
 const ALLOWED_IDENTITY_DOCUMENT_MIME_TYPES: Record<string, string> = {

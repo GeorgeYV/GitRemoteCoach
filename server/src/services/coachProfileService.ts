@@ -3,6 +3,7 @@ import { AppError, ValidationError } from '../lib/errors.js';
 import { isR2Configured, uploadObject } from '../lib/r2.js';
 import * as coachRepository from '../repositories/coachRepository.js';
 import * as coachVerificationDocumentRepository from '../repositories/coachVerificationDocumentRepository.js';
+import * as notificationService from './notificationService.js';
 import type { CoachVerificationBadges } from '../repositories/coachVerificationDocumentRepository.js';
 import type {
   AgeCategory,
@@ -69,7 +70,7 @@ export async function registerCoachProfile(
     documents: { docType: VerificationDocType; fileUrl: string }[];
   },
 ): Promise<CoachProfileWithTraining> {
-  return withTransaction(async (client) => {
+  const result = await withTransaction(async (client) => {
     await coachRepository.create(
       userId,
       {
@@ -93,6 +94,15 @@ export async function registerCoachProfile(
     const profile = await coachRepository.getCoachProfile(userId, client);
     return { profile, ageCategories: params.ageCategories, levels: params.levels };
   });
+
+  if (params.documents.length > 0) {
+    await notificationService.notifyRoleByEmail('platform_admin', {
+      subject: 'Nuevo entrenador para verificar — Remote Coach',
+      html: `<p><strong>${result.profile.city}</strong> tiene un entrenador nuevo con documentos pendientes de revisión.</p>`,
+    });
+  }
+
+  return result;
 }
 
 /** CoachRegistrationScreen "Editar perfil" — datos personales/tarifa, sin tocar

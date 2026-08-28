@@ -326,9 +326,9 @@ export async function submitPaymentProof(
   bookingIds: string[],
   params: { provider: PaymentProvider; referenceCode: string },
 ): Promise<Booking[]> {
-  return withTransaction(async (client) => {
-    const bookings = await bookingRepository.getBookingsByIdsForUpdate(bookingIds, client);
-    for (const booking of bookings) {
+  const bookings = await withTransaction(async (client) => {
+    const toPay = await bookingRepository.getBookingsByIdsForUpdate(bookingIds, client);
+    for (const booking of toPay) {
       if (booking.status !== 'accepted' && booking.status !== 'payment_failed') {
         throw new ConflictError(`No se puede pagar una reserva en estado "${booking.status}"`, 'invalid_transition');
       }
@@ -338,7 +338,7 @@ export async function submitPaymentProof(
     }
 
     const updated: Booking[] = [];
-    for (const booking of bookings) {
+    for (const booking of toPay) {
       const result = await bookingRepository.updateStatus(
         booking.id,
         ['accepted', 'payment_failed'],
@@ -355,6 +355,15 @@ export async function submitPaymentProof(
     }
     return updated;
   });
+
+  // Un solo correo por envío (no uno por reserva) — submitPaymentProof ya acepta un batch para
+  // eso mismo (BookingConfirmScreen "Pagar todas").
+  await notificationService.notifyRoleByEmail('platform_admin', {
+    subject: 'Comprobante de pago para verificar — Remote Coach',
+    html: `<p>Se envió${bookings.length > 1 ? 'n' : ''} un comprobante de pago (${params.provider}) para ${bookings.length} reserva${bookings.length > 1 ? 's' : ''} — código ${params.referenceCode}.</p>`,
+  });
+
+  return bookings;
 }
 
 /**
