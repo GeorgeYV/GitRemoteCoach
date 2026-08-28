@@ -7,21 +7,28 @@ import DocumentRow from '../../components/coach/DocumentRow';
 import IconTextInput from '../../components/shared/IconTextInput';
 import { useAuth } from '../../context/AuthContext';
 import { ApiError, Club, CountryCode, registerClub, updateClub, uploadClubIdentityDocument } from '../../lib/api';
+import { CLUB_TYPE_ARTICLE, CLUB_TYPE_LABELS, CLUB_TYPE_LABELS_LOWER } from '../../lib/clubType';
 import { colors, radius, withOpacity } from '../../lib/theme';
 import { isValidEmail } from '../../lib/validation';
 import { COUNTRY_LABELS, COUNTRY_OPTIONS, DocumentItem } from '../../mock/coachFlow';
 
 const TYPE_OPTIONS: { value: 'club' | 'federation'; label: string }[] = [
-  { value: 'club', label: 'Club' },
-  { value: 'federation', label: 'Federación' },
+  { value: 'club', label: CLUB_TYPE_LABELS.club },
+  { value: 'federation', label: CLUB_TYPE_LABELS.federation },
 ];
 
-const IDENTITY_DOC: DocumentItem = {
-  id: 'identity',
-  title: 'Identificación oficial de quien registra el club',
-  subtitle: 'INE, pasaporte o cédula — obligatoria para poder aprobar el club',
-  status: 'pending',
-};
+/** null antes de elegir tipo — club es masculino ("el club"), federación es femenino ("la
+ * federación"), así que no alcanza con pegar la palabra: hace falta el artículo correcto. Sin
+ * tipo todavía, se evita la construcción "el/la X" (género ambiguo) con una frase genérica. */
+function identityDoc(type: 'club' | 'federation' | null): DocumentItem {
+  const phrase = type ? `${CLUB_TYPE_ARTICLE[type]} ${CLUB_TYPE_LABELS_LOWER[type]}` : 'tu cuenta';
+  return {
+    id: 'identity',
+    title: `Identificación oficial de quien registra ${phrase}`,
+    subtitle: `INE, pasaporte o cédula — obligatoria para poder aprobar ${phrase}`,
+    status: 'pending',
+  };
+}
 
 export default function ClubRegistrationScreen({
   club,
@@ -45,18 +52,24 @@ export default function ClubRegistrationScreen({
   // Solo aplica al alta (club === undefined) — editar un club ya existente no vuelve a pedir
   // identidad, mismo criterio que ClubRegistrationScreen "Editar perfil" no toca documentos de
   // coach tampoco (ver decisión #43 en db/schema.sql).
-  const [identityDoc, setIdentityDoc] = useState<DocumentItem>(IDENTITY_DOC);
+  const [identityDocState, setIdentityDocState] = useState<Pick<DocumentItem, 'status' | 'fileUrl'>>({ status: 'pending' });
   const [uploadingIdentityDoc, setUploadingIdentityDoc] = useState(false);
   const [identityDocError, setIdentityDocError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // "club o federación" antes de elegir tipo; la palabra exacta ya elegida (alta) o del registro
+  // existente (edición) en cuanto se sabe.
+  const typeLabelLower = type ? CLUB_TYPE_LABELS_LOWER[type] : 'club o federación';
+  const doc = identityDoc(type);
+  const identityDocValue: DocumentItem = { ...doc, ...identityDocState };
 
   const canSubmit =
     name.trim().length > 0 &&
     type !== null &&
     city.trim().length > 0 &&
     !!country &&
-    (!!club || (identityDoc.status === 'uploaded' && !!identityDoc.fileUrl)) &&
+    (!!club || (identityDocState.status === 'uploaded' && !!identityDocState.fileUrl)) &&
     !submitting;
 
   /** Sube el archivo real de identidad a R2 antes de marcarlo "subido" — se llama antes de que el
@@ -84,7 +97,7 @@ export default function ClubRegistrationScreen({
         type: asset.mimeType ?? 'image/jpeg',
         file: asset.file,
       });
-      setIdentityDoc((prev) => ({ ...prev, status: 'uploaded', fileUrl }));
+      setIdentityDocState({ status: 'uploaded', fileUrl });
     } catch (err) {
       setIdentityDocError(err instanceof ApiError ? err.message : 'No se pudo subir el documento. Intenta de nuevo.');
     } finally {
@@ -110,7 +123,7 @@ export default function ClubRegistrationScreen({
       country,
       contactEmail: contactEmail.trim() || undefined,
       contactPhone: contactPhone.trim() || undefined,
-      identityDocumentUrl: identityDoc.fileUrl ?? '',
+      identityDocumentUrl: identityDocState.fileUrl ?? '',
     };
     try {
       const result = club ? await updateClub(token, club.id, params) : await registerClub(token, params);
@@ -119,7 +132,7 @@ export default function ClubRegistrationScreen({
       setError(
         err instanceof ApiError
           ? err.message
-          : `No se pudo ${club ? 'guardar los cambios' : 'registrar tu club'}. Intenta de nuevo.`,
+          : `No se pudo ${club ? 'guardar los cambios' : `registrar tu ${typeLabelLower}`}. Intenta de nuevo.`,
       );
     } finally {
       setSubmitting(false);
@@ -135,10 +148,10 @@ export default function ClubRegistrationScreen({
           </Pressable>
         )}
         <View style={styles.headerText}>
-          <Text style={styles.headerTitle}>{club ? 'Editar club' : 'Registra tu club'}</Text>
+          <Text style={styles.headerTitle}>{club ? `Editar ${typeLabelLower}` : 'Registra tu club o federación'}</Text>
           <Text style={styles.headerSubtitle}>
             {club
-              ? 'Actualiza los datos de tu club o federación.'
+              ? `Actualiza los datos de tu ${typeLabelLower}.`
               : 'Crea el perfil de tu club o federación para invitar entrenadores y organizar torneos.'}
           </Text>
         </View>
@@ -185,7 +198,7 @@ export default function ClubRegistrationScreen({
         {!club && (
           <>
             <Text style={styles.sectionLabel}>Identidad</Text>
-            <DocumentRow doc={identityDoc} uploading={uploadingIdentityDoc} onPressUpload={handlePickIdentityDocument} />
+            <DocumentRow doc={identityDocValue} uploading={uploadingIdentityDoc} onPressUpload={handlePickIdentityDocument} />
             {identityDocError && <Text style={styles.errorText}>{identityDocError}</Text>}
           </>
         )}
@@ -218,7 +231,7 @@ export default function ClubRegistrationScreen({
           ) : (
             <View style={styles.submitContent}>
               <Ionicons name={club ? 'checkmark-outline' : 'business-outline'} size={18} color={colors.courtBlueDeep} />
-              <Text style={styles.submitLabel}>{club ? 'Guardar cambios' : 'Crear club'}</Text>
+              <Text style={styles.submitLabel}>{club ? 'Guardar cambios' : `Crear ${typeLabelLower}`}</Text>
             </View>
           )}
         </Pressable>

@@ -109,7 +109,7 @@ export default function CoachBookingDetailScreen({
           <View style={styles.detailCard}>
             <DetailLine label="Tarifa acordada" value={money(booking.agreedRate)} />
             <DetailLine
-              label={booking.coachNetAmount !== undefined ? 'Comisiones (plataforma y club)' : 'Comisión de la plataforma (estimada)'}
+              label={booking.coachNetAmount !== undefined ? 'Comisiones (plataforma y club/federación)' : 'Comisión de la plataforma (estimada)'}
               value={money(commission)}
             />
             <DetailLine label="Tu pago neto" value={money(net)} emphasize />

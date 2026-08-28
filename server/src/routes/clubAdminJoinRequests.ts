@@ -37,10 +37,10 @@ export async function clubAdminJoinRequestRoutes(app: FastifyInstance): Promise<
     try {
       adminClubId = await clubRepository.getClubIdForAdminUser(sub);
     } catch {
-      throw new ForbiddenError('Solo un administrador del club puede ver sus solicitudes de acceso');
+      throw new ForbiddenError('Solo un administrador del club/federación puede ver sus solicitudes de acceso');
     }
     if (adminClubId !== id) {
-      throw new ForbiddenError('Solo un administrador del club puede ver sus solicitudes de acceso');
+      throw new ForbiddenError('Solo un administrador del club/federación puede ver sus solicitudes de acceso');
     }
 
     return clubAdminJoinRequestService.listPendingRequestsForClub(id);
@@ -57,10 +57,10 @@ export async function clubAdminJoinRequestRoutes(app: FastifyInstance): Promise<
     try {
       adminClubId = await clubRepository.getClubIdForAdminUser(sub);
     } catch {
-      throw new ForbiddenError('Solo un administrador del club puede responder esta solicitud');
+      throw new ForbiddenError('Solo un administrador del club/federación puede responder esta solicitud');
     }
     if (adminClubId !== request.clubId) {
-      throw new ForbiddenError('Solo un administrador del club puede responder esta solicitud');
+      throw new ForbiddenError('Solo un administrador del club/federación puede responder esta solicitud');
     }
 
     return clubAdminJoinRequestService.respondToRequest(id, parsed.data.decision);

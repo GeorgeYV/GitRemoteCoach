@@ -950,7 +950,7 @@ export function ClubFlow({ adminUserId }: { adminUserId: string }) {
           setNeedsRegistration(true);
           return;
         }
-        setError(err instanceof ApiError ? err.message : 'No se pudo cargar tu club.');
+        setError(err instanceof ApiError ? err.message : 'No se pudo cargar tu club o federación.');
       });
     return () => {
       cancelled = true;

@@ -36,7 +36,7 @@ export async function createInvitation(
   } catch (err: any) {
     // Única violación de unicidad posible: idx_club_admin_invitations_no_duplicate_pending.
     if (err.code === UNIQUE_VIOLATION) {
-      throw new ConflictError('Ya existe una invitación pendiente para ese email en este club', 'duplicate_invitation');
+      throw new ConflictError('Ya existe una invitación pendiente para ese email en este club/federación', 'duplicate_invitation');
     }
     throw err;
   }

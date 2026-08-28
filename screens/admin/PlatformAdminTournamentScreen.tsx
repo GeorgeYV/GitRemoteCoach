@@ -96,7 +96,7 @@ export default function PlatformAdminTournamentScreen() {
         startDate,
         endDate,
       });
-      setSuccessMessage(`"${tournament.name}" creado — visible para clubes de ${COUNTRY_LABELS[country]} para reclamar.`);
+      setSuccessMessage(`"${tournament.name}" creado — visible para clubes y federaciones de ${COUNTRY_LABELS[country]} para reclamar.`);
       setName('');
       setVenue('');
       setCity('');
@@ -112,9 +112,9 @@ export default function PlatformAdminTournamentScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Crear torneo sin club</Text>
+        <Text style={styles.headerTitle}>Crear torneo sin club/federación</Text>
         <Text style={styles.headerSubtitle}>
-          Para torneos con demanda conocida que ningún club creó todavía — cualquier club de ese país podrá reclamarlo después.
+          Para torneos con demanda conocida que ningún club o federación creó todavía — cualquiera de ese país podrá reclamarlo después.
         </Text>
       </View>
 
@@ -122,7 +122,7 @@ export default function PlatformAdminTournamentScreen() {
         {reports.length > 0 && (
           <Section label={reports.length === 1 ? 'Reporte abierto (respaldo)' : `${reports.length} reportes abiertos (respaldo)`}>
             <Text style={styles.reportsHint}>
-              De cualquier club — visible acá por si el club dueño del torneo no reacciona.
+              De cualquier club o federación — visible acá por si el dueño del torneo no reacciona.
             </Text>
             {resolveError && <Text style={styles.errorText}>{resolveError}</Text>}
             {reports.map((report) => (
@@ -220,7 +220,7 @@ function ReportCard({
         <Text style={styles.reportTournamentName}>{report.tournamentName}</Text>
       </View>
       <Text style={styles.reportMeta}>
-        {report.clubName ?? 'Sin club'} · reportado por {report.reporterName}
+        {report.clubName ?? 'Sin club/federación'} · reportado por {report.reporterName}
       </Text>
       <Text style={styles.reportMessage}>{report.message}</Text>
       <Pressable style={styles.resolveButton} onPress={onResolve} disabled={resolving}>

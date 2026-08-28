@@ -26,10 +26,10 @@ export async function clubAdminInvitationRoutes(app: FastifyInstance): Promise<v
     try {
       adminClubId = await clubRepository.getClubIdForAdminUser(sub);
     } catch {
-      throw new ForbiddenError('Solo un administrador del club puede invitar administradores de respaldo');
+      throw new ForbiddenError('Solo un administrador del club/federación puede invitar administradores de respaldo');
     }
     if (adminClubId !== id) {
-      throw new ForbiddenError('Solo un administrador del club puede invitar administradores de respaldo');
+      throw new ForbiddenError('Solo un administrador del club/federación puede invitar administradores de respaldo');
     }
 
     const invitation = await clubAdminInvitationService.inviteAdmin({ clubId: id, email: parsed.data.email, invitedBy: sub });
@@ -45,10 +45,10 @@ export async function clubAdminInvitationRoutes(app: FastifyInstance): Promise<v
     try {
       adminClubId = await clubRepository.getClubIdForAdminUser(sub);
     } catch {
-      throw new ForbiddenError('Solo un administrador del club puede ver sus invitaciones enviadas');
+      throw new ForbiddenError('Solo un administrador del club/federación puede ver sus invitaciones enviadas');
     }
     if (adminClubId !== id) {
-      throw new ForbiddenError('Solo un administrador del club puede ver sus invitaciones enviadas');
+      throw new ForbiddenError('Solo un administrador del club/federación puede ver sus invitaciones enviadas');
     }
 
     return clubAdminInvitationService.listInvitationsForClub(id);

@@ -27,10 +27,10 @@ export async function clubInvitationRoutes(app: FastifyInstance): Promise<void> 
     try {
       adminClubId = await clubRepository.getClubIdForAdminUser(sub);
     } catch {
-      throw new ForbiddenError('Solo un administrador del club puede invitar entrenadores');
+      throw new ForbiddenError('Solo un administrador del club/federación puede invitar entrenadores');
     }
     if (adminClubId !== parsed.data.clubId) {
-      throw new ForbiddenError('Solo un administrador del club puede invitar entrenadores');
+      throw new ForbiddenError('Solo un administrador del club/federación puede invitar entrenadores');
     }
 
     const invitation = await clubInvitationService.inviteCoach({ ...parsed.data, invitedBy: sub });

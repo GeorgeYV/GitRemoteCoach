@@ -16,12 +16,8 @@ import {
   respondToClubAdminInvitation,
   searchClubs,
 } from '../../lib/api';
+import { CLUB_TYPE_LABELS } from '../../lib/clubType';
 import { colors, radius } from '../../lib/theme';
-
-const TYPE_LABELS: Record<ClubSearchResult['type'], string> = {
-  club: 'Club',
-  federation: 'Federación',
-};
 
 /**
  * Se muestra cuando un club_admin recién registrado todavía no administra ningún club — antes,
@@ -138,9 +134,9 @@ export default function ClubJoinScreen({
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.headerTitle}>Administrás un club nuevo, o uno que ya existe?</Text>
+        <Text style={styles.headerTitle}>¿Administras un club o federación nuevo, o uno que ya existe?</Text>
         <Text style={styles.headerSubtitle}>
-          Si sos el respaldo de un club/federación que ya usa Remote Coach, no hace falta crear uno duplicado.
+          Si eres el respaldo de un club/federación que ya usa Remote Coach, no hace falta crear uno duplicado.
         </Text>
 
         {actionError && <Text style={styles.actionErrorText}>{actionError}</Text>}
@@ -149,7 +145,7 @@ export default function ClubJoinScreen({
           <View style={styles.card}>
             <Ionicons name="mail-outline" size={20} color={colors.courtBlue} style={styles.cardIcon} />
             <Text style={styles.cardTitle}>Fuiste invitado a administrar {invitation.clubName}</Text>
-            <Text style={styles.cardSubtitle}>Podés aceptar para sumarte como administrador de respaldo, o rechazar.</Text>
+            <Text style={styles.cardSubtitle}>Puedes aceptar para sumarte como administrador de respaldo, o rechazar.</Text>
             <View style={styles.rowButtons}>
               <Pressable
                 style={[styles.actionButton, styles.declineButton]}
@@ -176,12 +172,12 @@ export default function ClubJoinScreen({
             <Ionicons name="time-outline" size={20} color={colors.amber} style={styles.cardIcon} />
             <Text style={styles.cardTitle}>Tu solicitud para unirte a {myRequest.clubName} está pendiente</Text>
             <Text style={styles.cardSubtitle}>
-              Un administrador de ese club tiene que aprobarla. Volvé a entrar más tarde para ver si ya se resolvió.
+              Un administrador tiene que aprobarla. Vuelve a entrar más tarde para ver si ya se resolvió.
             </Text>
           </View>
         ) : (
           <>
-            <Text style={styles.sectionLabel}>Buscar mi club</Text>
+            <Text style={styles.sectionLabel}>Buscar mi club o federación</Text>
             <View style={styles.searchRow}>
               <TextInput
                 style={styles.searchInput}
@@ -200,14 +196,14 @@ export default function ClubJoinScreen({
             {results !== null && (
               <View style={styles.resultsList}>
                 {results.length === 0 ? (
-                  <Text style={styles.emptyText}>No encontramos ningún club con ese nombre.</Text>
+                  <Text style={styles.emptyText}>No encontramos ningún club o federación con ese nombre.</Text>
                 ) : (
                   results.map((club) => (
                     <View key={club.id} style={styles.resultCard}>
                       <View style={styles.resultInfo}>
                         <Text style={styles.resultName}>{club.name}</Text>
                         <Text style={styles.resultMeta}>
-                          {TYPE_LABELS[club.type]} · {club.city}
+                          {CLUB_TYPE_LABELS[club.type]} · {club.city}
                           {club.country ? `, ${club.country}` : ''}
                         </Text>
                       </View>
@@ -229,7 +225,7 @@ export default function ClubJoinScreen({
             )}
 
             <Pressable style={styles.createNewButton} onPress={onCreateNew}>
-              <Text style={styles.createNewButtonLabel}>¿No encontrás tu club? Crear uno nuevo</Text>
+              <Text style={styles.createNewButtonLabel}>¿No encuentras tu club o federación? Crear uno nuevo</Text>
             </Pressable>
           </>
         )}

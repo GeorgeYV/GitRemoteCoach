@@ -80,7 +80,7 @@ export default function CoachClubInvitationScreen({ coachId, onBack }: { coachId
           <Pressable style={styles.backButton} onPress={onBack}>
             <Text style={styles.backIcon}>←</Text>
           </Pressable>
-          <Text style={styles.headerTitle}>Invitación de club</Text>
+          <Text style={styles.headerTitle}>Invitación de club o federación</Text>
         </View>
         <Text style={styles.headerSubtitle}>{invitedAtLabel}</Text>
       </View>

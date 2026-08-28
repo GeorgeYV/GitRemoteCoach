@@ -76,5 +76,5 @@ export async function claimTournamentForClub(tournamentId: string, clubId: strin
   // El UPDATE no afectó filas: o el torneo no existe (404, la llamada de abajo lo confirma
   // lanzando NotFoundError) o existe pero ya tiene club_id (409, alguien más lo reclamó primero).
   await tournamentRepository.getTournamentCommissionInfo(tournamentId);
-  throw new ConflictError('Este torneo ya fue reclamado por otro club', 'already_claimed');
+  throw new ConflictError('Este torneo ya fue reclamado por otro club/federación', 'already_claimed');
 }

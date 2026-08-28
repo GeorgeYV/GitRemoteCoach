@@ -25,10 +25,10 @@ export async function settlementRoutes(app: FastifyInstance): Promise<void> {
     try {
       adminClubId = await clubRepository.getClubIdForAdminUser(sub);
     } catch {
-      throw new ForbiddenError('Solo un administrador del club puede liquidar este torneo');
+      throw new ForbiddenError('Solo un administrador del club/federación puede liquidar este torneo');
     }
     if (adminClubId !== tournament.clubId) {
-      throw new ForbiddenError('Solo un administrador del club puede liquidar este torneo');
+      throw new ForbiddenError('Solo un administrador del club/federación puede liquidar este torneo');
     }
 
     const settlement = await settlementService.settleTournamentCommissions(id);

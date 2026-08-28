@@ -19,6 +19,7 @@ import {
   respondToClubAdminJoinRequest,
   TournamentSummary,
 } from '../../lib/api';
+import { CLUB_TYPE_LABELS_LOWER } from '../../lib/clubType';
 import { colors, radius, withOpacity } from '../../lib/theme';
 import { isValidEmail } from '../../lib/validation';
 
@@ -197,7 +198,7 @@ export default function ClubHomeScreen({
       })
       .catch((err) => {
         if (cancelled) return;
-        setError(err instanceof ApiError ? err.message : 'No se pudo cargar el panel del club.');
+        setError(err instanceof ApiError ? err.message : 'No se pudo cargar el panel.');
       });
     return () => {
       cancelled = true;
@@ -222,6 +223,7 @@ export default function ClubHomeScreen({
     );
   }
 
+  const typeLabelLower = CLUB_TYPE_LABELS_LOWER[club.type];
   const activeTournaments = tournaments.filter((t) => t.status === 'scheduled' || t.status === 'in_progress').length;
   const officialCoachCount = tournaments.reduce((sum, t) => sum + t.officialCoachCount, 0);
   const pendingCommission = tournaments.reduce((sum, t) => sum + Number(t.pendingCommissionAmount), 0);
@@ -254,8 +256,8 @@ export default function ClubHomeScreen({
             />
             <Text style={styles.verificationBannerText}>
               {club.verificationStatus === 'rejected'
-                ? 'Tu club no pasó la verificación. Contactá a soporte para revisar los datos enviados.'
-                : 'Verificación pendiente — tus torneos todavía no aparecen en la búsqueda pública hasta que un administrador de la plataforma revise tu club.'}
+                ? `Tu ${typeLabelLower} no pasó la verificación. Contacta a soporte para revisar los datos enviados.`
+                : `Verificación pendiente — tus torneos todavía no aparecen en la búsqueda pública hasta que un administrador de la plataforma revise tu ${typeLabelLower}.`}
             </Text>
           </View>
         )}

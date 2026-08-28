@@ -44,7 +44,7 @@ export async function createRequest(
   } catch (err: any) {
     // Única violación de unicidad posible: idx_club_admin_join_requests_no_duplicate_pending.
     if (err.code === UNIQUE_VIOLATION) {
-      throw new ConflictError('Ya tienes una solicitud pendiente para este club', 'duplicate_request');
+      throw new ConflictError('Ya tienes una solicitud pendiente para este club/federación', 'duplicate_request');
     }
     throw err;
   }

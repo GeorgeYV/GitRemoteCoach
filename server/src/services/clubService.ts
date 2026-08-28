@@ -34,7 +34,7 @@ export async function getClubForAdmin(userId: string): Promise<Club> {
 async function assertUserHasNoClub(userId: string, client?: PoolClient): Promise<void> {
   try {
     await clubRepository.getClubIdForAdminUser(userId, client);
-    throw new ConflictError('Ya administras un club', 'already_club_admin');
+    throw new ConflictError('Ya administras un club/federación', 'already_club_admin');
   } catch (err) {
     if (!(err instanceof NotFoundError)) throw err;
   }
@@ -73,9 +73,13 @@ export async function registerClub(
     return created;
   });
 
+  // club/federación: género distinto ("Nuevo club" vs. "Nueva federación") — no alcanza con
+  // pegar la palabra, hace falta el adjetivo en el género correcto.
+  const typeLabelLower = club.type === 'federation' ? 'federación' : 'club';
+  const newAdjective = club.type === 'federation' ? 'Nueva' : 'Nuevo';
   await notificationService.notifyRoleByEmail('platform_admin', {
-    subject: 'Nuevo club para verificar — Remote Coach',
-    html: `<p><strong>${club.name}</strong> (${club.city}) se registró y está pendiente de verificación.</p>`,
+    subject: `${newAdjective} ${typeLabelLower} para verificar — Remote Coach`,
+    html: `<p><strong>${club.name}</strong> (${club.city}) se registró como ${typeLabelLower} y está pendiente de verificación.</p>`,
   });
 
   return club;

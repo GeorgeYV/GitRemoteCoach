@@ -4,12 +4,8 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { ApiError, Club, listPendingClubVerifications, reviewClubVerification } from '../../lib/api';
+import { CLUB_TYPE_LABELS, CLUB_TYPE_LABELS_LOWER } from '../../lib/clubType';
 import { colors, radius } from '../../lib/theme';
-
-const TYPE_LABELS: Record<Club['type'], string> = {
-  club: 'Club',
-  federation: 'Federación',
-};
 
 /** Cola de clubes/federaciones autoregistrados sin revisar (ver decisión #41 en db/schema.sql) —
  * mientras un club siga 'pending', tournamentRepository.search no muestra sus torneos, así que
@@ -55,7 +51,7 @@ export default function PlatformAdminClubVerificationScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Verificación de clubes</Text>
+        <Text style={styles.headerTitle}>Verificación de clubes y federaciones</Text>
         <Text style={styles.headerSubtitle}>
           Aprueba o rechaza clubes/federaciones recién registrados. Mientras estén pendientes, sus torneos no
           aparecen en la búsqueda pública.
@@ -75,7 +71,7 @@ export default function PlatformAdminClubVerificationScreen() {
           {actionError && <Text style={styles.actionErrorText}>{actionError}</Text>}
 
           {clubs.length === 0 ? (
-            <Text style={styles.emptyText}>No hay clubes pendientes de verificación.</Text>
+            <Text style={styles.emptyText}>No hay clubes ni federaciones pendientes de verificación.</Text>
           ) : (
             clubs.map((club) => {
               const acting = actingOnId === club.id;
@@ -84,13 +80,15 @@ export default function PlatformAdminClubVerificationScreen() {
                   <View style={styles.clubInfo}>
                     <Text style={styles.clubName}>{club.name}</Text>
                     <Text style={styles.clubMeta}>
-                      {TYPE_LABELS[club.type]} · {club.city}
+                      {CLUB_TYPE_LABELS[club.type]} · {club.city}
                       {club.country ? `, ${club.country}` : ''}
                     </Text>
                     {club.contactEmail && <Text style={styles.clubMeta}>{club.contactEmail}</Text>}
                     {club.contactPhone && <Text style={styles.clubMeta}>{club.contactPhone}</Text>}
                     <Text style={club.identityDocumentUrl ? styles.identityOk : styles.identityMissing}>
-                      {club.identityDocumentUrl ? '✓ Identidad recibida' : '⚠ Sin identidad (club previo a este requisito)'}
+                      {club.identityDocumentUrl
+                        ? '✓ Identidad recibida'
+                        : `⚠ Sin identidad (${CLUB_TYPE_LABELS_LOWER[club.type]} de antes de este requisito)`}
                     </Text>
                   </View>
                   <View style={styles.clubActions}>

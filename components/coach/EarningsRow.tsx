@@ -32,7 +32,7 @@ export default function EarningsRow({ entry }: { entry: EarningsEntry }) {
         </View>
         <View style={styles.breakdownRow}>
           <Text style={styles.breakdownLabel}>
-            {entry.coachNetAmount !== undefined ? 'Comisiones (plataforma y club)' : 'Comisión de la plataforma (15%)'}
+            {entry.coachNetAmount !== undefined ? 'Comisiones (plataforma y club/federación)' : 'Comisión de la plataforma (15%)'}
           </Text>
           <Text style={styles.breakdownValueNegative}>−{money(commission)}</Text>
         </View>

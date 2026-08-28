@@ -95,10 +95,10 @@ export async function clubRoutes(app: FastifyInstance): Promise<void> {
     try {
       adminClubId = await clubRepository.getClubIdForAdminUser(sub);
     } catch {
-      throw new ForbiddenError('Solo un administrador del club puede editarlo');
+      throw new ForbiddenError('Solo un administrador del club/federación puede editarlo');
     }
     if (adminClubId !== id) {
-      throw new ForbiddenError('Solo un administrador del club puede editarlo');
+      throw new ForbiddenError('Solo un administrador del club/federación puede editarlo');
     }
 
     const parsed = updateClubSchema.safeParse(req.body);
@@ -116,10 +116,10 @@ export async function clubRoutes(app: FastifyInstance): Promise<void> {
     try {
       adminClubId = await clubRepository.getClubIdForAdminUser(sub);
     } catch {
-      throw new ForbiddenError('Solo un administrador del club puede ver sus liquidaciones');
+      throw new ForbiddenError('Solo un administrador del club/federación puede ver sus liquidaciones');
     }
     if (adminClubId !== id) {
-      throw new ForbiddenError('Solo un administrador del club puede ver sus liquidaciones');
+      throw new ForbiddenError('Solo un administrador del club/federación puede ver sus liquidaciones');
     }
 
     return clubService.listSettlementsForClub(id);
@@ -135,10 +135,10 @@ export async function clubRoutes(app: FastifyInstance): Promise<void> {
     try {
       adminClubId = await clubRepository.getClubIdForAdminUser(sub);
     } catch {
-      throw new ForbiddenError('Solo un administrador del club puede ver sus torneos');
+      throw new ForbiddenError('Solo un administrador del club/federación puede ver sus torneos');
     }
     if (adminClubId !== id) {
-      throw new ForbiddenError('Solo un administrador del club puede ver sus torneos');
+      throw new ForbiddenError('Solo un administrador del club/federación puede ver sus torneos');
     }
 
     return clubService.listTournamentsForClub(id);
@@ -154,10 +154,10 @@ export async function clubRoutes(app: FastifyInstance): Promise<void> {
     try {
       adminClubId = await clubRepository.getClubIdForAdminUser(sub);
     } catch {
-      throw new ForbiddenError('Solo un administrador del club puede ver sus reportes');
+      throw new ForbiddenError('Solo un administrador del club/federación puede ver sus reportes');
     }
     if (adminClubId !== id) {
-      throw new ForbiddenError('Solo un administrador del club puede ver sus reportes');
+      throw new ForbiddenError('Solo un administrador del club/federación puede ver sus reportes');
     }
 
     return tournamentReportService.listOpenReportsForClub(id);
@@ -174,10 +174,10 @@ export async function clubRoutes(app: FastifyInstance): Promise<void> {
     try {
       adminClubId = await clubRepository.getClubIdForAdminUser(sub);
     } catch {
-      throw new ForbiddenError('Solo un administrador del club puede crear torneos');
+      throw new ForbiddenError('Solo un administrador del club/federación puede crear torneos');
     }
     if (adminClubId !== id) {
-      throw new ForbiddenError('Solo un administrador del club puede crear torneos');
+      throw new ForbiddenError('Solo un administrador del club/federación puede crear torneos');
     }
 
     const tournament = await clubService.createTournamentForClub(id, parsed.data);
@@ -197,10 +197,10 @@ export async function clubRoutes(app: FastifyInstance): Promise<void> {
     try {
       adminClubId = await clubRepository.getClubIdForAdminUser(sub);
     } catch {
-      throw new ForbiddenError('Solo un administrador del club puede editar torneos');
+      throw new ForbiddenError('Solo un administrador del club/federación puede editar torneos');
     }
     if (adminClubId !== id) {
-      throw new ForbiddenError('Solo un administrador del club puede editar torneos');
+      throw new ForbiddenError('Solo un administrador del club/federación puede editar torneos');
     }
 
     return clubService.updateTournamentForClub(id, tournamentId, parsed.data);
@@ -222,10 +222,10 @@ export async function clubRoutes(app: FastifyInstance): Promise<void> {
     try {
       adminClubId = await clubRepository.getClubIdForAdminUser(sub);
     } catch {
-      throw new ForbiddenError('Solo un administrador del club puede reclamar torneos');
+      throw new ForbiddenError('Solo un administrador del club/federación puede reclamar torneos');
     }
     if (adminClubId !== id) {
-      throw new ForbiddenError('Solo un administrador del club puede reclamar torneos');
+      throw new ForbiddenError('Solo un administrador del club/federación puede reclamar torneos');
     }
 
     await tournamentService.claimTournamentForClub(tournamentId, id);
@@ -252,7 +252,7 @@ export async function clubRoutes(app: FastifyInstance): Promise<void> {
     const { id } = req.params as { id: string };
     const { sub, role } = req.user as { sub: string; role: string };
     if (role !== 'platform_admin') {
-      throw new ForbiddenError('Solo un administrador de la plataforma puede revisar clubes');
+      throw new ForbiddenError('Solo un administrador de la plataforma puede revisar clubes/federaciones');
     }
     const parsed = reviewClubSchema.safeParse(req.body);
     if (!parsed.success) throw new ValidationError(parsed.error.message);

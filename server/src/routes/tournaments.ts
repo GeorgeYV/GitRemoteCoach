@@ -48,7 +48,7 @@ export async function tournamentRoutes(app: FastifyInstance): Promise<void> {
   app.post('/tournaments', { preHandler: app.authenticate }, async (req, reply) => {
     const { role } = req.user as { role: string };
     if (role !== 'platform_admin') {
-      throw new ForbiddenError('Solo un administrador de la plataforma puede crear torneos sin club');
+      throw new ForbiddenError('Solo un administrador de la plataforma puede crear torneos sin club/federación');
     }
     const parsed = createUnclaimedTournamentSchema.safeParse(req.body);
     if (!parsed.success) throw new ValidationError(parsed.error.message);
@@ -98,10 +98,10 @@ export async function tournamentRoutes(app: FastifyInstance): Promise<void> {
       try {
         clubId = await clubRepository.getClubIdForAdminUser(sub);
       } catch {
-        throw new ForbiddenError('Solo un administrador de club o de la plataforma puede resolver reportes');
+        throw new ForbiddenError('Solo un administrador de club/federación o de la plataforma puede resolver reportes');
       }
       return tournamentReportService.resolveReport(id, sub, clubId);
     }
-    throw new ForbiddenError('Solo un administrador de club o de la plataforma puede resolver reportes');
+    throw new ForbiddenError('Solo un administrador de club/federación o de la plataforma puede resolver reportes');
   });
 }

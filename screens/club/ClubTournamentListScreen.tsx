@@ -184,7 +184,7 @@ export default function ClubTournamentListScreen({
           ))}
 
           {tournaments.length === 0 && (
-            <Text style={styles.emptyText}>Todavía no hay torneos organizados por este club.</Text>
+            <Text style={styles.emptyText}>Todavía no hay torneos organizados por {clubName}.</Text>
           )}
 
           {unclaimed && unclaimed.length > 0 && (

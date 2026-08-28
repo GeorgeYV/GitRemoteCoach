@@ -96,7 +96,7 @@ export default function ClubSettlementsScreen({
 
       {settlements.length === 0 ? (
         <View style={styles.emptyState}>
-          <Text style={styles.emptyText}>Todavía no hay liquidaciones para este club.</Text>
+          <Text style={styles.emptyText}>Todavía no hay liquidaciones para {clubName}.</Text>
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.list}>
