@@ -2,6 +2,7 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import jwt from '@fastify/jwt';
 import multipart from '@fastify/multipart';
+import rateLimit from '@fastify/rate-limit';
 import { env } from './config.js';
 import { AppError } from './lib/errors.js';
 import { authRoutes } from './routes/auth.js';
@@ -49,6 +50,11 @@ export function buildApp() {
   // antes de que el service tenga la chance de rechazarlo.
   app.register(multipart, { limits: { fileSize: 5 * 1024 * 1024 } });
 
+  // global: false — sin límite por defecto en todas las rutas, solo en las de routes/auth.ts que
+  // se pueden probar por fuerza bruta (login, códigos de 6 dígitos) vía `config: { rateLimit }`
+  // en cada una (ver rateLimits en config.ts). Por IP, en memoria — un solo proceso en Render hoy.
+  app.register(rateLimit, { global: false });
+
   // Fundamento de auth (login/register en routes/auth.ts): la mayoría de las rutas de negocio
   // (bookings, matches, etc.) todavía no exigen este token — eso llega junto con
   // navegación/role-gating. routes/pushTokens.ts es la primera excepción real: ahí sí importa
@@ -64,6 +70,21 @@ export function buildApp() {
   app.setErrorHandler((err, _req, reply) => {
     if (err instanceof AppError) {
       reply.code(err.statusCode).send({ error: err.code, message: err.message });
+      return;
+    }
+    // @fastify/rate-limit (y errores internos de Fastify, ej. body vacío con Content-Type json)
+    // lanzan un Error normal con .statusCode ya seteado — sin este chequeo, esos casos caían al
+    // 500 genérico de abajo, tapando un 429/400 real detrás de "Error interno".
+    const statusCode = (err as { statusCode?: unknown })?.statusCode;
+    if (err instanceof Error && typeof statusCode === 'number' && statusCode >= 400 && statusCode < 500) {
+      // @fastify/rate-limit manda su mensaje en inglés (Error normal, no un AppError) — se
+      // traduce acá porque ForgotPasswordScreen/LoginScreen/VerifyEmailGateScreen muestran
+      // err.message tal cual al usuario.
+      if (statusCode === 429) {
+        reply.code(429).send({ error: 'too_many_requests', message: 'Demasiados intentos. Espera unos minutos y vuelve a intentarlo.' });
+        return;
+      }
+      reply.code(statusCode).send({ error: 'bad_request', message: err.message });
       return;
     }
     app.log.error(err);

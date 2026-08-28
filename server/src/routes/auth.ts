@@ -5,6 +5,7 @@ import * as passwordResetService from '../services/passwordResetService.js';
 import * as emailVerificationService from '../services/emailVerificationService.js';
 import * as googleAuthService from '../services/googleAuthService.js';
 import { AppError, ValidationError } from '../lib/errors.js';
+import { rateLimits } from '../config.js';
 
 const SELF_SERVICE_ROLES = ['parent', 'coach', 'club_admin'] as const;
 
@@ -72,7 +73,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     return { user, token };
   });
 
-  app.post('/auth/login', async (req) => {
+  app.post('/auth/login', { config: { rateLimit: rateLimits.login } }, async (req) => {
     const parsed = loginSchema.safeParse(req.body);
     if (!parsed.success) throw new ValidationError(parsed.error.message);
 
@@ -97,7 +98,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
   // Enumeration-safe: siempre 200 sin importar si el correo existe (el servicio decide en
   // silencio si de verdad hay algo que enviar).
-  app.post('/auth/forgot-password', async (req) => {
+  app.post('/auth/forgot-password', { config: { rateLimit: rateLimits.forgotPassword } }, async (req) => {
     const parsed = forgotPasswordSchema.safeParse(req.body);
     if (!parsed.success) throw new ValidationError(parsed.error.message);
 
@@ -105,7 +106,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     return { message: 'Si el correo existe, se envió un código' };
   });
 
-  app.post('/auth/reset-password', async (req) => {
+  app.post('/auth/reset-password', { config: { rateLimit: rateLimits.resetPassword } }, async (req) => {
     const parsed = resetPasswordSchema.safeParse(req.body);
     if (!parsed.success) throw new ValidationError(parsed.error.message);
 
@@ -114,20 +115,28 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // VerifyEmailGateScreen (decisión #48) — el código llega por correo al registrarse.
-  app.post('/auth/verify-email', { preHandler: app.authenticate }, async (req) => {
-    const parsed = verifyEmailSchema.safeParse(req.body);
-    if (!parsed.success) throw new ValidationError(parsed.error.message);
+  app.post(
+    '/auth/verify-email',
+    { preHandler: app.authenticate, config: { rateLimit: rateLimits.verifyEmail } },
+    async (req) => {
+      const parsed = verifyEmailSchema.safeParse(req.body);
+      if (!parsed.success) throw new ValidationError(parsed.error.message);
 
-    const { sub } = req.user as { sub: string };
-    return emailVerificationService.verifyEmail(sub, parsed.data.code);
-  });
+      const { sub } = req.user as { sub: string };
+      return emailVerificationService.verifyEmail(sub, parsed.data.code);
+    },
+  );
 
   // VerifyEmailGateScreen "Reenviar código".
-  app.post('/auth/resend-verification', { preHandler: app.authenticate }, async (req) => {
-    const { sub } = req.user as { sub: string };
-    await emailVerificationService.sendVerificationCode(sub);
-    return { message: 'Código reenviado' };
-  });
+  app.post(
+    '/auth/resend-verification',
+    { preHandler: app.authenticate, config: { rateLimit: rateLimits.resendVerification } },
+    async (req) => {
+      const { sub } = req.user as { sub: string };
+      await emailVerificationService.sendVerificationCode(sub);
+      return { message: 'Código reenviado' };
+    },
+  );
 
   // VerifyEmailGateScreen "¿Correo incorrecto?" — corrige un typo sin depender de que alguien
   // con acceso a la base lo arregle a mano (ver decisión #48).

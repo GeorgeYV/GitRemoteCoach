@@ -4219,6 +4219,32 @@ console.log('\n=== Escenario 45: verificación de correo al registrarse (decisi�
   );
 }
 
+console.log('\n=== Escenario 46: límite de intentos en rutas de auth (fuerza bruta) ===');
+{
+  // 15 intentos alcanza siempre para pasar rateLimits.login.max (10, ver config.ts) sin importar
+  // cuántos /auth/login ya se hayan hecho antes en este mismo proceso (mismo IP, misma ventana).
+  let sawRateLimited = false;
+  let rateLimitedBody: any = null;
+  for (let i = 0; i < 15; i++) {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/auth/login',
+      payload: { email: 'fuerza.bruta@example.com', password: 'lo-que-sea' },
+    });
+    if (res.statusCode === 429) {
+      sawRateLimited = true;
+      rateLimitedBody = res.json();
+      break;
+    }
+  }
+  assertTrue(sawRateLimited, 'suficientes intentos de login seguidos terminan en 429');
+  assertEqual(rateLimitedBody?.error, 'too_many_requests', 'el código de error es el esperado');
+  assertTrue(
+    typeof rateLimitedBody?.message === 'string' && !/rate limit/i.test(rateLimitedBody.message),
+    'el mensaje del límite está en español, no el texto en inglés del plugin',
+  );
+}
+
 console.log(`\n=== Resultado: ${passed} pasaron, ${failed} fallaron ===`);
 await app.close();
 process.exit(failed > 0 ? 1 : 0);

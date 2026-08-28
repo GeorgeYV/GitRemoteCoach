@@ -57,6 +57,24 @@ export const businessRules = {
 };
 
 /**
+ * Límites de intentos (ver @fastify/rate-limit en app.ts) sobre las rutas de auth que un
+ * atacante podría probar por fuerza bruta: login (contraseña), y los códigos de 6 dígitos de
+ * "olvidé mi contraseña"/verificación de correo — emailVerificationMaxAttempts/
+ * passwordResetMaxAttempts arriba invalidan UN código tras varios intentos fallidos, pero no
+ * evitan que alguien pida códigos nuevos sin parar para resetear ese contador. Por IP (default
+ * del plugin, sin Redis — un solo proceso en Render hoy, ver decisión de infra de la sesión).
+ * Los que mandan un correo real (forgotPassword/resendVerification) tienen un límite más chico
+ * que los que no (login/resetPassword/verifyEmail) — cuestan más que solo CPU.
+ */
+export const rateLimits = {
+  login: { max: 10, timeWindow: '15 minutes' },
+  forgotPassword: { max: 5, timeWindow: '1 hour' },
+  resetPassword: { max: 10, timeWindow: '15 minutes' },
+  verifyEmail: { max: 10, timeWindow: '15 minutes' },
+  resendVerification: { max: 5, timeWindow: '1 hour' },
+};
+
+/**
  * Cuentas de cobro de la plataforma para el pago manual por país (fase 1 sin Stripe: el padre
  * paga a estas cuentas por fuera de la app y manda un código de operación, ver
  * paymentService.submitPaymentProof). Vive en env vars (no hardcodeado ni en una tabla) porque
