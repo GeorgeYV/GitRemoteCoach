@@ -1,4 +1,5 @@
 import * as userRepository from '../repositories/userRepository.js';
+import * as emailVerificationService from './emailVerificationService.js';
 import { hashPassword, verifyPassword } from '../lib/password.js';
 import { AppError, ConflictError, ValidationError } from '../lib/errors.js';
 import type { PublicUser, UserRole } from '../types.js';
@@ -6,7 +7,14 @@ import type { PublicUser, UserRole } from '../types.js';
 export const SELF_SERVICE_ROLES: UserRole[] = ['parent', 'coach', 'club_admin'];
 
 export function toPublicUser(user: userRepository.UserRecord): PublicUser {
-  return { id: user.id, email: user.email, fullName: user.fullName, phone: user.phone, primaryRole: user.primaryRole };
+  return {
+    id: user.id,
+    email: user.email,
+    fullName: user.fullName,
+    phone: user.phone,
+    primaryRole: user.primaryRole,
+    emailVerifiedAt: user.emailVerifiedAt,
+  };
 }
 
 export async function register(params: {
@@ -28,6 +36,17 @@ export async function register(params: {
     fullName: params.fullName,
     primaryRole: params.primaryRole,
   });
+
+  // No fatal: crear la cuenta es el propósito principal de este llamado, el correo de
+  // verificación es secundario — si el envío falla, el usuario igual queda registrado y puede
+  // pedir un código nuevo con "Reenviar código" (a diferencia de passwordResetService, donde
+  // mandar el correo ES el propósito entero de la solicitud).
+  try {
+    await emailVerificationService.sendVerificationCode(user.id);
+  } catch (err) {
+    console.error(`No se pudo mandar el código de verificación a ${user.id}:`, err);
+  }
+
   return toPublicUser(user);
 }
 

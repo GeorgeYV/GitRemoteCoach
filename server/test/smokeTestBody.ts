@@ -2834,6 +2834,7 @@ console.log('\n=== Escenario 29: Google sign-in (cuenta nueva, re-login, vincula
   const completed = completeRes.json();
   assertEqual(completed.user.email, newIdentity.email, 'la cuenta creada trae el correo de Google');
   assertEqual(completed.user.primaryRole, 'parent', 'la cuenta se crea con el rol elegido');
+  assertTrue(completed.user.emailVerifiedAt !== null, 'una cuenta nueva por Google ya queda verificada (decisión #48)');
   assertTrue(typeof completed.token === 'string' && completed.token.length > 0, 'devuelve un token de sesión real');
 
   const passwordLoginRes = await app.inject({
@@ -3960,6 +3961,9 @@ console.log('\n=== Escenario 44: correos de aviso — "algo pendiente de aprobar
     },
   });
   const { token: emailCoachToken } = emailCoachReg.json();
+  // El registro en sí ya dispara su propio correo de verificación (decisión #48) — se limpia acá
+  // para medir solo lo que dispara POST /coaches.
+  emailState.sent.length = 0;
   await app.inject({
     method: 'POST',
     url: '/coaches',
@@ -3989,6 +3993,7 @@ console.log('\n=== Escenario 44: correos de aviso — "algo pendiente de aprobar
       primaryRole: 'coach',
     },
   });
+  emailState.sent.length = 0;
   await app.inject({
     method: 'POST',
     url: '/coaches',
@@ -4009,6 +4014,7 @@ console.log('\n=== Escenario 44: correos de aviso — "algo pendiente de aprobar
       primaryRole: 'club_admin',
     },
   });
+  emailState.sent.length = 0;
   await app.inject({
     method: 'POST',
     url: '/clubs',
@@ -4086,6 +4092,130 @@ console.log('\n=== Escenario 44: correos de aviso — "algo pendiente de aprobar
   assertTrue(
     emailState.sent.some((m) => m.to === CLUB_BOSQUES_ADMIN_EMAIL),
     'el correo de reporte incluye al admin original del club dueño del torneo',
+  );
+}
+
+console.log('\n=== Escenario 45: verificación de correo al registrarse (decisión #48) ===');
+{
+  // --- Registrarse manda un código, la cuenta arranca sin verificar ---
+  emailState.sent.length = 0;
+  const verifyEmail = 'verificar.correo@example.com';
+  const registerRes = await app.inject({
+    method: 'POST',
+    url: '/auth/register',
+    payload: { email: verifyEmail, password: 'super-secreta-123', fullName: 'Verifica Correo', primaryRole: 'parent' },
+  });
+  const { token: verifyToken, user: verifyUser } = registerRes.json();
+  assertEqual(verifyUser.emailVerifiedAt, null, 'una cuenta nueva por contraseña arranca sin verificar');
+  assertEqual(emailState.sent.length, 1, 'registrarse dispara exactamente un correo de verificación');
+  assertEqual(emailState.sent[0].to, verifyEmail, 'el correo de verificación va al correo recién registrado');
+
+  const codeMatch = emailState.sent[0].html.match(/\d{6}/);
+  assertTrue(codeMatch !== null, 'el cuerpo del correo trae un código de 6 dígitos');
+  const code = codeMatch![0];
+
+  // --- Código incorrecto no verifica, pero no rompe nada ---
+  const wrongCodeRes = await app.inject({
+    method: 'POST',
+    url: '/auth/verify-email',
+    headers: { authorization: `Bearer ${verifyToken}` },
+    payload: { code: '000000' },
+  });
+  assertEqual(wrongCodeRes.statusCode, 400, 'verify-email con código incorrecto devuelve 400');
+
+  // --- Código correcto sí verifica ---
+  const okRes = await app.inject({
+    method: 'POST',
+    url: '/auth/verify-email',
+    headers: { authorization: `Bearer ${verifyToken}` },
+    payload: { code },
+  });
+  assertEqual(okRes.statusCode, 200, 'verify-email con código correcto devuelve 200');
+  assertTrue(okRes.json().emailVerifiedAt !== null, 'la cuenta queda verificada');
+
+  // --- Un código ya usado no vuelve a servir ---
+  const reuseRes = await app.inject({
+    method: 'POST',
+    url: '/auth/verify-email',
+    headers: { authorization: `Bearer ${verifyToken}` },
+    payload: { code },
+  });
+  assertEqual(reuseRes.statusCode, 400, 'el mismo código no se puede canjear dos veces');
+
+  // --- Reenviar código (otra cuenta, sin verificar) ---
+  emailState.sent.length = 0;
+  const resendReg = await app.inject({
+    method: 'POST',
+    url: '/auth/register',
+    payload: { email: 'reenviar.codigo@example.com', password: 'super-secreta-123', fullName: 'Reenviar Codigo', primaryRole: 'parent' },
+  });
+  const resendToken = resendReg.json().token;
+  emailState.sent.length = 0;
+  const resendRes = await app.inject({
+    method: 'POST',
+    url: '/auth/resend-verification',
+    headers: { authorization: `Bearer ${resendToken}` },
+  });
+  assertEqual(resendRes.statusCode, 200, 'resend-verification devuelve 200');
+  assertEqual(emailState.sent.length, 1, 'reenviar dispara exactamente un correo nuevo');
+
+  // --- Cambiar el correo (typo al registrarse, ver decisión #48) ---
+  const changeToUnknown = await app.inject({
+    method: 'PUT',
+    url: '/auth/me/email',
+    headers: { authorization: `Bearer ${resendToken}` },
+    payload: { email: verifyEmail }, // ya existe (la cuenta del principio del escenario)
+  });
+  assertEqual(changeToUnknown.statusCode, 409, 'cambiar a un correo ya usado por otra cuenta devuelve 409');
+
+  emailState.sent.length = 0;
+  const fixedEmail = 'reenviar.codigo.corregido@example.com';
+  const changeRes = await app.inject({
+    method: 'PUT',
+    url: '/auth/me/email',
+    headers: { authorization: `Bearer ${resendToken}` },
+    payload: { email: fixedEmail },
+  });
+  assertEqual(changeRes.statusCode, 200, 'cambiar a un correo libre devuelve 200');
+  assertEqual(changeRes.json().email, fixedEmail, 'el correo queda actualizado');
+  assertEqual(changeRes.json().emailVerifiedAt, null, 'cambiar el correo reinicia la verificación');
+  assertEqual(emailState.sent.length, 1, 'cambiar el correo manda un código nuevo a la dirección corregida');
+  assertEqual(emailState.sent[0].to, fixedEmail, 'el código nuevo va a la dirección corregida, no a la vieja');
+
+  const fixedCodeMatch = emailState.sent[0].html.match(/\d{6}/);
+  const fixedVerifyRes = await app.inject({
+    method: 'POST',
+    url: '/auth/verify-email',
+    headers: { authorization: `Bearer ${resendToken}` },
+    payload: { code: fixedCodeMatch![0] },
+  });
+  assertEqual(fixedVerifyRes.statusCode, 200, 'el código mandado al correo corregido sí verifica la cuenta');
+
+  // --- Vincular Google a una cuenta por contraseña que todavía no había verificado la deja
+  // verificada de una (Google ya probó que el correo es real) ---
+  const unverifiedPasswordEmail = 'vincular.google@example.com';
+  const passwordRegRes = await app.inject({
+    method: 'POST',
+    url: '/auth/register',
+    payload: { email: unverifiedPasswordEmail, password: 'super-secreta-123', fullName: 'Vincular Google', primaryRole: 'parent' },
+  });
+  assertEqual(passwordRegRes.json().user.emailVerifiedAt, null, 'la cuenta por contraseña arranca sin verificar (previo a vincular)');
+
+  googleAuthState.identities.set('fake-code-vincular', {
+    googleId: 'google-sub-vincular',
+    email: unverifiedPasswordEmail,
+    emailVerified: true,
+    name: 'Vincular Google',
+  });
+  const linkRes = await app.inject({
+    method: 'POST',
+    url: '/auth/google',
+    payload: { code: 'fake-code-vincular', redirectUri: 'http://localhost:8081', codeVerifier: 'verifier' },
+  });
+  assertEqual(linkRes.statusCode, 200, 'vincular Google a una cuenta existente devuelve 200');
+  assertTrue(
+    linkRes.json().user.emailVerifiedAt !== null,
+    'vincular Google a una cuenta sin verificar la deja verificada de una',
   );
 }
 

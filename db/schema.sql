@@ -90,14 +90,17 @@ CREATE TYPE rally_length AS ENUM ('corto', 'medio', 'largo');
 -- Usuarios
 -- ---------------------------------------------------------------------
 CREATE TABLE users (
-  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  email         CITEXT NOT NULL UNIQUE,
-  phone         TEXT,
-  password_hash TEXT NOT NULL,
-  full_name     TEXT NOT NULL,
-  primary_role  user_role NOT NULL,
-  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email             CITEXT NOT NULL UNIQUE,
+  phone             TEXT,
+  password_hash     TEXT NOT NULL,
+  full_name         TEXT NOT NULL,
+  primary_role      user_role NOT NULL,
+  -- NULL = sin verificar (ver decisión #48). Se pobla al registrarse por Google (el correo ya
+  -- viene confirmado por Google) o al canjear el código de email_verification_tokens.
+  email_verified_at TIMESTAMPTZ,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE INDEX idx_users_primary_role ON users (primary_role);
@@ -132,6 +135,21 @@ CREATE TABLE password_reset_tokens (
 );
 
 CREATE INDEX idx_password_reset_tokens_user_id ON password_reset_tokens (user_id);
+
+-- Códigos de un solo uso para verificar el correo al registrarse (ver decisión #48) — mismo
+-- diseño que password_reset_tokens de arriba (varios códigos históricos, solo el más reciente
+-- sin usar/vencer es válido).
+CREATE TABLE email_verification_tokens (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id    UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  code_hash  TEXT NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  used_at    TIMESTAMPTZ,
+  attempts   INT NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_email_verification_tokens_user_id ON email_verification_tokens (user_id);
 
 -- ---------------------------------------------------------------------
 -- Entrenadores
@@ -2216,4 +2234,19 @@ CREATE INDEX idx_push_tokens_user_id ON push_tokens (user_id);
 --     en clubService.updateTournamentForClub (server) y reflejada en la
 --     UI vía TournamentSummary.hasActiveBookings (cliente deshabilita
 --     los date pickers, pero el server la vuelve a chequear de verdad).
+-- 48. users.email_verified_at + email_verification_tokens: verificación de correo al
+--     registrarse (mismo código de 6 dígitos que password_reset_tokens, no un link — esta app
+--     no tiene deep-linking configurado, ver comentario en ForgotPasswordScreen). Motivo real:
+--     un correo mal escrito al registrarse deja una cuenta inservible sin que nadie se entere
+--     (no puede recibir "olvidé mi contraseña" ni ningún aviso) — pasó de verdad con la propia
+--     cuenta del fundador en producción. Cuentas por Google quedan verificadas de entrada (Google
+--     ya confirmó el correo, ver googleAuthService); las de contraseña quedan sin verificar hasta
+--     canjear el código. La aplicación de la regla vive solo en el cliente (AuthenticatedHome en
+--     app/index.tsx bloquea el home del rol hasta verificar, mismo criterio que
+--     CoachVerificationPendingScreen para coach approval) — no en un guard centralizado de rutas,
+--     porque la mayoría de las rutas de negocio ya no exigen JWT hoy (ver comentario en
+--     app.ts#authenticate), así que un guard ahí no cubriría nada que la UI no cubra ya. Se
+--     agregó también PUT /auth/me/email (autenticado) para poder corregir el correo típeado sin
+--     tener que pedirle a alguien con acceso a la base que lo arregle a mano — cambiar el correo
+--     vuelve a poner email_verified_at en NULL y manda un código nuevo.
 -- =====================================================================

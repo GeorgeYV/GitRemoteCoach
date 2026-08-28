@@ -18,6 +18,7 @@ function mapRow(row: any): UserRecord {
     phone: row.phone,
     primaryRole: row.primary_role,
     passwordHash: row.password_hash,
+    emailVerifiedAt: row.email_verified_at,
   };
 }
 
@@ -41,15 +42,41 @@ export async function listEmailsByRole(role: UserRole, db: Queryable = pool): Pr
 }
 
 export async function create(
-  params: { email: string; passwordHash: string | null; fullName: string; primaryRole: UserRole },
+  params: {
+    email: string;
+    passwordHash: string | null;
+    fullName: string;
+    primaryRole: UserRole;
+    /** true en el alta por Google (el correo ya viene confirmado por Google, ver
+     * googleAuthService) — de resto queda sin verificar hasta canjear el código. */
+    emailVerified?: boolean;
+  },
   db: Queryable = pool,
 ): Promise<UserRecord> {
   const { rows } = await db.query(
-    `INSERT INTO users (email, password_hash, full_name, primary_role)
-     VALUES ($1, $2, $3, $4)
+    `INSERT INTO users (email, password_hash, full_name, primary_role, email_verified_at)
+     VALUES ($1, $2, $3, $4, $5)
      RETURNING *`,
-    [params.email, params.passwordHash, params.fullName, params.primaryRole],
+    [params.email, params.passwordHash, params.fullName, params.primaryRole, params.emailVerified ? new Date() : null],
   );
+  return mapRow(rows[0]);
+}
+
+/** authService.register llama a esto justo tras crear la cuenta con contraseña — separado de
+ * create() para no acoplar emailVerificationService (que manda el correo) con el INSERT. */
+export async function markEmailVerified(userId: string, db: Queryable = pool): Promise<void> {
+  await db.query(`UPDATE users SET email_verified_at = now(), updated_at = now() WHERE id = $1`, [userId]);
+}
+
+/** PUT /auth/me/email — corregir un correo mal escrito (ver decisión #48) o cambiarlo por otro
+ * motivo. Vuelve a poner email_verified_at en NULL: cambiar el correo invalida la verificación
+ * anterior, el nuevo correo no está confirmado todavía. */
+export async function updateEmail(userId: string, email: string, db: Queryable = pool): Promise<UserRecord> {
+  const { rows } = await db.query(
+    `UPDATE users SET email = $2, email_verified_at = NULL, updated_at = now() WHERE id = $1 RETURNING *`,
+    [userId, email],
+  );
+  if (rows.length === 0) throw new NotFoundError('User', userId);
   return mapRow(rows[0]);
 }
 

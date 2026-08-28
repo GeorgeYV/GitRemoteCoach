@@ -2,16 +2,19 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import {
   ApiError,
+  changeEmail as changeEmailRequest,
   completeGoogleRegistration as completeGoogleRegistrationRequest,
   getCurrentUser,
   loginUser,
   PublicUser,
   registerPushToken,
   registerUser,
+  resendVerificationCode as resendVerificationCodeRequest,
   signInWithGoogle,
   unregisterPushToken,
   updateProfile as updateProfileRequest,
   UserRole,
+  verifyEmail as verifyEmailRequest,
 } from '../lib/api';
 import { registerForPushNotificationsAsync } from '../lib/notifications';
 
@@ -40,6 +43,12 @@ interface AuthContextValue {
     primaryRole: Exclude<UserRole, 'platform_admin'>;
   }) => Promise<void>;
   updateProfile: (params: { fullName: string; phone?: string }) => Promise<void>;
+  /** VerifyEmailGateScreen — canjea el código de 6 dígitos. Actualiza el user en memoria con
+   * emailVerifiedAt ya poblado (no hace falta relogin). */
+  verifyEmail: (code: string) => Promise<void>;
+  resendVerificationCode: () => Promise<void>;
+  /** VerifyEmailGateScreen "¿Correo incorrecto?" — corrige el correo y vuelve a mandar el código. */
+  changeEmail: (email: string) => Promise<void>;
   logout: () => void;
 }
 
@@ -146,6 +155,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(await updateProfileRequest(token, params));
       } catch (err) {
         setError(err instanceof ApiError ? err.message : 'No se pudo actualizar tu perfil');
+        throw err;
+      }
+    },
+    verifyEmail: async (code) => {
+      if (!token) throw new Error('No hay una sesión activa.');
+      setError(null);
+      try {
+        setUser(await verifyEmailRequest(token, code));
+      } catch (err) {
+        setError(err instanceof ApiError ? err.message : 'No se pudo verificar el código');
+        throw err;
+      }
+    },
+    resendVerificationCode: async () => {
+      if (!token) throw new Error('No hay una sesión activa.');
+      setError(null);
+      try {
+        await resendVerificationCodeRequest(token);
+      } catch (err) {
+        setError(err instanceof ApiError ? err.message : 'No se pudo reenviar el código');
+        throw err;
+      }
+    },
+    changeEmail: async (email) => {
+      if (!token) throw new Error('No hay una sesión activa.');
+      setError(null);
+      try {
+        setUser(await changeEmailRequest(token, email));
+      } catch (err) {
+        setError(err instanceof ApiError ? err.message : 'No se pudo cambiar el correo');
         throw err;
       }
     },

@@ -35,7 +35,13 @@ export async function signInWithGoogle(params: {
       provider: 'google',
       providerUserId: identity.googleId,
     });
-    return { status: 'loggedIn', user: toPublicUser(existingUserByEmail) };
+    // Si esa cuenta todavía no había verificado su correo (registrada con contraseña, nunca
+    // canjeó el código), vincular con Google ya es prueba suficiente de que el correo es real —
+    // ver decisión #48.
+    if (!existingUserByEmail.emailVerifiedAt) {
+      await userRepository.markEmailVerified(existingUserByEmail.id);
+    }
+    return { status: 'loggedIn', user: toPublicUser(await userRepository.findById(existingUserByEmail.id)) };
   }
 
   return { status: 'pendingRegistration', googleId: identity.googleId, email: identity.email, name: identity.name };
@@ -56,7 +62,13 @@ export async function completeGoogleRegistration(params: {
 
   return withTransaction(async (client) => {
     const user = await userRepository.create(
-      { email: params.email, passwordHash: null, fullName: params.name, primaryRole: params.primaryRole },
+      {
+        email: params.email,
+        passwordHash: null,
+        fullName: params.name,
+        primaryRole: params.primaryRole,
+        emailVerified: true,
+      },
       client,
     );
     await oauthIdentityRepository.create(

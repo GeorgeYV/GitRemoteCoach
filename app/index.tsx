@@ -10,6 +10,7 @@ import PlatformAdminFlow from '../screens/admin/PlatformAdminFlow';
 import CoachRegistrationScreen from '../screens/coach/CoachRegistrationScreen';
 import CoachVerificationPendingScreen from '../screens/coach/CoachVerificationPendingScreen';
 import ParentHomeScreen from '../screens/parent/ParentHomeScreen';
+import VerifyEmailGateScreen from '../screens/auth/VerifyEmailGateScreen';
 
 /**
  * Gatea el home del coach en el estado real de su coach_profiles: sin fila todavía → formulario
@@ -96,6 +97,11 @@ export default function AuthenticatedHome() {
 
   // Stack.Protected en app/_layout.tsx garantiza que esta ruta solo se monta con sesión activa.
   if (!user) return null;
+
+  // Ver decisión #48 en db/schema.sql — cuentas ya existentes antes de esta funcionalidad quedan
+  // verificadas por defecto (backfill en el schema), así que esto solo frena a cuentas nuevas por
+  // contraseña que todavía no canjearon el código. Cuentas por Google llegan ya verificadas.
+  if (!user.emailVerifiedAt) return <VerifyEmailGateScreen />;
 
   // Parent, coach y club_admin ya tienen su propio botón "Salir" dentro del flujo — este chip
   // flotante se sobreponía a botones de esas pantallas (p. ej. "Crear torneo"). Solo

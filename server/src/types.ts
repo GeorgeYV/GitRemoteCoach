@@ -51,6 +51,9 @@ export interface PublicUser {
   fullName: string;
   phone: string | null;
   primaryRole: UserRole;
+  /** NULL = correo sin verificar (ver decisión #48). ISO string, no Date — mismo criterio que el
+   * resto de PublicUser, que viaja tal cual al cliente. */
+  emailVerifiedAt: string | null;
 }
 
 export interface Booking {

@@ -54,6 +54,8 @@ export interface PublicUser {
   fullName: string;
   phone: string | null;
   primaryRole: UserRole;
+  /** NULL = correo sin verificar (ver decisión #48 en db/schema.sql). */
+  emailVerifiedAt: string | null;
 }
 
 export interface AuthSession {
@@ -101,6 +103,34 @@ export function resetPassword(params: { email: string; code: string; newPassword
   message: string;
 }> {
   return request('/auth/reset-password', { method: 'POST', body: JSON.stringify(params) });
+}
+
+/** POST /auth/verify-email — VerifyEmailGateScreen. Devuelve el usuario actualizado (con
+ * emailVerifiedAt ya poblado) para que AuthContext pueda salir de la pantalla de bloqueo. */
+export function verifyEmail(authToken: string, code: string): Promise<PublicUser> {
+  return request('/auth/verify-email', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${authToken}` },
+    body: JSON.stringify({ code }),
+  });
+}
+
+/** POST /auth/resend-verification — VerifyEmailGateScreen "Reenviar código". */
+export function resendVerificationCode(authToken: string): Promise<{ message: string }> {
+  return request('/auth/resend-verification', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${authToken}` },
+  });
+}
+
+/** PUT /auth/me/email — VerifyEmailGateScreen "¿Correo incorrecto?". Reinicia la verificación y
+ * manda un código nuevo a la dirección corregida. */
+export function changeEmail(authToken: string, email: string): Promise<PublicUser> {
+  return request('/auth/me/email', {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${authToken}` },
+    body: JSON.stringify({ email }),
+  });
 }
 
 export type GoogleSignInResult =

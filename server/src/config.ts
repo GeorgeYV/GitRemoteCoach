@@ -49,6 +49,11 @@ export const businessRules = {
   passwordResetCodeTtlMinutes: 15,
   /** Intentos fallidos permitidos antes de invalidar el código. */
   passwordResetMaxAttempts: 5,
+  /** Vigencia del código de verificación de correo (decisión #48) — más generoso que el de
+   * contraseña porque no hay urgencia de seguridad, solo confirmar que el correo es real. */
+  emailVerificationCodeTtlMinutes: 60,
+  /** Intentos fallidos permitidos antes de invalidar el código de verificación. */
+  emailVerificationMaxAttempts: 5,
 };
 
 /**

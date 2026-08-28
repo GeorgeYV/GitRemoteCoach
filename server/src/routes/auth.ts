@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import * as authService from '../services/authService.js';
 import * as passwordResetService from '../services/passwordResetService.js';
+import * as emailVerificationService from '../services/emailVerificationService.js';
 import * as googleAuthService from '../services/googleAuthService.js';
 import { AppError, ValidationError } from '../lib/errors.js';
 
@@ -32,6 +33,14 @@ const resetPasswordSchema = z.object({
   email: z.string().email(),
   code: z.string().length(6),
   newPassword: z.string().min(8),
+});
+
+const verifyEmailSchema = z.object({
+  code: z.string().length(6),
+});
+
+const changeEmailSchema = z.object({
+  email: z.string().email(),
 });
 
 const googleSignInSchema = z.object({
@@ -102,6 +111,32 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
     await passwordResetService.resetPassword(parsed.data);
     return { message: 'Contraseña actualizada' };
+  });
+
+  // VerifyEmailGateScreen (decisión #48) — el código llega por correo al registrarse.
+  app.post('/auth/verify-email', { preHandler: app.authenticate }, async (req) => {
+    const parsed = verifyEmailSchema.safeParse(req.body);
+    if (!parsed.success) throw new ValidationError(parsed.error.message);
+
+    const { sub } = req.user as { sub: string };
+    return emailVerificationService.verifyEmail(sub, parsed.data.code);
+  });
+
+  // VerifyEmailGateScreen "Reenviar código".
+  app.post('/auth/resend-verification', { preHandler: app.authenticate }, async (req) => {
+    const { sub } = req.user as { sub: string };
+    await emailVerificationService.sendVerificationCode(sub);
+    return { message: 'Código reenviado' };
+  });
+
+  // VerifyEmailGateScreen "¿Correo incorrecto?" — corrige un typo sin depender de que alguien
+  // con acceso a la base lo arregle a mano (ver decisión #48).
+  app.put('/auth/me/email', { preHandler: app.authenticate }, async (req) => {
+    const parsed = changeEmailSchema.safeParse(req.body);
+    if (!parsed.success) throw new ValidationError(parsed.error.message);
+
+    const { sub } = req.user as { sub: string };
+    return emailVerificationService.changeEmail(sub, parsed.data.email);
   });
 
   app.post('/auth/google', async (req) => {
