@@ -60,8 +60,9 @@ export const VERIFICATION_DOC_CHECKLIST: DocumentItem[] = [
   {
     id: 'club_reference',
     title: 'Referencias de club o academia',
-    subtitle: 'Al menos un contacto que confirme tu experiencia',
+    subtitle: 'Un plus para que el padre tenga una referencia extra de tu experiencia',
     status: 'pending',
+    optional: true,
   },
 ];
 
