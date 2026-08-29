@@ -156,7 +156,7 @@ export async function rejectBooking(bookingId: string): Promise<Booking> {
   const parentUserId = await bookingRepository.getParentUserIdForBooking(bookingId);
   await notificationService.notifyUser(parentUserId, {
     title: 'Solicitud rechazada',
-    body: 'Tu entrenador no pudo aceptar tu solicitud — buscá otra fecha u otro entrenador.',
+    body: 'Tu entrenador no pudo aceptar tu solicitud — busca otra fecha u otro entrenador.',
     data: { bookingId },
   });
 
