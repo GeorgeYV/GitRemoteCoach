@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { ApiError, Club, listPendingClubVerifications, reviewClubVerification } from '../../lib/api';
@@ -85,11 +85,15 @@ export default function PlatformAdminClubVerificationScreen() {
                     </Text>
                     {club.contactEmail && <Text style={styles.clubMeta}>{club.contactEmail}</Text>}
                     {club.contactPhone && <Text style={styles.clubMeta}>{club.contactPhone}</Text>}
-                    <Text style={club.identityDocumentUrl ? styles.identityOk : styles.identityMissing}>
-                      {club.identityDocumentUrl
-                        ? '✓ Identidad recibida'
-                        : `⚠ Sin identidad (${CLUB_TYPE_LABELS_LOWER[club.type]} de antes de este requisito)`}
-                    </Text>
+                    {club.identityDocumentUrl ? (
+                      <Pressable onPress={() => Linking.openURL(club.identityDocumentUrl!)}>
+                        <Text style={styles.identityOk}>✓ Identidad recibida — ver documento</Text>
+                      </Pressable>
+                    ) : (
+                      <Text style={styles.identityMissing}>
+                        {`⚠ Sin identidad (${CLUB_TYPE_LABELS_LOWER[club.type]} de antes de este requisito)`}
+                      </Text>
+                    )}
                   </View>
                   <View style={styles.clubActions}>
                     <Pressable style={styles.rejectButton} onPress={() => respond(club.id, 'rejected')} disabled={acting}>
@@ -187,6 +191,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     marginTop: 6,
+    textDecorationLine: 'underline',
   },
   identityMissing: {
     color: colors.amber,

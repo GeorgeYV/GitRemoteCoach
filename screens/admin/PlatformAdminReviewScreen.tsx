@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import {
@@ -105,6 +105,9 @@ export default function PlatformAdminReviewScreen() {
                           {label.optional && <Text style={styles.docOptional}>Opcional</Text>}
                         </View>
                         <View style={styles.docActions}>
+                          <Pressable style={styles.viewButton} onPress={() => Linking.openURL(doc.fileUrl)}>
+                            <Ionicons name="eye-outline" size={16} color={colors.textSoft} />
+                          </Pressable>
                           <Pressable
                             style={styles.rejectButton}
                             onPress={() => respond(doc.id, 'rejected')}
@@ -223,6 +226,15 @@ const styles = StyleSheet.create({
   docActions: {
     flexDirection: 'row',
     gap: 8,
+  },
+  viewButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   rejectButton: {
     width: 32,
