@@ -98,7 +98,7 @@ export async function registerCoachProfile(
   if (params.documents.length > 0) {
     await notificationService.notifyRoleByEmail('platform_admin', {
       subject: 'Nuevo entrenador para verificar — Remote Coach',
-      html: `<p><strong>${result.profile.city}</strong> tiene un entrenador nuevo con documentos pendientes de revisión.</p>`,
+      html: `<p>Nuevo entrenador en <strong>${result.profile.city}</strong> con documentos pendientes de revisión.</p>`,
     });
   }
 
