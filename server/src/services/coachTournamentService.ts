@@ -44,6 +44,11 @@ export async function setAvailability(
   });
 }
 
+/** CoachTournamentSearchScreen: ver comentario en coachTournamentRepository.listConfiguredTournamentIdsForCoach. */
+export async function listConfiguredTournamentIds(coachId: string): Promise<string[]> {
+  return coachTournamentRepository.listConfiguredTournamentIdsForCoach(coachId);
+}
+
 export async function setRate(
   coachId: string,
   tournamentId: string,

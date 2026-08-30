@@ -10,6 +10,7 @@ import { CoachBooking } from '../../mock/coachFlow';
 // "Mi perfil"/"Disponibilidad"/"Ingresos" ya viven en CoachTabBar (barra de abajo) — solo quedan
 // acá los accesos que la barra no cubre, para no duplicar el mismo destino en dos lugares.
 const QUICK_LINKS = [
+  { key: 'configuredTournaments', label: 'Mis torneos con disponibilidad', hint: 'Revisa o edita lo que ya configuraste' },
   { key: 'sessions', label: 'Historial de sesiones', hint: 'Revisa partidos pasados y en curso' },
   { key: 'reputation', label: 'Reputación', hint: 'Reseñas y estadísticas de actividad' },
 ] as const;
@@ -44,6 +45,7 @@ export default function CoachHomeScreen({
   onOpenReputation,
   onOpenInvitation,
   onOpenAvailability,
+  onOpenConfiguredTournaments,
   onLogout,
   tabBar,
 }: {
@@ -67,10 +69,14 @@ export default function CoachHomeScreen({
   /** "Explora torneos" (ver más abajo) — guía a un coach sin solicitudes todavía a la pestaña
    * Disponibilidad, que arranca en CoachTournamentSearchScreen (buscar/elegir torneo). */
   onOpenAvailability?: () => void;
+  /** "Mis torneos con disponibilidad" en Accesos rápidos — mismo destino que onOpenAvailability
+   * pero con el filtro "Con disponibilidad" ya activado (ver CoachTournamentSearchScreen). */
+  onOpenConfiguredTournaments?: () => void;
   onLogout?: () => void;
   tabBar?: React.ReactNode;
 }) {
   const quickLinkHandlers: Record<(typeof QUICK_LINKS)[number]['key'], (() => void) | undefined> = {
+    configuredTournaments: onOpenConfiguredTournaments,
     sessions: onOpenSessions,
     reputation: onOpenReputation,
   };
@@ -130,9 +136,10 @@ export default function CoachHomeScreen({
           </Pressable>
         )}
 
-        <Text style={styles.sectionLabel}>{nextSessions && nextSessions.length > 1 ? 'Próximas sesiones' : 'Próxima sesión'}</Text>
-        {nextSessions && nextSessions.length > 0 ? (
-          <View style={styles.nextGroup}>
+        {nextSessions && nextSessions.length > 0 && (
+          <>
+            <Text style={styles.sectionLabel}>{nextSessions.length > 1 ? 'Próximas sesiones' : 'Próxima sesión'}</Text>
+            <View style={styles.nextGroup}>
             {nextSessions.map((session) => {
               const countdown = daysUntilCountdown(session.matchDatetime);
               return (
@@ -169,17 +176,14 @@ export default function CoachHomeScreen({
                 </Pressable>
               );
             })}
-            {!!upcomingCount && upcomingCount > nextSessions.length && (
-              <Pressable style={styles.seeAllRow} onPress={onOpenSessions}>
-                <Text style={styles.seeAllLabel}>Ver todas ({upcomingCount})</Text>
-                <Text style={styles.chevron}>›</Text>
-              </Pressable>
-            )}
-          </View>
-        ) : (
-          <View style={styles.emptyCard}>
-            <Text style={styles.emptyText}>No tienes sesiones confirmadas por ahora.</Text>
-          </View>
+              {!!upcomingCount && upcomingCount > nextSessions.length && (
+                <Pressable style={styles.seeAllRow} onPress={onOpenSessions}>
+                  <Text style={styles.seeAllLabel}>Ver todas ({upcomingCount})</Text>
+                  <Text style={styles.chevron}>›</Text>
+                </Pressable>
+              )}
+            </View>
+          </>
         )}
 
         <Text style={styles.sectionLabel}>Accesos rápidos</Text>
@@ -477,19 +481,6 @@ const styles = StyleSheet.create({
     color: colors.textDim,
     fontSize: 20,
     fontWeight: '700',
-  },
-  emptyCard: {
-    backgroundColor: colors.panel,
-    borderRadius: radius,
-    padding: 18,
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  emptyText: {
-    color: colors.textDim,
-    fontSize: 13,
-    textAlign: 'center',
   },
   linkList: {
     gap: 10,

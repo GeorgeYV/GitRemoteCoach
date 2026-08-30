@@ -11,6 +11,7 @@ import {
   CountryCode,
   getCoachProfile,
   listCoachClubTags,
+  listConfiguredCoachTournamentIds,
   searchTournaments,
   TournamentSearchResult,
 } from '../../lib/api';
@@ -35,18 +36,24 @@ export default function CoachTournamentSearchScreen({
   onSelect,
   onBack,
   tabBar,
+  /** CoachHomeScreen "Ver mis torneos con disponibilidad" — arranca con el filtro ya activado en
+   * vez de que el coach tenga que encontrar y tocar el chip él mismo. */
+  initialConfiguredFilter,
 }: {
   onSelect: (tournament: TournamentSearchResult) => void;
   onBack?: () => void;
   tabBar?: React.ReactNode;
+  initialConfiguredFilter?: boolean;
 }) {
   const { user, token } = useAuth();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<TournamentSearchResult[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [clubTags, setClubTags] = useState<CoachClubTag[]>([]);
+  const [configuredIds, setConfiguredIds] = useState<Set<string>>(new Set());
   const [defaultCountry, setDefaultCountry] = useState<CountryCode | null>(null);
   const [countryFilterOn, setCountryFilterOn] = useState(true);
+  const [configuredFilterOn, setConfiguredFilterOn] = useState(!!initialConfiguredFilter);
   const [reportTarget, setReportTarget] = useState<{ id: string; name: string } | null>(null);
 
   useEffect(() => {
@@ -59,6 +66,22 @@ export default function CoachTournamentSearchScreen({
       cancelled = true;
     };
   }, [user]);
+
+  // Píldora "Disponibilidad lista" + filtro "Con disponibilidad" (ver comentario del lado del
+  // servidor) — recarga cuando vuelve el foco a esta pantalla no hace falta: se re-monta entera
+  // cada vez que el coach entra desde el tab, así que siempre trae el estado actual.
+  useEffect(() => {
+    if (!user || !token) return;
+    let cancelled = false;
+    listConfiguredCoachTournamentIds(token, user.id)
+      .then(({ tournamentIds }) => {
+        if (!cancelled) setConfiguredIds(new Set(tournamentIds));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [user, token]);
 
   // País donde entrena — default del toggle "mi país"/"todos" de abajo.
   useEffect(() => {
@@ -97,6 +120,8 @@ export default function CoachTournamentSearchScreen({
       clearTimeout(handle);
     };
   }, [query, activeCountry]);
+
+  const visibleResults = results ? (configuredFilterOn ? results.filter((t) => configuredIds.has(t.id)) : results) : [];
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -142,6 +167,19 @@ export default function CoachTournamentSearchScreen({
         </View>
       )}
 
+      {configuredIds.size > 0 && (
+        <View style={styles.countryToggleRow}>
+          <Pressable
+            style={[styles.countryToggleChip, configuredFilterOn && styles.countryToggleChipActive]}
+            onPress={() => setConfiguredFilterOn((v) => !v)}
+          >
+            <Text style={[styles.countryToggleLabel, configuredFilterOn && styles.countryToggleLabelActive]}>
+              Con disponibilidad
+            </Text>
+          </Pressable>
+        </View>
+      )}
+
       {loadError ? (
         <View style={styles.emptyState}>
           <Text style={styles.emptyText}>{loadError}</Text>
@@ -152,18 +190,23 @@ export default function CoachTournamentSearchScreen({
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.list}>
-          {results.map((tournament) => (
+          {visibleResults.map((tournament) => (
             <TournamentCard
               key={tournament.id}
               tournament={tournament}
               clubTags={clubTags}
+              configured={configuredIds.has(tournament.id)}
               onPress={() => onSelect(tournament)}
               onReport={() => setReportTarget({ id: tournament.id, name: tournament.name })}
             />
           ))}
 
-          {results.length === 0 && (
-            <Text style={styles.emptyText}>No encontramos torneos con ese nombre, sede o ciudad.</Text>
+          {visibleResults.length === 0 && (
+            <Text style={styles.emptyText}>
+              {configuredFilterOn
+                ? 'Todavía no configuraste disponibilidad en ningún torneo.'
+                : 'No encontramos torneos con ese nombre, sede o ciudad.'}
+            </Text>
           )}
         </ScrollView>
       )}
@@ -185,11 +228,14 @@ export default function CoachTournamentSearchScreen({
 function TournamentCard({
   tournament,
   clubTags,
+  configured,
   onPress,
   onReport,
 }: {
   tournament: TournamentSearchResult;
   clubTags: CoachClubTag[];
+  /** true si el coach ya guardó disponibilidad/tarifa acá — ver GET .../configured-tournaments. */
+  configured: boolean;
   onPress: () => void;
   onReport: () => void;
 }) {
@@ -202,6 +248,12 @@ function TournamentCard({
         <View style={styles.cardTitleWrap}>
           <Text style={styles.tournamentName}>{tournament.name}</Text>
           {tagging && <ClubTagBadge clubName={tagging.clubName} />}
+          {configured && (
+            <View style={styles.configuredPill}>
+              <Ionicons name="checkmark" size={11} color={colors.courtBlue} />
+              <Text style={styles.configuredPillLabel}>Disponibilidad lista</Text>
+            </View>
+          )}
         </View>
         {/* Pressable anidado dentro del Pressable de la tarjeta — RN prioriza el más interno,
            así que no dispara onPress de la tarjeta (mismo criterio que ParentHomeScreen). */}
@@ -217,7 +269,7 @@ function TournamentCard({
         {countdown && <Text style={[styles.countdown, { color: countdown.color }]}> · {countdown.text}</Text>}
       </Text>
       <View style={styles.selectRow}>
-        <Text style={styles.selectLabel}>Configurar disponibilidad</Text>
+        <Text style={styles.selectLabel}>{configured ? 'Editar disponibilidad' : 'Configurar disponibilidad'}</Text>
         <Text style={styles.chevron}>›</Text>
       </View>
     </Pressable>
@@ -323,8 +375,25 @@ const styles = StyleSheet.create({
   cardTitleWrap: {
     flex: 1,
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     gap: 8,
+  },
+  configuredPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: withOpacity(colors.ballLime, 0.14),
+    borderWidth: 1,
+    borderColor: withOpacity(colors.ballLime, 0.4),
+    borderRadius: 10,
+    paddingVertical: 3,
+    paddingHorizontal: 7,
+  },
+  configuredPillLabel: {
+    color: colors.courtBlue,
+    fontSize: 10,
+    fontWeight: '700',
   },
   reportButton: {
     paddingHorizontal: 4,

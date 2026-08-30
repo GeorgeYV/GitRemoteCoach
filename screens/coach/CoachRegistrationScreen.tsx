@@ -246,6 +246,12 @@ export default function CoachRegistrationScreen({
         </View>
 
         <Section label="Datos personales">
+          {profile && user?.email && (
+            <View style={styles.emailRow}>
+              <Ionicons name="mail-outline" size={16} color={colors.textDim} />
+              <Text style={styles.emailText}>{user.email}</Text>
+            </View>
+          )}
           <IconTextInput icon="person-outline" placeholder="Nombre completo" value={name} onChangeText={setName} />
           <View style={styles.row2}>
             <IconTextInput
@@ -456,6 +462,16 @@ const styles = StyleSheet.create({
     color: colors.textDim,
     fontSize: 12,
     marginTop: 10,
+  },
+  emailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 14,
+  },
+  emailText: {
+    color: colors.textSoft,
+    fontSize: 13,
   },
   fieldHint: {
     color: colors.textDim,

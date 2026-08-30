@@ -953,6 +953,14 @@ export function setCoachTournamentAvailability(
   });
 }
 
+/** GET /coaches/:coachId/configured-tournaments — CoachTournamentSearchScreen: píldora
+ * "Disponibilidad lista" + filtro "Con disponibilidad". */
+export function listConfiguredCoachTournamentIds(authToken: string, coachId: string): Promise<{ tournamentIds: string[] }> {
+  return request(`/coaches/${coachId}/configured-tournaments`, {
+    headers: { Authorization: `Bearer ${authToken}` },
+  });
+}
+
 /** PUT /coaches/:coachId/tournaments/:tournamentId/rate — CoachAvailabilityScreen. */
 export function setCoachTournamentRate(
   authToken: string,

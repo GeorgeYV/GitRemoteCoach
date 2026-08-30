@@ -4,6 +4,7 @@ import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollVie
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ClubTagBadge from '../../components/coach/ClubTagBadge';
 import TogglePill from '../../components/coach/TogglePill';
+import TimePickerField from '../../components/shared/TimePickerField';
 import { useAuth } from '../../context/AuthContext';
 import {
   ApiError,
@@ -78,6 +79,10 @@ export default function CoachAvailabilityScreen({
   const [saved, setSaved] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // El header (+ banner de etiqueta, si aplica) vive AFUERA del KeyboardAvoidingView, así que un
+  // keyboardVerticalOffset fijo no alcanza — con la tarjeta de etiqueta presente el header mide
+  // más, y un offset corto dejaba el campo de monto tapado por el teclado al enfocarlo.
+  const [headerHeight, setHeaderHeight] = useState(0);
 
   useEffect(() => {
     if (!user) return;
@@ -202,35 +207,37 @@ export default function CoachAvailabilityScreen({
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <View style={styles.header}>
-        <Pressable style={styles.backButton} onPress={onBack}>
-          <Text style={styles.backIcon}>←</Text>
-        </Pressable>
-        <View style={styles.headerText}>
-          <Text style={styles.tournamentName} numberOfLines={1}>
-            {tournament.name}
-          </Text>
-          <Text style={styles.tournamentMeta} numberOfLines={1}>
-            {tournament.venue} · {dateRangeLabel(tournament.startDate, tournament.endDate)}
-          </Text>
+      <View onLayout={(e) => setHeaderHeight(e.nativeEvent.layout.height)}>
+        <View style={styles.header}>
+          <Pressable style={styles.backButton} onPress={onBack}>
+            <Text style={styles.backIcon}>←</Text>
+          </Pressable>
+          <View style={styles.headerText}>
+            <Text style={styles.tournamentName} numberOfLines={1}>
+              {tournament.name}
+            </Text>
+            <Text style={styles.tournamentMeta} numberOfLines={1}>
+              {tournament.venue} · {dateRangeLabel(tournament.startDate, tournament.endDate)}
+            </Text>
+          </View>
         </View>
-      </View>
 
-      {tagging && (
-        <View style={styles.taggingBanner}>
-          <ClubTagBadge clubName={tagging.clubName} />
-          <Text style={styles.taggingBannerText}>
-            Te etiquetaron como entrenador oficial para este torneo — los padres ya ven la insignia en tu perfil.
-          </Text>
-        </View>
-      )}
+        {tagging && (
+          <View style={styles.taggingBanner}>
+            <ClubTagBadge clubName={tagging.clubName} />
+            <Text style={styles.taggingBannerText}>
+              Te etiquetaron como entrenador oficial para este torneo — los padres ya ven la insignia en tu perfil.
+            </Text>
+          </View>
+        )}
+      </View>
 
       <KeyboardAvoidingView
         style={styles.flexArea}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={8}
+        keyboardVerticalOffset={headerHeight}
       >
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Section label="Días disponibles">
           <View style={styles.daysList}>
             {days.map((day, i) => {
@@ -255,22 +262,17 @@ export default function CoachAvailabilityScreen({
                         Excepción de horario (opcional) — ej. clases en la academia
                       </Text>
                       <View style={styles.exceptionInputsRow}>
-                        <TextInput
-                          style={styles.exceptionInput}
+                        <TimePickerField
+                          placeholder="Desde"
                           value={day.unavailableFrom}
-                          onChangeText={(v) => changeExceptionTime(i, 'unavailableFrom', v)}
-                          placeholder="Desde (15:00)"
-                          placeholderTextColor={colors.textDim}
-                          maxLength={5}
+                          onChange={(v) => changeExceptionTime(i, 'unavailableFrom', v)}
                         />
                         <Text style={styles.exceptionDash}>–</Text>
-                        <TextInput
-                          style={styles.exceptionInput}
+                        <TimePickerField
+                          placeholder="Hasta"
                           value={day.unavailableTo}
-                          onChangeText={(v) => changeExceptionTime(i, 'unavailableTo', v)}
-                          placeholder="Hasta (17:00)"
-                          placeholderTextColor={colors.textDim}
-                          maxLength={5}
+                          onChange={(v) => changeExceptionTime(i, 'unavailableTo', v)}
+                          minTime={day.unavailableFrom || undefined}
                         />
                       </View>
                       {exceptionError && <Text style={styles.exceptionError}>{exceptionError}</Text>}
@@ -484,17 +486,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-  },
-  exceptionInput: {
-    flex: 1,
-    backgroundColor: colors.panelLight,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    color: colors.lineWhite,
-    fontSize: 13,
   },
   exceptionDash: {
     color: colors.textDim,

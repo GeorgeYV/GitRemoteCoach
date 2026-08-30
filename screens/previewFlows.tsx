@@ -97,11 +97,19 @@ export function CoachFlow({
 export function CoachAvailabilityFlow({
   onBack,
   tabBar,
-}: { onBack?: () => void; tabBar?: React.ReactNode } = {}) {
+  initialConfiguredFilter,
+}: { onBack?: () => void; tabBar?: React.ReactNode; initialConfiguredFilter?: boolean } = {}) {
   const [tournament, setTournament] = useState<TournamentSearchResult | null>(null);
 
   if (!tournament) {
-    return <CoachTournamentSearchScreen onSelect={setTournament} onBack={onBack} tabBar={tabBar} />;
+    return (
+      <CoachTournamentSearchScreen
+        onSelect={setTournament}
+        onBack={onBack}
+        tabBar={tabBar}
+        initialConfiguredFilter={initialConfiguredFilter}
+      />
+    );
   }
 
   return <CoachAvailabilityScreen tournament={tournament} onBack={() => setTournament(null)} />;
@@ -339,6 +347,9 @@ export function CoachHomeFlow({ coachId, coachName }: { coachId: string; coachNa
   const [suspendedMatch, setSuspendedMatch] = useState<SuspendedMatchSummary | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
+  // "Explora torneos disponibles" arranca en false, "Mis torneos con disponibilidad" en true —
+  // mismo `step` ('availability') para las dos, solo cambia con qué filtro arranca la búsqueda.
+  const [availabilityFilterOn, setAvailabilityFilterOn] = useState(false);
   const [step, setStep] = useState<
     | 'home'
     | 'detail'
@@ -512,7 +523,10 @@ export function CoachHomeFlow({ coachId, coachName }: { coachId: string; coachNa
       <CoachRequestInboxScreen
         coachId={coachId}
         onBack={() => setStep('home')}
-        onOpenAvailability={() => setStep('availability')}
+        onOpenAvailability={() => {
+          setAvailabilityFilterOn(false);
+          setStep('availability');
+        }}
         tabBar={<CoachTabBar active="requests" onSelect={setStep} />}
       />
     );
@@ -540,6 +554,7 @@ export function CoachHomeFlow({ coachId, coachName }: { coachId: string; coachNa
       <CoachAvailabilityFlow
         onBack={() => setStep('home')}
         tabBar={<CoachTabBar active="availability" onSelect={setStep} />}
+        initialConfiguredFilter={availabilityFilterOn}
       />
     );
   }
@@ -610,7 +625,14 @@ export function CoachHomeFlow({ coachId, coachName }: { coachId: string; coachNa
       onOpenEarnings={() => setStep('earnings')}
       onOpenReputation={() => setStep('reputation')}
       onOpenInvitation={() => setStep('invitation')}
-      onOpenAvailability={() => setStep('availability')}
+      onOpenAvailability={() => {
+        setAvailabilityFilterOn(false);
+        setStep('availability');
+      }}
+      onOpenConfiguredTournaments={() => {
+        setAvailabilityFilterOn(true);
+        setStep('availability');
+      }}
       onLogout={logout}
       tabBar={<CoachTabBar active="home" onSelect={setStep} />}
     />

@@ -94,6 +94,17 @@ export async function upsertRate(
   return mapRateRow(rows[0]);
 }
 
+/** CoachTournamentSearchScreen: qué torneos, de los que aparecen en la búsqueda, ya tienen
+ * disponibilidad configurada por este coach — para la píldora "Disponibilidad lista" y el filtro
+ * "Con disponibilidad". coach_tournament_rates (no _availability) es la fuente: se escribe una
+ * sola vez, al guardar de verdad desde CoachAvailabilityScreen (ver handleSave), así que su sola
+ * existencia ya significa "esto está configurado" — a diferencia de _availability, que puede
+ * tener filas con available=false sin que el coach haya llegado a guardar tarifa. */
+export async function listConfiguredTournamentIdsForCoach(coachId: string, db: Queryable = pool): Promise<string[]> {
+  const { rows } = await db.query(`SELECT tournament_id FROM coach_tournament_rates WHERE coach_id = $1`, [coachId]);
+  return rows.map((r) => r.tournament_id);
+}
+
 export async function getRateForCoachTournament(
   coachId: string,
   tournamentId: string,

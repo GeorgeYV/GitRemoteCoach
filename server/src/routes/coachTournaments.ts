@@ -59,6 +59,17 @@ export async function coachTournamentRoutes(app: FastifyInstance): Promise<void>
     return { players };
   });
 
+  // CoachTournamentSearchScreen: píldora "Disponibilidad lista" + filtro "Con disponibilidad" —
+  // a diferencia de las tres lecturas de arriba, esto es específico del propio coach (no algo que
+  // un padre necesite), así que va autenticado con el mismo chequeo de dueño que las escrituras.
+  app.get('/coaches/:coachId/configured-tournaments', { preHandler: app.authenticate }, async (req) => {
+    const { coachId } = req.params as { coachId: string };
+    const { sub } = req.user as { sub: string };
+    assertOwnsCoachId(coachId, sub);
+    const tournamentIds = await coachTournamentService.listConfiguredTournamentIds(coachId);
+    return { tournamentIds };
+  });
+
   app.put(
     '/coaches/:coachId/tournaments/:tournamentId/availability',
     { preHandler: app.authenticate },

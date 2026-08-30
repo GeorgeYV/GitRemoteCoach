@@ -806,6 +806,35 @@ console.log('\n=== Escenario 11b: disponibilidad y tarifa de torneo (CoachAvaila
   });
   assertEqual(rateRes.statusCode, 200, 'el propio coach puede fijar su tarifa → 200');
 
+  // CoachTournamentSearchScreen: píldora "Disponibilidad lista" + filtro "Con disponibilidad".
+  const unauthConfiguredRes = await app.inject({
+    method: 'GET',
+    url: `/coaches/${fixtures.coachAUserId}/configured-tournaments`,
+  });
+  assertEqual(unauthConfiguredRes.statusCode, 401, 'GET configured-tournaments sin token devuelve 401');
+
+  const wrongCoachConfiguredRes = await app.inject({
+    method: 'GET',
+    url: `/coaches/${fixtures.coachAUserId}/configured-tournaments`,
+    headers: { authorization: `Bearer ${coachBToken}` },
+  });
+  assertEqual(wrongCoachConfiguredRes.statusCode, 403, 'un coach no puede ver la lista de otro coach → 403');
+
+  const configuredRes = await app.inject({
+    method: 'GET',
+    url: `/coaches/${fixtures.coachAUserId}/configured-tournaments`,
+    headers: { authorization: `Bearer ${coachAToken}` },
+  });
+  assertEqual(configuredRes.statusCode, 200, 'el propio coach puede ver su lista → 200');
+  assertTrue(
+    configuredRes.json().tournamentIds.includes(fixtures.tournamentId),
+    'el torneo con tarifa recién guardada aparece en la lista de "ya configurados"',
+  );
+  assertTrue(
+    !configuredRes.json().tournamentIds.includes(fixtures.activeTournamentId),
+    'un torneo sin tarifa guardada no aparece en la lista',
+  );
+
   const getRes = await app.inject({
     method: 'GET',
     url: `/coaches/${fixtures.coachAUserId}/tournaments/${fixtures.tournamentId}/availability`,
