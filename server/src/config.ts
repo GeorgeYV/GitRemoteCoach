@@ -54,6 +54,13 @@ export const businessRules = {
   emailVerificationCodeTtlMinutes: 60,
   /** Intentos fallidos permitidos antes de invalidar el código de verificación. */
   emailVerificationMaxAttempts: 5,
+  /** jobs/recruitCoachesForUncoveredTournaments: recién a partir de esta cantidad de días desde
+   * creado se considera "sin cobertura" un torneo sin coach_tournament_rates — cero coaches el
+   * día 0 es normal, no una señal de problema todavía (ver decisión #50). */
+  coachRecruitmentEmailDelayDays: 3,
+  /** No reclutar entrenadores para un torneo que arranca demasiado pronto — sin margen real para
+   * que alguien configure disponibilidad a tiempo. */
+  coachRecruitmentEmailMinDaysBeforeStart: 3,
 };
 
 /**

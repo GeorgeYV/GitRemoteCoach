@@ -370,6 +370,65 @@ export async function claim(tournamentId: string, clubId: string, db: Queryable 
   return (rowCount ?? 0) > 0;
 }
 
+export interface UncoveredTournament {
+  id: string;
+  name: string;
+  venue: string;
+  city: string;
+  country: CountryCode | null;
+  startDate: string;
+  endDate: string;
+}
+
+function mapUncoveredRow(row: any): UncoveredTournament {
+  return {
+    id: row.id,
+    name: row.name,
+    venue: row.venue,
+    city: row.city,
+    country: row.country,
+    startDate: normalizeDate(row.start_date),
+    endDate: normalizeDate(row.end_date),
+  };
+}
+
+/** jobs/recruitCoachesForUncoveredTournaments (decisión #50): torneos vigentes, creados hace más
+ * de coachRecruitmentEmailDelayDays, que arrancan en al menos coachRecruitmentEmailMinDaysBeforeStart,
+ * sin ningún coach_tournament_rates cargado todavía y que todavía no recibieron este correo.
+ * LEFT JOIN a una subconsulta agregada (no NOT EXISTS/subconsulta correlacionada) por el mismo
+ * motivo que el resto del archivo: pg-mem (smoke tests) no resuelve una referencia a la tabla
+ * externa (t.id) dentro de una subconsulta — un JOIN normal sí. Mismo COALESCE(t.city, c.city) /
+ * COALESCE(c.country, t.country) que search(), y el mismo filtro de club aprobado (un torneo de un
+ * club todavía sin revisar no debería generarle correos a nadie). */
+export async function findUncoveredTournamentsNeedingRecruitmentEmail(
+  createdBefore: Date,
+  /** 'YYYY-MM-DD' — se compara contra t.start_date (DATE), no un TIMESTAMPTZ como createdBefore. */
+  startsAfter: string,
+  db: Queryable = pool,
+): Promise<UncoveredTournament[]> {
+  const { rows } = await db.query(
+    `SELECT t.id, t.name, t.venue, COALESCE(t.city, c.city) AS city, COALESCE(c.country, t.country) AS country,
+            t.start_date, t.end_date
+     FROM tournaments t
+     LEFT JOIN clubs c ON c.id = t.club_id
+     LEFT JOIN (SELECT DISTINCT tournament_id FROM coach_tournament_rates) configured
+       ON configured.tournament_id = t.id
+     WHERE t.status IN ('scheduled', 'in_progress')
+       AND t.end_date >= CURRENT_DATE
+       AND t.coach_recruitment_email_sent_at IS NULL
+       AND t.created_at <= $1
+       AND t.start_date >= $2
+       AND configured.tournament_id IS NULL
+       AND (t.club_id IS NULL OR c.verification_status = 'approved')`,
+    [createdBefore, startsAfter],
+  );
+  return rows.map(mapUncoveredRow);
+}
+
+export async function markRecruitmentEmailSent(tournamentId: string, db: Queryable = pool): Promise<void> {
+  await db.query(`UPDATE tournaments SET coach_recruitment_email_sent_at = now() WHERE id = $1`, [tournamentId]);
+}
+
 export async function findTournamentsEndedWithoutFullSettlement(db: Queryable = pool): Promise<string[]> {
   const { rows } = await db.query(
     `SELECT DISTINCT t.id

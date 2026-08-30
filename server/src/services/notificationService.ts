@@ -1,8 +1,9 @@
+import * as coachRepository from '../repositories/coachRepository.js';
 import * as pushTokenRepository from '../repositories/pushTokenRepository.js';
 import * as userRepository from '../repositories/userRepository.js';
 import { sendPushNotifications } from '../lib/pushNotifications.js';
 import { sendEmail } from '../lib/emailClient.js';
-import type { UserRole } from '../types.js';
+import type { CountryCode, UserRole } from '../types.js';
 
 export async function registerPushToken(userId: string, token: string): Promise<void> {
   await pushTokenRepository.upsert(userId, token);
@@ -57,6 +58,23 @@ export async function notifyRoleByEmail(role: UserRole, email: { subject: string
     emails.map((to) =>
       sendEmail({ to, ...email }).catch((err) => {
         console.error(`No se pudo mandar el correo a ${to} (rol ${role}):`, err);
+      }),
+    ),
+  );
+}
+
+/** jobs/recruitCoachesForUncoveredTournaments (decisión #50): mismo patrón que notifyRoleByEmail
+ * (0 o más destinatarios, cada envío con su propio try/catch para que uno que falle no frene a
+ * los demás), pero acotado a los coaches aprobados de un país en vez de un rol entero. */
+export async function notifyCoachesInCountryByEmail(
+  country: CountryCode,
+  email: { subject: string; html: string },
+): Promise<void> {
+  const emails = await coachRepository.listApprovedEmailsByCountry(country);
+  await Promise.all(
+    emails.map((to) =>
+      sendEmail({ to, ...email }).catch((err) => {
+        console.error(`No se pudo mandar el correo a ${to} (país ${country}):`, err);
       }),
     ),
   );

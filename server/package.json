@@ -12,6 +12,7 @@
     "jobs:settle-coach-payouts": "tsx src/jobs/settleCoachPayoutsRunner.ts",
     "jobs:payment-reminders": "tsx src/jobs/paymentRemindersRunner.ts",
     "jobs:transcribe-voice-notes": "tsx src/jobs/transcribeVoiceNotesRunner.ts",
+    "jobs:recruit-coaches": "tsx src/jobs/recruitCoachesForUncoveredTournamentsRunner.ts",
     "typecheck": "tsc --noEmit",
     "test:smoke": "tsx test/smokeTest.ts"
   },

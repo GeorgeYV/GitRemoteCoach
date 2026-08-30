@@ -415,6 +415,9 @@ CREATE TABLE tournaments (
   city                     TEXT,
   country                  TEXT,
   created_at               TIMESTAMPTZ NOT NULL DEFAULT now(),
+  -- NULL = todavía no se mandó (o no aplica) el correo de reclutamiento de jobs/recruitCoaches...
+  -- (ver decisión #50); se pisa una sola vez, el job nunca vuelve a considerar este torneo después.
+  coach_recruitment_email_sent_at TIMESTAMPTZ,
   CONSTRAINT chk_tournaments_country CHECK (country IS NULL OR country IN ('EC', 'PE', 'CO', 'CL', 'BO', 'AR', 'VE', 'BR', 'PY', 'UY')),
   CONSTRAINT chk_tournaments_unclaimed_has_location CHECK (club_id IS NOT NULL OR (city IS NOT NULL AND country IS NOT NULL))
 );
@@ -2257,4 +2260,14 @@ CREATE INDEX idx_push_tokens_user_id ON push_tokens (user_id);
 --     justamente porque puede variar de un torneo a otro). No se usaba para nada más (ni
 --     búsqueda/filtro, ni liquidaciones, ni pagos). TrainerProfileScreen ahora muestra un mensaje
 --     explícito en vez de un precio cuando no hay tarifa fijada para ese torneo.
+-- 50. tournaments.coach_recruitment_email_sent_at + jobs/recruitCoachesForUncoveredTournaments:
+--     un correo automático (no un botón del padre — es un problema de oferta, no de demanda) a
+--     todos los entrenadores aprobados del país de un torneo que sigue sin ningún
+--     coach_tournament_rates cargado varios días después de creado (businessRules.
+--     coachRecruitmentEmailDelayDays), siempre que todavía falten varios días para que arranque
+--     (businessRules.coachRecruitmentEmailMinDaysBeforeStart) — no tiene sentido reclutar para un
+--     torneo que empieza mañana. Se manda una sola vez por torneo (la columna se pisa apenas se
+--     manda y el job nunca vuelve a mirar ese torneo) — sin reintentos/escalación en esta primera
+--     entrega. El asunto siempre remarca ciudad y sede, para que un entrenador reconozca de un
+--     vistazo si le queda cerca antes de abrir el correo.
 -- =====================================================================

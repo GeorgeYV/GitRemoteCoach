@@ -16,6 +16,7 @@ import { setTranscribeAudioForTesting } from '../src/lib/transcription.js';
 import { buildApp } from '../src/app.js';
 import { runExpireBookingsJob } from '../src/jobs/expireBookings.js';
 import { MAX_TRANSCRIPTION_ATTEMPTS, runTranscribeVoiceNotesJob } from '../src/jobs/transcribeVoiceNotes.js';
+import { runRecruitCoachesForUncoveredTournamentsJob } from '../src/jobs/recruitCoachesForUncoveredTournaments.js';
 import { findTournamentsReadyForSettlement } from '../src/services/settlementService.js';
 
 let passed = 0;
@@ -4352,6 +4353,116 @@ console.log('\n=== Escenario 46: límite de intentos en rutas de auth (fuerza br
     typeof rateLimitedBody?.message === 'string' && !/rate limit/i.test(rateLimitedBody.message),
     'el mensaje del límite está en español, no el texto en inglés del plugin',
   );
+}
+
+console.log('\n=== Escenario 47: correo de reclutamiento a entrenadores sin cobertura (decisión #50) ===');
+{
+  const COACH_A_EMAIL = 'carlos@example.com'; // fixtures.coachAUserId, ver test/seed.ts
+  const COACH_B_EMAIL = 'ana@example.com'; // fixtures.coachBUserId, ver test/seed.ts
+  const dateOffset = (n: number) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
+  await testPool.query(`UPDATE coach_profiles SET country = 'EC' WHERE user_id = $1`, [fixtures.coachAUserId]);
+  await testPool.query(`UPDATE coach_profiles SET country = 'PE' WHERE user_id = $1`, [fixtures.coachBUserId]);
+
+  // Torneo sin club (país propio 'EC'), creado hace 10 días (> coachRecruitmentEmailDelayDays) y
+  // que arranca en 30 días (> coachRecruitmentEmailMinDaysBeforeStart) — el caso que sí debe
+  // disparar el correo.
+  const uncoveredRes = await app.inject({
+    method: 'POST',
+    url: '/tournaments',
+    headers: { authorization: `Bearer ${platformAdminToken}` },
+    payload: {
+      name: 'Torneo Sin Cobertura Test',
+      venue: 'Cancha Central',
+      city: 'Loja',
+      country: 'EC',
+      startDate: dateOffset(30),
+      endDate: dateOffset(32),
+    },
+  });
+  assertEqual(uncoveredRes.statusCode, 201, 'crear el torneo de prueba (platform_admin) devuelve 201');
+  const uncoveredId = uncoveredRes.json().id;
+  await testPool.query(`UPDATE tournaments SET created_at = now() - interval '10 days' WHERE id = $1`, [uncoveredId]);
+
+  // Mismo país (EC), mismo atraso de creación, pero YA tiene un coach_tournament_rates cargado —
+  // no debería recibir el correo.
+  const coveredRes = await app.inject({
+    method: 'POST',
+    url: '/tournaments',
+    headers: { authorization: `Bearer ${platformAdminToken}` },
+    payload: {
+      name: 'Torneo Con Cobertura Test',
+      venue: 'Cancha Norte',
+      city: 'Loja',
+      country: 'EC',
+      startDate: dateOffset(30),
+      endDate: dateOffset(32),
+    },
+  });
+  const coveredId = coveredRes.json().id;
+  await testPool.query(`UPDATE tournaments SET created_at = now() - interval '10 days' WHERE id = $1`, [coveredId]);
+  await testPool.query(
+    `INSERT INTO coach_tournament_rates (coach_id, tournament_id, rate_mode, amount) VALUES ($1, $2, 'per_day', 20)`,
+    [fixtures.coachAUserId, coveredId],
+  );
+
+  // Mismo país, sin cobertura, pero creado hace apenas 1 día — todavía no pasó
+  // coachRecruitmentEmailDelayDays, así que tampoco debería recibir el correo todavía.
+  const tooRecentRes = await app.inject({
+    method: 'POST',
+    url: '/tournaments',
+    headers: { authorization: `Bearer ${platformAdminToken}` },
+    payload: {
+      name: 'Torneo Muy Reciente Test',
+      venue: 'Cancha Sur',
+      city: 'Loja',
+      country: 'EC',
+      startDate: dateOffset(30),
+      endDate: dateOffset(32),
+    },
+  });
+  const tooRecentId = tooRecentRes.json().id;
+  await testPool.query(`UPDATE tournaments SET created_at = now() - interval '1 day' WHERE id = $1`, [tooRecentId]);
+
+  // Mismo país, sin cobertura, creado hace tiempo, pero arranca en 1 día — sin margen real para
+  // que alguien configure disponibilidad a tiempo, tampoco debería recibir el correo.
+  const startsSoonRes = await app.inject({
+    method: 'POST',
+    url: '/tournaments',
+    headers: { authorization: `Bearer ${platformAdminToken}` },
+    payload: {
+      name: 'Torneo Arranca Ya Test',
+      venue: 'Cancha Este',
+      city: 'Loja',
+      country: 'EC',
+      startDate: dateOffset(1),
+      endDate: dateOffset(3),
+    },
+  });
+  const startsSoonId = startsSoonRes.json().id;
+  await testPool.query(`UPDATE tournaments SET created_at = now() - interval '10 days' WHERE id = $1`, [startsSoonId]);
+
+  emailState.sent.length = 0;
+  const run1 = await runRecruitCoachesForUncoveredTournamentsJob();
+  assertTrue(run1.notifiedTournamentIds.includes(uncoveredId), 'el torneo sin cobertura y con suficiente antelación se notifica');
+  assertTrue(!run1.notifiedTournamentIds.includes(coveredId), 'el torneo que ya tiene una tarifa cargada NO se notifica');
+  assertTrue(!run1.notifiedTournamentIds.includes(tooRecentId), 'el torneo creado hace muy poco todavía NO se notifica');
+  assertTrue(!run1.notifiedTournamentIds.includes(startsSoonId), 'el torneo que arranca demasiado pronto NO se notifica');
+
+  const recruitmentEmails = emailState.sent.filter((m) => m.subject.includes('Loja') && m.subject.includes('Cancha Central'));
+  assertTrue(recruitmentEmails.length > 0, 'el asunto del correo incluye ciudad y sede del torneo');
+  assertTrue(
+    recruitmentEmails.some((m) => m.to === COACH_A_EMAIL),
+    'un coach aprobado de EC (país del torneo) recibe el correo',
+  );
+  assertTrue(
+    !recruitmentEmails.some((m) => m.to === COACH_B_EMAIL),
+    'un coach aprobado de otro país (PE) NO recibe el correo',
+  );
+
+  emailState.sent.length = 0;
+  const run2 = await runRecruitCoachesForUncoveredTournamentsJob();
+  assertTrue(!run2.notifiedTournamentIds.includes(uncoveredId), 'el mismo torneo no se vuelve a notificar en un segundo corrido');
+  assertEqual(emailState.sent.length, 0, 'el segundo corrido no manda ningún correo nuevo para ese torneo');
 }
 
 console.log(`\n=== Resultado: ${passed} pasaron, ${failed} fallaron ===`);

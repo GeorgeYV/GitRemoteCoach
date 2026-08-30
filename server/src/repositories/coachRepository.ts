@@ -20,6 +20,19 @@ function mapSearchRow(row: any): CoachSearchResult {
   };
 }
 
+/** jobs/recruitCoachesForUncoveredTournaments (decisión #50): todos los aprobados del país del
+ * torneo — no solo los ya etiquetados oficiales de un club, porque un coach puede configurar
+ * disponibilidad/tarifa de cualquier torneo por su cuenta, sin invitación (ver
+ * coach_tournament_rates/availability, que solo validan assertOwnsCoachId). */
+export async function listApprovedEmailsByCountry(country: CountryCode, db: Queryable = pool): Promise<string[]> {
+  const { rows } = await db.query(
+    `SELECT u.email FROM coach_profiles cp JOIN users u ON u.id = cp.user_id
+     WHERE cp.verification_status = 'approved' AND cp.country = $1`,
+    [country],
+  );
+  return rows.map((r) => r.email);
+}
+
 /**
  * ClubInviteCoachScreen: entrenadores aprobados que coinciden con el texto de búsqueda
  * (nombre o ciudad), excluyendo a quienes ya son oficiales o ya tienen invitación
