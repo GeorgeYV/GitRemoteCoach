@@ -674,13 +674,22 @@ export interface CoachSearchResult {
   ratingAvg: string;
   yearsExperience: number;
   specialty: string | null;
+  photoUrl: string | null;
+  rateAmount?: string;
+  rateMode?: RateMode;
 }
 
-/** GET /coaches?search=&excludeTournamentId= — ClubInviteCoachScreen. */
-export function searchCoaches(params: { query?: string; excludeTournamentId?: string }): Promise<CoachSearchResult[]> {
+/** GET /coaches?search=&excludeTournamentId=&configuredForTournamentId= — ClubInviteCoachScreen
+ * (excludeTournamentId) / TrainerListScreen (configuredForTournamentId). */
+export function searchCoaches(params: {
+  query?: string;
+  excludeTournamentId?: string;
+  configuredForTournamentId?: string;
+}): Promise<CoachSearchResult[]> {
   const qs = new URLSearchParams();
   if (params.query) qs.set('search', params.query);
   if (params.excludeTournamentId) qs.set('excludeTournamentId', params.excludeTournamentId);
+  if (params.configuredForTournamentId) qs.set('configuredForTournamentId', params.configuredForTournamentId);
   const suffix = qs.toString();
   return request(`/coaches${suffix ? `?${suffix}` : ''}`);
 }

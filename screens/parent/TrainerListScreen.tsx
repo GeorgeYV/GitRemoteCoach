@@ -7,7 +7,6 @@ import {
   ApiError,
   BookedPlayer,
   CoachSearchResult,
-  getCoachTournamentAvailability,
   getCoachTournamentBookedPlayers,
   listOfficialCoachIds,
   RateMode,
@@ -42,12 +41,14 @@ export default function TrainerListScreen({
   // Entrenadores oficiales de este torneo — se muestran primero y con una insignia (ver
   // sortedTrainers más abajo). undefined mientras carga, para no reordenar la lista dos veces.
   const [officialIds, setOfficialIds] = useState<Set<string> | undefined>(undefined);
-  const [ratesByCoach, setRatesByCoach] = useState<Record<string, { amount: number; rateMode: RateMode } | null>>({});
 
+  // configuredForTournamentId: solo entrenadores que ya configuraron disponibilidad/tarifa para
+  // ESTE torneo (antes traía los ~25 aprobados de toda la plataforma sin relación con el torneo
+  // elegido) — la tarifa ya viene incluida en cada resultado, ver decisión en coachRepository.
   useEffect(() => {
     let cancelled = false;
     setError(null);
-    searchCoaches({})
+    searchCoaches({ configuredForTournamentId: tournament.id })
       .then((result) => {
         if (!cancelled) setTrainers(result);
       })
@@ -58,7 +59,7 @@ export default function TrainerListScreen({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [tournament.id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -73,33 +74,6 @@ export default function TrainerListScreen({
       cancelled = true;
     };
   }, [tournament.id]);
-
-  // Tarifa de catálogo de cada coach para ESTE torneo (ver decisión #49 — ya no hay una tarifa
-  // general de perfil que mostrar como respaldo). Mismo criterio de "una llamada por coach
-  // visible" que bookedPlayersByCoach, abajo.
-  useEffect(() => {
-    if (!trainers || trainers.length === 0) return;
-    let cancelled = false;
-    Promise.all(
-      trainers.map((t) =>
-        getCoachTournamentAvailability(t.id, tournament.id)
-          .then(
-            (result) =>
-              [
-                t.id,
-                result.rate ? { amount: Number(result.rate.amount), rateMode: result.rate.rateMode } : null,
-              ] as const,
-          )
-          .catch(() => [t.id, null] as const),
-      ),
-    ).then((entries) => {
-      if (cancelled) return;
-      setRatesByCoach(Object.fromEntries(entries));
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [trainers, tournament.id]);
 
   // Un coach puede aceptar varios alumnos el mismo torneo — el padre necesita ver quiénes ya
   // reservaron antes de elegir. Una llamada por coach visible (la lista es corta) en vez de una
@@ -177,7 +151,6 @@ export default function TrainerListScreen({
                 trainer={trainer}
                 bookedPlayers={bookedPlayersByCoach[trainer.id]}
                 official={!!officialIds?.has(trainer.id)}
-                rate={ratesByCoach[trainer.id]}
                 onPress={() => onSelectTrainer?.(trainer)}
               />
             ))}
@@ -186,7 +159,7 @@ export default function TrainerListScreen({
               <Text style={styles.emptyText}>
                 {minRatingOnly
                   ? `Ningún entrenador tiene ${MIN_RATING_THRESHOLD}+ estrellas todavía.`
-                  : 'No hay entrenadores disponibles por ahora.'}
+                  : 'Todavía ningún entrenador configuró su disponibilidad para este torneo.'}
               </Text>
             )}
           </ScrollView>
@@ -200,21 +173,18 @@ function TrainerCard({
   trainer,
   bookedPlayers,
   official,
-  rate,
   onPress,
 }: {
   trainer: CoachSearchResult;
   bookedPlayers?: BookedPlayer[];
   official: boolean;
-  /** undefined mientras carga, null si el coach no fijó tarifa para este torneo todavía. */
-  rate?: { amount: number; rateMode: RateMode } | null;
   onPress?: () => void;
 }) {
   const metaParts = [trainer.city, trainer.specialty, `${trainer.yearsExperience} años`].filter(Boolean);
   return (
     <Pressable style={styles.card} onPress={onPress}>
       <View style={styles.cardTopRow}>
-        <TrainerAvatarPlaceholder size={60} />
+        <TrainerAvatarPlaceholder size={60} photoUrl={trainer.photoUrl} />
         <View style={styles.cardInfo}>
           <View style={styles.nameRow}>
             <Text style={styles.trainerName}>{trainer.name}</Text>
@@ -224,9 +194,9 @@ function TrainerCard({
             ★ {trainer.ratingAvg} · {metaParts.join(' · ')}
           </Text>
         </View>
-        {rate && (
+        {trainer.rateAmount && trainer.rateMode && (
           <Text style={styles.price}>
-            ${rate.amount} <Text style={styles.priceSuffix}>{PRICE_SUFFIX[rate.rateMode]}</Text>
+            ${Number(trainer.rateAmount)} <Text style={styles.priceSuffix}>{PRICE_SUFFIX[trainer.rateMode]}</Text>
           </Text>
         )}
       </View>

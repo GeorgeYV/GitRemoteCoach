@@ -885,6 +885,52 @@ console.log('\n=== Escenario 11b: disponibilidad y tarifa de torneo (CoachAvaila
     'la disponibilidad guardada (día completo, sin mañana/tarde) aparece en la lectura pública',
   );
   assertEqual(availabilityAndRate.rate?.rateMode, 'per_day', 'la tarifa guardada aparece en la lectura pública');
+
+  // TrainerListScreen (padre): GET /coaches?configuredForTournamentId= — solo coachA configuró
+  // fixtures.tournamentId (coachB no fijó nada ahí), y la tarifa ya viene incluida en el resultado.
+  const configuredSearchRes = await app.inject({
+    method: 'GET',
+    url: `/coaches?configuredForTournamentId=${fixtures.tournamentId}`,
+  });
+  assertEqual(configuredSearchRes.statusCode, 200, 'GET /coaches?configuredForTournamentId= devuelve 200');
+  const configuredSearchResults = configuredSearchRes.json();
+  assertTrue(
+    configuredSearchResults.some((c: any) => c.id === fixtures.coachAUserId),
+    'coachA (con tarifa fijada en este torneo) aparece en la búsqueda filtrada por torneo',
+  );
+  assertTrue(
+    !configuredSearchResults.some((c: any) => c.id === fixtures.coachBUserId),
+    'coachB (sin tarifa fijada en este torneo) NO aparece en la búsqueda filtrada por torneo',
+  );
+  const coachAInSearch = configuredSearchResults.find((c: any) => c.id === fixtures.coachAUserId);
+  assertEqual(Number(coachAInSearch?.rateAmount), 45, 'la tarifa de coachA viene incluida en el resultado de búsqueda');
+  assertEqual(coachAInSearch?.rateMode, 'per_day', 'el rateMode de coachA viene incluido en el resultado de búsqueda');
+  assertEqual(coachAInSearch?.photoUrl, null, 'photoUrl viene presente (null si no subió foto) en el resultado de búsqueda');
+
+  // coachA también fijó tarifa en activeTournamentId (arriba, rateActiveRes) — confirma que el
+  // filtro es específico de CADA torneo, no "cualquier torneo que el coach haya configurado".
+  const noOneConfiguredRes = await app.inject({
+    method: 'GET',
+    url: `/coaches?configuredForTournamentId=${fixtures.activeTournamentId}`,
+  });
+  assertEqual(noOneConfiguredRes.statusCode, 200, 'GET /coaches?configuredForTournamentId= (otro torneo) devuelve 200');
+  const activeSearchResults = noOneConfiguredRes.json();
+  assertTrue(
+    activeSearchResults.some((c: any) => c.id === fixtures.coachAUserId),
+    'coachA también aparece filtrado por el otro torneo donde también fijó tarifa',
+  );
+  assertTrue(
+    !activeSearchResults.some((c: any) => c.id === fixtures.coachBUserId),
+    'coachB sigue sin aparecer en ningún torneo filtrado, porque nunca configuró nada',
+  );
+
+  // Sin configuredForTournamentId, la búsqueda sigue siendo la de siempre (todos los aprobados).
+  const unfilteredSearchRes = await app.inject({ method: 'GET', url: '/coaches' });
+  assertEqual(unfilteredSearchRes.statusCode, 200, 'GET /coaches sin filtro sigue devolviendo 200');
+  assertTrue(
+    unfilteredSearchRes.json().some((c: any) => c.id === fixtures.coachBUserId),
+    'sin configuredForTournamentId, coachB (sin ninguna tarifa fijada) sigue apareciendo en la búsqueda general',
+  );
 }
 
 console.log('\n=== Escenario 11c: conteo de jugadores reservados por torneo (TrainerProfileScreen) ===');

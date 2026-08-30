@@ -29,10 +29,16 @@ const registerCoachSchema = z.object({
 });
 
 export async function coachRoutes(app: FastifyInstance): Promise<void> {
-  // ClubInviteCoachScreen: búsqueda por nombre/ciudad, excluyendo coaches ya oficiales o ya invitados.
+  // ClubInviteCoachScreen: búsqueda por nombre/ciudad, excluyendo coaches ya oficiales o ya
+  // invitados. TrainerListScreen (padre) usa configuredForTournamentId en vez de eso, para traer
+  // solo a quienes ya configuraron disponibilidad/tarifa en ESE torneo.
   app.get('/coaches', async (req) => {
-    const { search, excludeTournamentId } = req.query as { search?: string; excludeTournamentId?: string };
-    return coachProfileService.searchCoaches({ query: search, excludeTournamentId });
+    const { search, excludeTournamentId, configuredForTournamentId } = req.query as {
+      search?: string;
+      excludeTournamentId?: string;
+      configuredForTournamentId?: string;
+    };
+    return coachProfileService.searchCoaches({ query: search, excludeTournamentId, configuredForTournamentId });
   });
 
   // CoachRegistrationScreen "Enviar para verificación": crea el perfil del coach logueado — el

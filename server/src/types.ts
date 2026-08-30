@@ -190,7 +190,9 @@ export interface CoachPayoutWithNames extends CoachPayout {
   tournamentName: string;
 }
 
-/** Lo que devuelve la búsqueda de entrenadores (ClubInviteCoachScreen) — solo lo necesario para elegir a quién invitar. */
+/** Lo que devuelve la búsqueda de entrenadores (ClubInviteCoachScreen/TrainerListScreen) — solo lo
+ * necesario para elegir a quién invitar o reservar. rateAmount/rateMode solo vienen presentes
+ * cuando la búsqueda pasó configuredForTournamentId (ver coachRepository.search). */
 export interface CoachSearchResult {
   id: string;
   name: string;
@@ -198,6 +200,9 @@ export interface CoachSearchResult {
   ratingAvg: string;
   yearsExperience: number;
   specialty: string | null;
+  photoUrl: string | null;
+  rateAmount?: string;
+  rateMode?: RateMode;
 }
 
 /** ClubJoinScreen: resultado liviano de "buscar mi club" — no expone contactEmail/Phone (a

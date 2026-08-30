@@ -15,6 +15,8 @@ function mapSearchRow(row: any): CoachSearchResult {
     ratingAvg: row.rating_avg,
     yearsExperience: row.years_experience,
     specialty: row.specialty,
+    photoUrl: row.photo_url,
+    ...(row.rate_amount != null ? { rateAmount: row.rate_amount, rateMode: row.rate_mode } : {}),
   };
 }
 
@@ -23,13 +25,19 @@ function mapSearchRow(row: any): CoachSearchResult {
  * (nombre o ciudad), excluyendo a quienes ya son oficiales o ya tienen invitación
  * pendiente en el torneo indicado. Ambos filtros de exclusión reutilizan el mismo
  * placeholder — es el mismo tournamentId en las dos mitades del UNION.
+ *
+ * TrainerListScreen (padre): usa configuredForTournamentId en vez de excludeTournamentId — un
+ * INNER JOIN contra coach_tournament_rates que además filtra la lista a solo quienes ya
+ * configuraron ESE torneo (antes traía los ~25 aprobados de toda la plataforma sin relación con
+ * el torneo elegido) y de paso trae la tarifa ya cargada, evitando N llamadas extra por coach.
  */
 export async function search(
-  params: { query?: string; excludeTournamentId?: string },
+  params: { query?: string; excludeTournamentId?: string; configuredForTournamentId?: string },
   db: Queryable = pool,
 ): Promise<CoachSearchResult[]> {
   const conditions: string[] = [`cp.verification_status = 'approved'`];
   const values: unknown[] = [];
+  let rateJoin = '';
 
   if (params.query) {
     values.push(`%${params.query}%`);
@@ -47,10 +55,17 @@ export async function search(
     );
   }
 
+  if (params.configuredForTournamentId) {
+    values.push(params.configuredForTournamentId);
+    rateJoin = `JOIN coach_tournament_rates ctr ON ctr.coach_id = cp.user_id AND ctr.tournament_id = $${values.length}`;
+  }
+
   const { rows } = await db.query(
-    `SELECT cp.user_id, u.full_name AS name, cp.city, cp.rating_avg, cp.years_experience, cp.specialty
+    `SELECT cp.user_id, u.full_name AS name, cp.city, cp.rating_avg, cp.years_experience, cp.specialty, cp.photo_url
+            ${rateJoin ? ', ctr.amount AS rate_amount, ctr.rate_mode' : ''}
      FROM coach_profiles cp
      JOIN users u ON u.id = cp.user_id
+     ${rateJoin}
      WHERE ${conditions.join(' AND ')}
      ORDER BY u.full_name
      LIMIT 25`,

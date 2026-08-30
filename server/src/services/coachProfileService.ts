@@ -33,6 +33,7 @@ export interface CoachProfileWithTrainingAndBadges extends CoachProfileWithTrain
 export async function searchCoaches(params: {
   query?: string;
   excludeTournamentId?: string;
+  configuredForTournamentId?: string;
 }): Promise<CoachSearchResult[]> {
   return coachRepository.search(params);
 }
