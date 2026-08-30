@@ -6,6 +6,7 @@ import IconTextInput from '../../components/shared/IconTextInput';
 import { useAuth } from '../../context/AuthContext';
 import { ApiError } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
+import { useHardwareBack } from '../../lib/useHardwareBack';
 import { isValidEmail } from '../../lib/validation';
 
 /**
@@ -73,6 +74,18 @@ export default function VerifyEmailGateScreen() {
 
   const canVerify = code.trim().length === 6 && !submitting;
   const canChangeEmail = newEmail.trim().length > 0 && !submitting;
+
+  // El botón/gesto de "atrás" debe hacer lo mismo que "Cancelar" en el paso de cambiar correo
+  // (ver lib/useHardwareBack.ts) — sin esto salta directo a la ruta anterior en vez de volver a
+  // "verify".
+  useHardwareBack(
+    step === 'change',
+    () => {
+      setError(null);
+      setStep('verify');
+    },
+    step,
+  );
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>

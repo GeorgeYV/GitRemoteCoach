@@ -8,6 +8,7 @@ import { useAuth } from '../../context/AuthContext';
 import { UserRole } from '../../lib/api';
 import { useGoogleAuthRequest } from '../../lib/googleAuthSession';
 import { colors, radius, withOpacity } from '../../lib/theme';
+import { useHardwareBack } from '../../lib/useHardwareBack';
 import { isValidEmail } from '../../lib/validation';
 
 /** Mismas opciones que RegisterScreen.tsx — solo se preguntan acá si "Continuar con Google"
@@ -95,6 +96,20 @@ export default function LoginScreen({
   }
 
   const canSubmit = email.trim().length > 0 && password.length > 0 && !submitting;
+
+  // El botón/gesto de "atrás" debe hacer lo mismo que "Cancelar" en el paso de Google (ver
+  // lib/useHardwareBack.ts) — sin esto salta directo a la ruta anterior en vez de volver a
+  // "credentials".
+  useHardwareBack(
+    step === 'google-complete-profile',
+    () => {
+      setStep('credentials');
+      setPendingGoogle(null);
+      setPendingRole(null);
+      setError(null);
+    },
+    step,
+  );
 
   if (user) {
     return (

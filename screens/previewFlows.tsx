@@ -103,6 +103,8 @@ export function CoachAvailabilityFlow({
 }: { onBack?: () => void; tabBar?: React.ReactNode; initialConfiguredFilter?: boolean } = {}) {
   const [tournament, setTournament] = useState<TournamentSearchResult | null>(null);
 
+  useHardwareBack(tournament !== null, () => setTournament(null), tournament?.id);
+
   if (!tournament) {
     return (
       <CoachTournamentSearchScreen
@@ -505,6 +507,27 @@ export function CoachHomeFlow({ coachId, coachName }: { coachId: string; coachNa
       });
   }
 
+  // El botón/gesto de "atrás" debe hacer lo mismo que la flechita de cada paso (ver
+  // lib/useHardwareBack.ts). 'match'/'resumeSuspended' quedan afuera a propósito: ahí se monta
+  // CoachMatchDayFlow, que tiene su propio useHardwareBack y es quien de verdad decide qué hacer
+  // (incluso bloquear el back del todo durante la captura en vivo).
+  useHardwareBack(
+    step !== 'home' && step !== 'match' && step !== 'resumeSuspended',
+    () => {
+      if (step === 'detail') setStep('home');
+      else if (step === 'cancel') setStep('detail');
+      else if (step === 'chat') setStep('detail');
+      else if (step === 'invitation') {
+        setStep('home');
+        setInvitationRefreshKey((k) => k + 1);
+      } else {
+        // requests/profile/availability/sessions/earnings/reputation: todas vuelven a 'home'.
+        setStep('home');
+      }
+    },
+    step,
+  );
+
   if (step === 'detail' && selectedBooking) {
     return (
       <CoachBookingDetailScreen
@@ -783,6 +806,21 @@ export function CoachMatchDayFlow({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, hasExistingMatch, bookingId, token]);
 
+  // Siempre activo mientras este flujo está montado (ver lib/useHardwareBack.ts): 'reminder' sale
+  // por completo (llama al onBack externo, ej. CoachHomeFlow), 'chat'/'setup' vuelven a
+  // 'reminder', y 'loadingMatch'/'live' no hacen nada — bloquea el back a propósito durante la
+  // captura en vivo, igual que ya no muestra una flechita en pantalla ahí.
+  useHardwareBack(
+    true,
+    () => {
+      if (step === 'reminder') onBack?.();
+      else if (step === 'chat') setStep('reminder');
+      else if (step === 'setup') setStep('reminder');
+      // 'loadingMatch' / 'live': sin acción, a propósito.
+    },
+    step,
+  );
+
   if (step === 'reminder') {
     return (
       <CoachPreMatchReminderScreen
@@ -912,6 +950,20 @@ export function ClubTournamentFlow({
   const [editing, setEditing] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
+  // El botón/gesto de "atrás" debe hacer lo mismo que la flechita de cada paso (ver
+  // lib/useHardwareBack.ts) — mismo orden de prioridad que el render de abajo.
+  useHardwareBack(
+    creating || tournament !== null,
+    () => {
+      if (creating) setCreating(false);
+      else if (editing && tournament) setEditing(false);
+      else if (inviting) setInviting(false);
+      else if (sharing) setSharing(false);
+      else setTournament(null);
+    },
+    `${creating}-${editing}-${inviting}-${sharing}-${tournament?.id ?? ''}`,
+  );
+
   if (creating) {
     return (
       <ClubCreateTournamentScreen
@@ -1020,6 +1072,18 @@ export function ClubFlow({ adminUserId }: { adminUserId: string }) {
   }, [adminUserId]);
 
   const [screen, setScreen] = useState<'home' | 'tournaments' | 'settlements' | 'editProfile'>('home');
+
+  // El botón/gesto de "atrás" debe hacer lo mismo que la flechita de cada paso (ver
+  // lib/useHardwareBack.ts). ClubJoinScreen (needsRegistration sin creatingNew) no tiene flechita
+  // en pantalla — no hay nada a lo que volver ahí, así que tampoco reacciona acá.
+  useHardwareBack(
+    (needsRegistration && creatingNew) || (!needsRegistration && screen !== 'home'),
+    () => {
+      if (needsRegistration && creatingNew) setCreatingNew(false);
+      else if (!needsRegistration) setScreen('home');
+    },
+    `${needsRegistration}-${creatingNew}-${screen}`,
+  );
 
   if (needsRegistration && creatingNew) {
     return (
