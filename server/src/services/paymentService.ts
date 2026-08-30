@@ -466,6 +466,27 @@ export async function verifyPayment(
     }
   }
 
+  // Único aviso "esto cambió" que faltaba en todo bookingService/paymentService — acceptBooking,
+  // rejectBooking, rescheduleBooking y completeBooking sí avisan al padre, esto se había quedado
+  // afuera. Un aviso por padre (no por reserva): verifyPayment siempre llega desde
+  // PlatformAdminPaymentsScreen agrupado por padre+proveedor+referencia (un solo envío de
+  // comprobante), pero por si algún día bookingIds mezclara padres, se agrupa igual.
+  const parentUserIds = new Set<string>();
+  for (const booking of verifiedBookings) {
+    parentUserIds.add(await bookingRepository.getParentUserIdForBooking(booking.id));
+  }
+  const plural = verifiedBookings.length > 1;
+  for (const parentUserId of parentUserIds) {
+    await notificationService.notifyUser(parentUserId, {
+      title: decision === 'verified' ? 'Pago confirmado' : 'Pago rechazado',
+      body:
+        decision === 'verified'
+          ? `Confirmamos el pago de tu${plural ? 's' : ''} reserva${plural ? 's' : ''} — revísala${plural ? 's' : ''} en "Reservas".`
+          : `No pudimos verificar tu comprobante — revisa "Reservas" para reenviarlo.`,
+      data: { bookingIds: verifiedBookings.map((b) => b.id) },
+    });
+  }
+
   return verifiedBookings;
 }
 

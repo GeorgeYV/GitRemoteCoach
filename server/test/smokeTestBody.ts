@@ -376,6 +376,17 @@ let manualBookingAId: string;
     headers: { authorization: `Bearer ${coachBToken}` },
   });
 
+  // Registra un device token del padre acá mismo (local a este escenario, ver deviceToken de
+  // Escenario 14 para el mismo patrón) para poder medir el push que verify-payment le manda —
+  // faltaba por completo antes de esta corrección.
+  const manualPaymentDeviceToken = 'ExponentPushToken[smoke-test-manual-payment]';
+  await app.inject({
+    method: 'POST',
+    url: '/push-tokens',
+    headers: { authorization: `Bearer ${parentToken}` },
+    payload: { token: manualPaymentDeviceToken },
+  });
+
   const noAuthQueueRes = await app.inject({ method: 'GET', url: '/bookings/payment-verification-queue' });
   assertEqual(noAuthQueueRes.statusCode, 401, 'cola de verificación sin Bearer token devuelve 401');
 
@@ -413,6 +424,7 @@ let manualBookingAId: string;
   });
   assertEqual(wrongRoleVerifyRes.statusCode, 403, 'verify-payment con token de entrenador devuelve 403');
 
+  pushState.sent.length = 0;
   const rejectRes = await app.inject({
     method: 'PUT',
     url: '/bookings/verify-payment',
@@ -427,6 +439,9 @@ let manualBookingAId: string;
     new Date(rejected.paymentDeadline).getTime() > Date.now(),
     'rechazo re-arma el plazo de pago para que el padre pueda reintentar',
   );
+  assertEqual(pushState.sent.length, 1, 'rechazar un pago manual dispara exactamente un push al padre');
+  assertEqual(pushState.sent[0]?.to, manualPaymentDeviceToken, 'el push de rechazo va al device token del padre');
+  assertEqual(pushState.sent[0]?.title, 'Pago rechazado', 'el título del push de rechazo de pago es el esperado');
 
   await app.inject({
     method: 'POST',
@@ -434,6 +449,7 @@ let manualBookingAId: string;
     headers: { authorization: `Bearer ${parentToken}` },
     payload: { bookingIds: [booking.id], provider: 'deuna', referenceCode: 'REF-A-002' },
   });
+  pushState.sent.length = 0;
   const verifyRes = await app.inject({
     method: 'PUT',
     url: '/bookings/verify-payment',
@@ -449,6 +465,50 @@ let manualBookingAId: string;
   assertEqual(Number(verified.coachNetAmount), 1500, 'coach_net_amount = 2000 - 300 - 200');
   assertEqual(verified.paymentProvider, 'deuna', 'payment_provider queda en deuna');
   assertEqual(verified.paymentVerifiedBy, fixtures.platformAdminUserId, 'payment_verified_by = admin que verificó');
+  assertEqual(pushState.sent.length, 1, 'verificar un pago manual dispara exactamente un push al padre (antes faltaba)');
+  assertEqual(pushState.sent[0]?.to, manualPaymentDeviceToken, 'el push de verificación va al device token del padre');
+  assertEqual(pushState.sent[0]?.title, 'Pago confirmado', 'el título del push de pago confirmado es el esperado');
+
+  // Un mismo padre puede pagar/verificar varias reservas juntas en un solo lote (BookingConfirmScreen
+  // "Pagar todas") — un solo push, no uno por reserva (mismo criterio que el correo de submitPaymentProof).
+  const batchARes = await requestBooking(fixtures.coachBUserId, inFuture(4), 500);
+  const batchBRes = await requestBooking(fixtures.coachBUserId, inFuture(5), 500);
+  const batchA = batchARes.json();
+  const batchB = batchBRes.json();
+  await app.inject({ method: 'POST', url: `/bookings/${batchA.id}/accept`, headers: { authorization: `Bearer ${coachBToken}` } });
+  await app.inject({ method: 'POST', url: `/bookings/${batchB.id}/accept`, headers: { authorization: `Bearer ${coachBToken}` } });
+  await app.inject({
+    method: 'POST',
+    url: '/bookings/submit-payment-proof-batch',
+    headers: { authorization: `Bearer ${parentToken}` },
+    payload: { bookingIds: [batchA.id, batchB.id], provider: 'deuna', referenceCode: 'REF-A-BATCH' },
+  });
+  pushState.sent.length = 0;
+  const batchVerifyRes = await app.inject({
+    method: 'PUT',
+    url: '/bookings/verify-payment',
+    headers: { authorization: `Bearer ${platformAdminToken}` },
+    payload: { bookingIds: [batchA.id, batchB.id], decision: 'verified' },
+  });
+  assertEqual(batchVerifyRes.statusCode, 200, 'verify-payment en lote (2 reservas) devuelve 200');
+  assertEqual(
+    pushState.sent.length,
+    1,
+    'verificar un lote de 2 reservas del mismo padre dispara UN solo push, no uno por reserva',
+  );
+  assertEqual(pushState.sent[0]?.title, 'Pago confirmado', 'el título del push de lote es el esperado');
+  assertTrue(
+    pushState.sent[0]?.body?.includes('reservas') ?? false,
+    'el cuerpo del push de lote usa plural porque son 2 reservas',
+  );
+
+  // Sin esto, este device token del padre queda registrado para el resto de la corrida y rompe
+  // los conteos "exactamente un push" de escenarios más adelante (ej. Escenario 14).
+  await app.inject({
+    method: 'DELETE',
+    url: `/push-tokens/${manualPaymentDeviceToken}`,
+    headers: { authorization: `Bearer ${parentToken}` },
+  });
 
   manualBookingAId = booking.id;
 }
