@@ -1,8 +1,11 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ClubTagBadge from '../../components/coach/ClubTagBadge';
+import ReportTournamentModal from '../../components/shared/ReportTournamentModal';
 import TrainerAvatarPlaceholder from '../../components/shared/TrainerAvatarPlaceholder';
+import { useAuth } from '../../context/AuthContext';
 import {
   ApiError,
   BookedPlayer,
@@ -34,9 +37,11 @@ export default function TrainerListScreen({
   onBack?: () => void;
   onSelectTrainer?: (coach: CoachSearchResult) => void;
 }) {
+  const { token } = useAuth();
   const [minRatingOnly, setMinRatingOnly] = useState(false);
   const [trainers, setTrainers] = useState<CoachSearchResult[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [reportOpen, setReportOpen] = useState(false);
   const [bookedPlayersByCoach, setBookedPlayersByCoach] = useState<Record<string, BookedPlayer[]>>({});
   // Entrenadores oficiales de este torneo — se muestran primero y con una insignia (ver
   // sortedTrainers más abajo). undefined mientras carga, para no reordenar la lista dos veces.
@@ -119,6 +124,12 @@ export default function TrainerListScreen({
             {tournament.venue} · {dateRangeLabel(tournament.startDate, tournament.endDate)}
           </Text>
         </View>
+        {/* Antes era una banderita junto a cada torneo en ParentHomeScreen — poco clara ahí.
+           Acá adentro, con el torneo ya elegido, un botón explícito tiene más contexto. */}
+        <Pressable style={styles.reportButton} onPress={() => setReportOpen(true)} hitSlop={8}>
+          <Ionicons name="flag-outline" size={14} color={colors.textDim} />
+          <Text style={styles.reportButtonLabel}>Reportar</Text>
+        </Pressable>
       </View>
 
       <View style={styles.chipsRow}>
@@ -164,6 +175,16 @@ export default function TrainerListScreen({
             )}
           </ScrollView>
         </>
+      )}
+
+      {token && (
+        <ReportTournamentModal
+          visible={reportOpen}
+          tournamentId={tournament.id}
+          tournamentName={tournament.name}
+          authToken={token}
+          onClose={() => setReportOpen(false)}
+        />
       )}
     </SafeAreaView>
   );
@@ -244,6 +265,19 @@ const styles = StyleSheet.create({
     color: colors.textDim,
     fontSize: 12,
     marginTop: 2,
+  },
+  reportButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginLeft: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+  },
+  reportButtonLabel: {
+    color: colors.textDim,
+    fontSize: 12,
+    fontWeight: '600',
   },
   chipsRow: {
     flexDirection: 'row',

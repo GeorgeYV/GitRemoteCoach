@@ -6,7 +6,6 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ParentTabBar from '../../components/parent/ParentTabBar';
 import IconTextInput from '../../components/shared/IconTextInput';
-import ReportTournamentModal from '../../components/shared/ReportTournamentModal';
 import InitialAvatar from '../../components/shared/InitialAvatar';
 import { useAuth } from '../../context/AuthContext';
 import {
@@ -88,7 +87,6 @@ export default function ParentHomeScreen() {
   const [defaultCountry, setDefaultCountry] = useState<CountryCode>(() => localeDefaultCountry());
   const [countryFilterOn, setCountryFilterOn] = useState(true);
   const [ageCategoryFilter, setAgeCategoryFilter] = useState<AgeCategory | null>(null);
-  const [reportTarget, setReportTarget] = useState<{ id: string; name: string } | null>(null);
   const [tournaments, setTournaments] = useState<TournamentSearchResult[] | null>(null);
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState<TournamentSearchResult[] | null>(null);
@@ -294,41 +292,18 @@ export default function ParentHomeScreen() {
         ) : (
           <View style={styles.tournamentList}>
             {visibleList.map((tournament) => (
-              <TournamentRow
-                key={tournament.id}
-                tournament={tournament}
-                onPress={() => goToTrainers(tournament.id)}
-                onReport={() => setReportTarget({ id: tournament.id, name: tournament.name })}
-              />
+              <TournamentRow key={tournament.id} tournament={tournament} onPress={() => goToTrainers(tournament.id)} />
             ))}
           </View>
         )}
       </ScrollView>
 
       <ParentTabBar active="inicio" />
-
-      {token && (
-        <ReportTournamentModal
-          visible={reportTarget !== null}
-          tournamentId={reportTarget?.id ?? null}
-          tournamentName={reportTarget?.name ?? ''}
-          authToken={token}
-          onClose={() => setReportTarget(null)}
-        />
-      )}
     </SafeAreaView>
   );
 }
 
-function TournamentRow({
-  tournament,
-  onPress,
-  onReport,
-}: {
-  tournament: TournamentSearchResult;
-  onPress?: () => void;
-  onReport: () => void;
-}) {
+function TournamentRow({ tournament, onPress }: { tournament: TournamentSearchResult; onPress?: () => void }) {
   const countdown = daysUntilCountdown(tournament.startDate);
 
   return (
@@ -346,11 +321,6 @@ function TournamentRow({
           {countdown && <Text style={[styles.countdown, { color: countdown.color }]}> · {countdown.text}</Text>}
         </Text>
       </View>
-      {/* Pressable anidado dentro del Pressable de la fila — RN prioriza el más interno (mismo
-         patrón que el backdrop/sheet de ContingencyMenu), así que no dispara onPress de la fila. */}
-      <Pressable style={styles.reportButton} onPress={onReport} hitSlop={8}>
-        <Ionicons name="flag-outline" size={16} color={colors.textDim} />
-      </Pressable>
       <Text style={styles.chevron}>›</Text>
     </Pressable>
   );
@@ -555,8 +525,5 @@ const styles = StyleSheet.create({
     color: colors.textDim,
     fontSize: 20,
     fontWeight: '700',
-  },
-  reportButton: {
-    paddingHorizontal: 6,
   },
 });
