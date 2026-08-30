@@ -94,14 +94,22 @@ export async function upsertRate(
   return mapRateRow(rows[0]);
 }
 
-/** CoachTournamentSearchScreen: qué torneos, de los que aparecen en la búsqueda, ya tienen
- * disponibilidad configurada por este coach — para la píldora "Disponibilidad lista" y el filtro
- * "Con disponibilidad". coach_tournament_rates (no _availability) es la fuente: se escribe una
- * sola vez, al guardar de verdad desde CoachAvailabilityScreen (ver handleSave), así que su sola
- * existencia ya significa "esto está configurado" — a diferencia de _availability, que puede
- * tener filas con available=false sin que el coach haya llegado a guardar tarifa. */
+/** CoachTournamentSearchScreen ("Disponibilidad lista" + filtro "Con disponibilidad") y
+ * CoachHomeScreen (píldora con la cantidad, en "Mis torneos con disponibilidad") — qué torneos
+ * VIGENTES ya tienen disponibilidad configurada por este coach. coach_tournament_rates (no
+ * _availability) es la fuente: se escribe una sola vez, al guardar de verdad desde
+ * CoachAvailabilityScreen (ver handleSave), así que su sola existencia ya significa "esto está
+ * configurado" — a diferencia de _availability, que puede tener filas con available=false sin que
+ * el coach haya llegado a guardar tarifa. "Vigente" = mismo criterio que
+ * tournamentRepository.search (status activo + todavía no termina) — sin este filtro, un torneo
+ * ya pasado hace meses seguiría contando para siempre. */
 export async function listConfiguredTournamentIdsForCoach(coachId: string, db: Queryable = pool): Promise<string[]> {
-  const { rows } = await db.query(`SELECT tournament_id FROM coach_tournament_rates WHERE coach_id = $1`, [coachId]);
+  const { rows } = await db.query(
+    `SELECT ctr.tournament_id FROM coach_tournament_rates ctr
+     JOIN tournaments t ON t.id = ctr.tournament_id
+     WHERE ctr.coach_id = $1 AND t.status IN ('scheduled', 'in_progress') AND t.end_date >= CURRENT_DATE`,
+    [coachId],
+  );
   return rows.map((r) => r.tournament_id);
 }
 

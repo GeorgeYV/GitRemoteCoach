@@ -806,7 +806,18 @@ console.log('\n=== Escenario 11b: disponibilidad y tarifa de torneo (CoachAvaila
   });
   assertEqual(rateRes.statusCode, 200, 'el propio coach puede fijar su tarifa → 200');
 
-  // CoachTournamentSearchScreen: píldora "Disponibilidad lista" + filtro "Con disponibilidad".
+  // CoachTournamentSearchScreen: píldora "Disponibilidad lista" + filtro "Con disponibilidad" —
+  // y la píldora con la cantidad en CoachHomeScreen. fixtures.tournamentId está 'completed' y en
+  // el pasado (ver test/seed.ts) — sirve acá para probar que "configurado pero ya no vigente" NO
+  // cuenta. fixtures.activeTournamentId sí es vigente.
+  const rateActiveRes = await app.inject({
+    method: 'PUT',
+    url: `/coaches/${fixtures.coachAUserId}/tournaments/${fixtures.activeTournamentId}/rate`,
+    headers: { authorization: `Bearer ${coachAToken}` },
+    payload: ratePayload,
+  });
+  assertEqual(rateActiveRes.statusCode, 200, 'fijar tarifa en el torneo vigente también devuelve 200');
+
   const unauthConfiguredRes = await app.inject({
     method: 'GET',
     url: `/coaches/${fixtures.coachAUserId}/configured-tournaments`,
@@ -827,12 +838,12 @@ console.log('\n=== Escenario 11b: disponibilidad y tarifa de torneo (CoachAvaila
   });
   assertEqual(configuredRes.statusCode, 200, 'el propio coach puede ver su lista → 200');
   assertTrue(
-    configuredRes.json().tournamentIds.includes(fixtures.tournamentId),
-    'el torneo con tarifa recién guardada aparece en la lista de "ya configurados"',
+    configuredRes.json().tournamentIds.includes(fixtures.activeTournamentId),
+    'el torneo vigente con tarifa recién guardada aparece en la lista de "ya configurados"',
   );
   assertTrue(
-    !configuredRes.json().tournamentIds.includes(fixtures.activeTournamentId),
-    'un torneo sin tarifa guardada no aparece en la lista',
+    !configuredRes.json().tournamentIds.includes(fixtures.tournamentId),
+    'un torneo con tarifa guardada pero ya no vigente (completed, en el pasado) no cuenta',
   );
 
   const getRes = await app.inject({

@@ -46,6 +46,7 @@ export default function CoachHomeScreen({
   onOpenInvitation,
   onOpenAvailability,
   onOpenConfiguredTournaments,
+  configuredTournamentsCount = 0,
   onLogout,
   tabBar,
 }: {
@@ -72,6 +73,8 @@ export default function CoachHomeScreen({
   /** "Mis torneos con disponibilidad" en Accesos rápidos — mismo destino que onOpenAvailability
    * pero con el filtro "Con disponibilidad" ya activado (ver CoachTournamentSearchScreen). */
   onOpenConfiguredTournaments?: () => void;
+  /** Píldora con la cantidad, en el mismo link — 0 no muestra nada (ver QUICK_LINKS.map). */
+  configuredTournamentsCount?: number;
   onLogout?: () => void;
   tabBar?: React.ReactNode;
 }) {
@@ -194,6 +197,11 @@ export default function CoachHomeScreen({
                 <Text style={styles.linkLabel}>{link.label}</Text>
                 <Text style={styles.linkHint}>{link.hint}</Text>
               </View>
+              {link.key === 'configuredTournaments' && configuredTournamentsCount > 0 && (
+                <View style={styles.countPill}>
+                  <Text style={styles.countPillLabel}>{configuredTournamentsCount}</Text>
+                </View>
+              )}
               <Text style={styles.chevron}>›</Text>
             </Pressable>
           ))}
@@ -493,6 +501,20 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingVertical: 14,
     paddingHorizontal: 16,
+  },
+  countPill: {
+    backgroundColor: withOpacity(colors.ballLime, 0.16),
+    borderRadius: 10,
+    minWidth: 22,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    alignItems: 'center',
+    marginRight: 6,
+  },
+  countPillLabel: {
+    color: colors.courtBlue,
+    fontSize: 11,
+    fontWeight: '800',
   },
   linkInfo: {
     flex: 1,

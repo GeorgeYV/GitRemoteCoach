@@ -18,6 +18,7 @@ import {
   getSuspendedMatch,
   listClubInvitations,
   listCoachBookings,
+  listConfiguredCoachTournamentIds,
   listPlayers,
   Match,
   Player,
@@ -345,6 +346,9 @@ export function CoachHomeFlow({ coachId, coachName }: { coachId: string; coachNa
   const [pendingInvitation, setPendingInvitation] = useState<ClubCoachInvitationWithNames | null>(null);
   const [invitationRefreshKey, setInvitationRefreshKey] = useState(0);
   const [suspendedMatch, setSuspendedMatch] = useState<SuspendedMatchSummary | null>(null);
+  // Píldora con la cantidad en "Mis torneos con disponibilidad" (Accesos rápidos) — ver
+  // coachTournamentRepository.listConfiguredTournamentIdsForCoach: ya viene filtrado a vigentes.
+  const [configuredTournamentsCount, setConfiguredTournamentsCount] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
   // "Explora torneos disponibles" arranca en false, "Mis torneos con disponibilidad" en true —
@@ -388,6 +392,22 @@ export function CoachHomeFlow({ coachId, coachName }: { coachId: string; coachNa
       cancelled = true;
     };
   }, [coachId, token]);
+
+  // Depende de `step`, no solo de montar una vez: sin esto, configurar un torneo nuevo desde
+  // "Explora torneos disponibles" y volver a Inicio dejaba la píldora con el número viejo hasta
+  // recargar toda la app.
+  useEffect(() => {
+    if (!token || step !== 'home') return;
+    let cancelled = false;
+    listConfiguredCoachTournamentIds(token, coachId)
+      .then(({ tournamentIds }) => {
+        if (!cancelled) setConfiguredTournamentsCount(tournamentIds.length);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [coachId, token, step]);
 
   // Invitaciones de club pendientes (CoachClubInvitationScreen) — separado del efecto de arriba para
   // poder refrescar solo esto al volver de la pantalla de invitación, sin recargar todo el panel.
@@ -633,6 +653,7 @@ export function CoachHomeFlow({ coachId, coachName }: { coachId: string; coachNa
         setAvailabilityFilterOn(true);
         setStep('availability');
       }}
+      configuredTournamentsCount={configuredTournamentsCount}
       onLogout={logout}
       tabBar={<CoachTabBar active="home" onSelect={setStep} />}
     />
