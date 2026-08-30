@@ -512,6 +512,7 @@ export function CoachHomeFlow({ coachId, coachName }: { coachId: string; coachNa
       <CoachRequestInboxScreen
         coachId={coachId}
         onBack={() => setStep('home')}
+        onOpenAvailability={() => setStep('availability')}
         tabBar={<CoachTabBar active="requests" onSelect={setStep} />}
       />
     );

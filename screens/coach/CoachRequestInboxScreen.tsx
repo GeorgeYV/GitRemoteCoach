@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -26,10 +27,15 @@ function toBookingRequest(booking: BookingWithParticipants): BookingRequest {
 export default function CoachRequestInboxScreen({
   coachId,
   onBack,
+  onOpenAvailability,
   tabBar,
 }: {
   coachId: string;
   onBack?: () => void;
+  /** Vacío guía a "¿En qué torneo vas a estar?" — sin esto, un coach que entra acá directo desde
+   * la barra inferior (sin pasar por el aviso del Inicio) se queda sin ninguna pista de qué
+   * hacer para empezar a recibir solicitudes. */
+  onOpenAvailability?: () => void;
   tabBar?: React.ReactNode;
 }) {
   const { token } = useAuth();
@@ -115,6 +121,12 @@ export default function CoachRequestInboxScreen({
                 Cuando un padre reserve una sesión contigo en un torneo, aparecerá aquí para que la aceptes o
                 rechaces.
               </Text>
+              {onOpenAvailability && (
+                <Pressable style={styles.guideButton} onPress={onOpenAvailability}>
+                  <Ionicons name="search-outline" size={16} color={colors.courtBlueDeep} />
+                  <Text style={styles.guideButtonLabel}>Explora torneos disponibles</Text>
+                </Pressable>
+              )}
             </View>
           )}
         </ScrollView>
@@ -170,6 +182,23 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 20,
     textAlign: 'center',
+  },
+  guideButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: colors.ballLime,
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    marginTop: 18,
+    alignSelf: 'center',
+  },
+  guideButtonLabel: {
+    color: colors.courtBlueDeep,
+    fontSize: 13,
+    fontWeight: '800',
   },
   actionErrorText: {
     color: colors.errorCoral,
