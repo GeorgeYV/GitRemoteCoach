@@ -38,9 +38,11 @@ si faltan (`src/config.ts#required`). El resto es opcional y cada feature se deg
 - `R2_*` — subida de fotos de perfil y audio de notas de voz a Cloudflare R2.
 - `OPENAI_API_KEY` — transcripción de notas de voz (Whisper). Sin esto, `jobs:transcribe-voice-notes`
   se salta en vez de fallar.
-- `PAYMENT_ACCOUNT_DEUNA` / `PAYMENT_ACCOUNT_YAPE` / `PAYMENT_ACCOUNT_PLIN` / `PAYMENT_BANK_EC_*` /
-  `PAYMENT_BANK_PE_*` — cuentas de cobro para el pago manual P2P (ver "Pagos" abajo). Sin
-  configurar, la pantalla del padre muestra "Pendiente de configurar" en vez de romper.
+
+Las cuentas de cobro del pago manual P2P (Deuna/Yape/Plin/transferencia) ya NO viven en variables
+de entorno (decisión #54) — platform_admin las edita desde "Cuentas de cobro" en el panel de admin,
+sin deploy. Sin cargar todavía, la pantalla del padre muestra "Pendiente de configurar" en vez de
+romper (ver "Pagos" abajo).
 
 ## Arquitectura
 

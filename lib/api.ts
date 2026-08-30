@@ -492,6 +492,51 @@ export function getPaymentInstructions(authToken: string): Promise<PaymentInstru
   return request('/payment-instructions', { headers: { Authorization: `Bearer ${authToken}` } });
 }
 
+/** Espeja server/src/types.ts#PaymentCollectionAccountAdmin (decisión #54) —
+ * PlatformAdminPaymentAccountsScreen. A diferencia de PaymentAccount (el shape público de arriba),
+ * acá vienen todos los campos siempre, null para los que no aplican al provider de esa fila. */
+export interface PaymentCollectionAccountAdmin {
+  id: string;
+  country: string;
+  provider: PaymentProvider;
+  label: string;
+  handle: string | null;
+  bankName: string | null;
+  accountType: string | null;
+  accountNumber: string | null;
+  accountHolderName: string | null;
+  interbankAccountNumber: string | null;
+  updatedAt: string;
+}
+
+/** GET /admin/payment-accounts — las 5 filas sembradas (Deuna, transferencia EC, Yape, Plin,
+ * transferencia PE), sin filtrar/paginar. */
+export function getPaymentAccountsForAdmin(authToken: string): Promise<PaymentCollectionAccountAdmin[]> {
+  return request('/admin/payment-accounts', { headers: { Authorization: `Bearer ${authToken}` } });
+}
+
+/** PUT /admin/payment-accounts/:id — el provider de la fila no cambia acá, solo sus datos de
+ * cobro. Manda solo los campos que apliquen (handle para deuna/yape/plin; los 4 de banco +
+ * interbankAccountNumber opcional para bank_transfer) — el resto no hace falta incluirlo. */
+export function updatePaymentAccount(
+  authToken: string,
+  id: string,
+  fields: {
+    handle?: string;
+    bankName?: string;
+    accountType?: string;
+    accountNumber?: string;
+    accountHolderName?: string;
+    interbankAccountNumber?: string;
+  },
+): Promise<PaymentCollectionAccountAdmin> {
+  return request(`/admin/payment-accounts/${id}`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${authToken}` },
+    body: JSON.stringify(fields),
+  });
+}
+
 /** POST /bookings/submit-payment-proof-batch — mismo criterio que payBookingsBatch: un solo
  * comprobante cubre varias reservas pagadas juntas en un solo envío por Deuna/Yape/Plin.
  * BookingPaymentScreen la usa incluso para una sola reserva (un arreglo de un elemento funciona

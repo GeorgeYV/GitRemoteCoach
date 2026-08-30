@@ -24,6 +24,16 @@ import {
 } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
 
+/** Sin logotipos reales de terceros (Deuna es una marca ajena) — un ícono genérico alcanza para
+ * diferenciar de un vistazo: celular para las apps P2P (Deuna/Yape/Plin, un número de celular
+ * alcanza para pagar), intercambio para transferencia bancaria tradicional. */
+const PROVIDER_ICONS: Record<PaymentProvider, React.ComponentProps<typeof Ionicons>['name']> = {
+  deuna: 'phone-portrait-outline',
+  yape: 'phone-portrait-outline',
+  plin: 'phone-portrait-outline',
+  bank_transfer: 'swap-horizontal-outline',
+};
+
 export interface PayableBooking {
   bookingId: string;
   dayLabel: string;
@@ -182,6 +192,11 @@ export default function BookingPaymentScreen({
                         style={[styles.providerChip, selected && styles.providerChipActive]}
                         onPress={() => setProvider(option.provider)}
                       >
+                        <Ionicons
+                          name={PROVIDER_ICONS[option.provider]}
+                          size={18}
+                          color={selected ? colors.lineWhite : colors.textSoft}
+                        />
                         <Text style={[styles.providerChipLabel, selected && styles.providerChipLabelActive]}>
                           {option.label}
                         </Text>
@@ -391,7 +406,10 @@ const styles = StyleSheet.create({
   },
   providerChip: {
     flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
     backgroundColor: colors.panel,
     borderRadius: 14,
     paddingVertical: 12,

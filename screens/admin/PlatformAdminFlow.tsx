@@ -4,18 +4,20 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../../lib/theme';
 import PlatformAdminAccountsScreen from './PlatformAdminAccountsScreen';
 import PlatformAdminClubVerificationScreen from './PlatformAdminClubVerificationScreen';
+import PlatformAdminPaymentAccountsScreen from './PlatformAdminPaymentAccountsScreen';
 import PlatformAdminPaymentsScreen from './PlatformAdminPaymentsScreen';
 import PlatformAdminPayoutsScreen from './PlatformAdminPayoutsScreen';
 import PlatformAdminRefundsScreen from './PlatformAdminRefundsScreen';
 import PlatformAdminReviewScreen from './PlatformAdminReviewScreen';
 import PlatformAdminTournamentScreen from './PlatformAdminTournamentScreen';
 
-type Tab = 'documents' | 'clubs' | 'accounts' | 'payments' | 'payouts' | 'refunds' | 'tournaments';
+type Tab = 'documents' | 'clubs' | 'accounts' | 'paymentAccounts' | 'payments' | 'payouts' | 'refunds' | 'tournaments';
 
 /** Home del platform_admin: revisión de documentos de coaches (flujo original), verificación de
  * clubes/federaciones autoregistrados (ver decisión #41 en db/schema.sql), deshabilitar/habilitar
- * cuentas de coach/padre (ver decisión #51), verificación de pagos manuales entrantes, reporte de
- * pagos salientes a entrenadores y de reembolsos a padres (fase 1 sin Stripe, ver
+ * cuentas de coach/padre (ver decisión #51), editar las cuentas de cobro del pago manual P2P (ver
+ * decisión #54), verificación de pagos manuales entrantes, reporte de pagos salientes a
+ * entrenadores y de reembolsos a padres (fase 1 sin Stripe, ver
  * paymentService.submitPaymentProof/verifyPayment, settlementService.settleTournamentCoachPayouts
  * y cancellationService.cancelBooking) y sembrar torneos sin club (ver decisión #36 en
  * db/schema.sql). Responsabilidades sin relación entre sí, así que van en pantallas separadas
@@ -40,6 +42,12 @@ export default function PlatformAdminFlow() {
         <Pressable style={[styles.tab, tab === 'accounts' && styles.tabActive]} onPress={() => setTab('accounts')}>
           <Text style={[styles.tabLabel, tab === 'accounts' && styles.tabLabelActive]}>Cuentas</Text>
         </Pressable>
+        <Pressable
+          style={[styles.tab, tab === 'paymentAccounts' && styles.tabActive]}
+          onPress={() => setTab('paymentAccounts')}
+        >
+          <Text style={[styles.tabLabel, tab === 'paymentAccounts' && styles.tabLabelActive]}>Cuentas de cobro</Text>
+        </Pressable>
         <Pressable style={[styles.tab, tab === 'payments' && styles.tabActive]} onPress={() => setTab('payments')}>
           <Text style={[styles.tabLabel, tab === 'payments' && styles.tabLabelActive]}>Pagos</Text>
         </Pressable>
@@ -61,6 +69,8 @@ export default function PlatformAdminFlow() {
           <PlatformAdminClubVerificationScreen />
         ) : tab === 'accounts' ? (
           <PlatformAdminAccountsScreen />
+        ) : tab === 'paymentAccounts' ? (
+          <PlatformAdminPaymentAccountsScreen />
         ) : tab === 'payments' ? (
           <PlatformAdminPaymentsScreen />
         ) : tab === 'payouts' ? (

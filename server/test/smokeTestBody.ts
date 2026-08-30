@@ -4805,6 +4805,139 @@ console.log('\n=== Escenario 48: deshabilitar/habilitar cuentas de coach, padre 
   });
 }
 
+console.log('\n=== Escenario 49: cuentas de cobro editables desde el admin (decisión #54) ===');
+{
+  // --- GET /payment-instructions (BookingPaymentScreen): sembrado sin cargar, todo en placeholder ---
+  const initialRes = await app.inject({
+    method: 'GET',
+    url: '/payment-instructions',
+    headers: { authorization: `Bearer ${parentToken}` },
+  });
+  assertEqual(initialRes.statusCode, 200, 'GET /payment-instructions devuelve 200');
+  const initial = initialRes.json();
+  const ecDeuna = initial.EC.find((a: any) => a.provider === 'deuna');
+  assertEqual(ecDeuna?.handle, 'Pendiente de configurar', 'Deuna sin cargar todavía muestra el placeholder');
+  const ecBank = initial.EC.find((a: any) => a.provider === 'bank_transfer');
+  assertEqual(ecBank?.bankName, 'Pendiente de configurar', 'transferencia EC sin cargar muestra el placeholder');
+  const pePlin = initial.PE.find((a: any) => a.provider === 'plin');
+  assertEqual(pePlin?.handle, 'Pendiente de configurar', 'Plin sin cargar también muestra el placeholder');
+
+  // --- Solo platform_admin puede listar/editar ---
+  const noAuthListRes = await app.inject({ method: 'GET', url: '/admin/payment-accounts' });
+  assertEqual(noAuthListRes.statusCode, 401, 'listar cuentas de cobro sin Bearer token devuelve 401');
+
+  const coachListRes = await app.inject({
+    method: 'GET',
+    url: '/admin/payment-accounts',
+    headers: { authorization: `Bearer ${coachAToken}` },
+  });
+  assertEqual(coachListRes.statusCode, 403, 'un coach no puede listar cuentas de cobro → 403');
+
+  const listRes = await app.inject({
+    method: 'GET',
+    url: '/admin/payment-accounts',
+    headers: { authorization: `Bearer ${platformAdminToken}` },
+  });
+  assertEqual(listRes.statusCode, 200, 'platform_admin puede listar cuentas de cobro → 200');
+  const accounts = listRes.json();
+  assertEqual(accounts.length, 5, 'las 5 filas sembradas (Deuna, transferencia EC, Yape, Plin, transferencia PE) están presentes');
+
+  const deunaRow = accounts.find((a: any) => a.country === 'EC' && a.provider === 'deuna');
+  const bankEcRow = accounts.find((a: any) => a.country === 'EC' && a.provider === 'bank_transfer');
+  const yapeRow = accounts.find((a: any) => a.country === 'PE' && a.provider === 'yape');
+
+  // --- Editar una cuenta por número (Deuna): vacío rechaza, con valor confirma y persiste ---
+  const emptyHandleRes = await app.inject({
+    method: 'PUT',
+    url: `/admin/payment-accounts/${deunaRow.id}`,
+    headers: { authorization: `Bearer ${platformAdminToken}` },
+    payload: { handle: '   ' },
+  });
+  assertEqual(emptyHandleRes.statusCode, 422, 'guardar Deuna sin número devuelve 422 (ValidationError)');
+
+  const coachUpdateRes = await app.inject({
+    method: 'PUT',
+    url: `/admin/payment-accounts/${deunaRow.id}`,
+    headers: { authorization: `Bearer ${coachAToken}` },
+    payload: { handle: '0999999999' },
+  });
+  assertEqual(coachUpdateRes.statusCode, 403, 'un coach no puede editar una cuenta de cobro → 403');
+
+  const updateDeunaRes = await app.inject({
+    method: 'PUT',
+    url: `/admin/payment-accounts/${deunaRow.id}`,
+    headers: { authorization: `Bearer ${platformAdminToken}` },
+    payload: { handle: '0991234567' },
+  });
+  assertEqual(updateDeunaRes.statusCode, 200, 'guardar Deuna con número devuelve 200');
+  assertEqual(updateDeunaRes.json().handle, '0991234567', 'el número guardado queda reflejado en la respuesta');
+
+  const afterDeunaRes = await app.inject({
+    method: 'GET',
+    url: '/payment-instructions',
+    headers: { authorization: `Bearer ${parentToken}` },
+  });
+  assertEqual(
+    afterDeunaRes.json().EC.find((a: any) => a.provider === 'deuna')?.handle,
+    '0991234567',
+    'BookingPaymentScreen ve el número nuevo sin redeploy',
+  );
+
+  // --- Editar transferencia bancaria: campos incompletos rechaza, completos confirma ---
+  const incompleteBankRes = await app.inject({
+    method: 'PUT',
+    url: `/admin/payment-accounts/${bankEcRow.id}`,
+    headers: { authorization: `Bearer ${platformAdminToken}` },
+    payload: { bankName: 'Banco Pichincha', accountType: 'Ahorros' },
+  });
+  assertEqual(incompleteBankRes.statusCode, 422, 'guardar transferencia sin número/titular devuelve 422 (ValidationError)');
+
+  const updateBankRes = await app.inject({
+    method: 'PUT',
+    url: `/admin/payment-accounts/${bankEcRow.id}`,
+    headers: { authorization: `Bearer ${platformAdminToken}` },
+    payload: {
+      bankName: 'Banco Pichincha',
+      accountType: 'Ahorros',
+      accountNumber: '2200123456',
+      accountHolderName: 'Remote Coach S.A.',
+    },
+  });
+  assertEqual(updateBankRes.statusCode, 200, 'guardar transferencia completa devuelve 200');
+  assertEqual(updateBankRes.json().interbankAccountNumber, null, 'CCI queda null cuando no se manda (es opcional)');
+
+  const afterBankRes = await app.inject({
+    method: 'GET',
+    url: '/payment-instructions',
+    headers: { authorization: `Bearer ${parentToken}` },
+  });
+  const bankAfter = afterBankRes.json().EC.find((a: any) => a.provider === 'bank_transfer');
+  assertEqual(bankAfter?.accountHolderName, 'Remote Coach S.A.', 'BookingPaymentScreen ve la transferencia completa sin redeploy');
+  assertEqual(bankAfter?.interbankAccountNumber, undefined, 'sin CCI cargado, el campo ni aparece en la respuesta pública');
+
+  // --- Actualizar una fila que no existe devuelve 404 ---
+  const missingRes = await app.inject({
+    method: 'PUT',
+    url: '/admin/payment-accounts/00000000-0000-0000-0000-000000000000',
+    headers: { authorization: `Bearer ${platformAdminToken}` },
+    payload: { handle: '0990000000' },
+  });
+  assertEqual(missingRes.statusCode, 404, 'editar una cuenta de cobro inexistente devuelve 404');
+
+  // Un provider no tocado (Yape) sigue en placeholder — confirma que actualizar una fila no afecta a las demás.
+  const yapeStillPlaceholderRes = await app.inject({
+    method: 'GET',
+    url: '/payment-instructions',
+    headers: { authorization: `Bearer ${parentToken}` },
+  });
+  assertEqual(
+    yapeStillPlaceholderRes.json().PE.find((a: any) => a.provider === 'yape')?.handle,
+    'Pendiente de configurar',
+    'Yape (no tocado en este escenario) sigue en placeholder',
+  );
+  assertTrue(!!yapeRow, 'sanity check: la fila de Yape existe en el listado del admin');
+}
+
 console.log(`\n=== Resultado: ${passed} pasaron, ${failed} fallaron ===`);
 await app.close();
 process.exit(failed > 0 ? 1 : 0);

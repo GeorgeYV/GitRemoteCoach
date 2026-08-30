@@ -174,6 +174,49 @@ export interface PaymentTransaction {
   createdAt: string;
 }
 
+/** Fila cruda de payment_collection_accounts (decisión #54) — PlatformAdminPaymentAccountsScreen.
+ * A diferencia de PaymentInstructions (el shape público, discriminado por provider), acá se
+ * exponen todos los campos siempre (null para los que no aplican al provider de esa fila), así el
+ * admin edita cualquiera de las 5 filas con un solo formulario genérico. */
+export interface PaymentCollectionAccountAdmin {
+  id: string;
+  country: string;
+  provider: PaymentProvider;
+  label: string;
+  handle: string | null;
+  bankName: string | null;
+  accountType: string | null;
+  accountNumber: string | null;
+  accountHolderName: string | null;
+  interbankAccountNumber: string | null;
+  updatedAt: string;
+}
+
+/** Cuenta de cobro por app P2P — GET /payment-instructions (BookingPaymentScreen). */
+export interface PhonePaymentAccount {
+  provider: 'deuna' | 'yape' | 'plin';
+  label: string;
+  handle: string;
+}
+
+/** Cuenta de cobro por transferencia bancaria — interbankAccountNumber (CCI en Perú) es opcional,
+ * no todos los bancos/países lo piden. */
+export interface BankTransferPaymentAccount {
+  provider: 'bank_transfer';
+  label: string;
+  bankName: string;
+  accountType: string;
+  accountNumber: string;
+  accountHolderName: string;
+  interbankAccountNumber?: string;
+}
+
+export type PublicPaymentAccount = PhonePaymentAccount | BankTransferPaymentAccount;
+
+/** GET /payment-instructions — a qué cuenta pagar según el país del torneo (decisión #54: antes
+ * hardcodeado en config.ts, ahora leído de payment_collection_accounts). */
+export type PaymentInstructions = Record<'EC' | 'PE', PublicPaymentAccount[]>;
+
 export interface ClubSettlement {
   id: string;
   clubId: string;

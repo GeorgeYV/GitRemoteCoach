@@ -1398,6 +1398,44 @@ BEFORE UPDATE OR DELETE ON payment_transactions
 FOR EACH ROW EXECUTE FUNCTION fn_payment_transactions_prevent_mutation();
 
 -- ---------------------------------------------------------------------
+-- Cuentas de cobro del pago manual P2P (decisión #54) — a qué cuenta le paga
+-- el padre por fuera de la app (Deuna/Yape/Plin: un número de celular;
+-- transferencia bancaria: banco/tipo/número/titular). Antes vivía en
+-- variables de entorno (requería un redeploy en Render para cambiar un
+-- número); ahora platform_admin la edita desde PlatformAdminPaymentAccountsScreen.
+-- Una fila por país+proveedor — se siembra una vez por país con los
+-- proveedores soportados (INSERT ... ON CONFLICT DO NOTHING más abajo), y
+-- de ahí en adelante solo se actualiza (UPDATE), nunca se crea/borra desde
+-- la app.
+-- ---------------------------------------------------------------------
+CREATE TABLE payment_collection_accounts (
+  id                        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  country                   TEXT NOT NULL,
+  provider                  TEXT NOT NULL CHECK (provider IN ('deuna', 'yape', 'plin', 'bank_transfer')),
+  label                     TEXT NOT NULL,
+  -- Deuna/Yape/Plin: número de celular. NULL para bank_transfer.
+  handle                    TEXT,
+  -- Transferencia bancaria: NULL para deuna/yape/plin.
+  bank_name                 TEXT,
+  account_type              TEXT,
+  account_number            TEXT,
+  account_holder_name       TEXT,
+  -- CCI u homólogo — opcional incluso para bank_transfer (no todos los bancos/países lo piden).
+  interbank_account_number  TEXT,
+  updated_at                TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_by                UUID REFERENCES users (id),
+  UNIQUE (country, provider)
+);
+
+INSERT INTO payment_collection_accounts (country, provider, label) VALUES
+  ('EC', 'deuna', 'Deuna'),
+  ('EC', 'bank_transfer', 'Transferencia bancaria'),
+  ('PE', 'yape', 'Yape'),
+  ('PE', 'plin', 'Plin'),
+  ('PE', 'bank_transfer', 'Transferencia bancaria')
+ON CONFLICT (country, provider) DO NOTHING;
+
+-- ---------------------------------------------------------------------
 -- Chat de coordinación (padre ↔ entrenador) por reserva
 -- ---------------------------------------------------------------------
 -- Un hilo por booking, no una tabla de "conversaciones" separada: el chat
@@ -2312,4 +2350,14 @@ CREATE INDEX idx_push_tokens_user_id ON push_tokens (user_id);
 --     donde alguien escribe una hora real a mano) la pone en true. El cliente no muestra ni cuenta
 --     regresiva a ninguna hora mientras esto sea false — CoachPreMatchReminderScreen antes corría
 --     una cuenta regresiva real contra esa hora inventada, así que el bug no era solo visual.
+-- 54. payment_collection_accounts: las cuentas de cobro del pago manual P2P (Deuna en Ecuador,
+--     Yape/Plin/transferencia en Perú, transferencia también en Ecuador) vivían en variables de
+--     entorno (config.ts) — cualquier cambio de número/cuenta exigía un redeploy en Render, y sin
+--     esas variables cargadas el padre veía "Pendiente de configurar" (reportado desde producción).
+--     Se agrega esta tabla (una fila por país+proveedor, sembrada una vez con los proveedores
+--     soportados) y una pestaña nueva "Cuentas de cobro" en PlatformAdminFlow para que
+--     platform_admin la edite directo, sin deploy. GET /payment-instructions (BookingPaymentScreen)
+--     ahora lee de acá en vez de config.ts — mismo contrato de respuesta, sin cambios del lado del
+--     padre. No hay ALTA/borrado de filas desde la app: los 5 proveedores están fijos en el CHECK
+--     y en el seed; platform_admin solo completa/corrige los datos de cobro de cada uno.
 -- =====================================================================

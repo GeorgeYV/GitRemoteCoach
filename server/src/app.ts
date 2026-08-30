@@ -26,6 +26,7 @@ import { reviewRoutes } from './routes/reviews.js';
 import { matchRoutes } from './routes/matches.js';
 import { pushTokenRoutes } from './routes/pushTokens.js';
 import { adminAccountRoutes } from './routes/adminAccounts.js';
+import { paymentAccountRoutes } from './routes/paymentAccounts.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -113,6 +114,7 @@ export function buildApp() {
   app.register(reviewRoutes);
   app.register(matchRoutes);
   app.register(adminAccountRoutes);
+  app.register(paymentAccountRoutes);
 
   return app;
 }
