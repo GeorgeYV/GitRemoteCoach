@@ -61,7 +61,6 @@ export default function CoachRegistrationScreen({
   const [region, setRegion] = useState(profile?.profile.region ?? '');
   const [country, setCountry] = useState<CountryCode | null>(profile?.profile.country ?? null);
   const [experience, setExperience] = useState(profile ? String(profile.profile.yearsExperience) : '');
-  const [hourlyRate, setHourlyRate] = useState(profile ? String(Number(profile.profile.hourlyRate)) : '');
   const [categories, setCategories] = useState<string[]>(profile?.ageCategories ?? []);
   const [levels, setLevels] = useState<string[]>(profile?.levels.map((l) => LEVEL_VALUE_TO_LABEL[l]) ?? []);
   const [documents, setDocuments] = useState<DocumentItem[]>(VERIFICATION_DOC_CHECKLIST);
@@ -172,7 +171,6 @@ export default function CoachRegistrationScreen({
             region: region.trim() || undefined,
             country,
             yearsExperience: Number(experience) || 0,
-            hourlyRate: Number(hourlyRate) || 0,
             // La pantalla nunca mostró un campo de especialidad para editar — se reenvía tal
             // cual para no perderla si el coach ya la tenía seteada por otra vía.
             specialty: profile.profile.specialty ?? undefined,
@@ -188,7 +186,6 @@ export default function CoachRegistrationScreen({
           region: region.trim() || undefined,
           country,
           yearsExperience: Number(experience) || 0,
-          hourlyRate: Number(hourlyRate) || 0,
           ageCategories: categories as AgeCategory[],
           levels: levels.map((label) => LEVEL_LABEL_TO_VALUE[label]),
           documents: documents
@@ -223,7 +220,7 @@ export default function CoachRegistrationScreen({
           <Text style={styles.headerTitle}>{profile ? 'Editar perfil' : 'Únete como entrenador'}</Text>
           <Text style={styles.headerSubtitle}>
             {profile
-              ? 'Actualiza tus datos, tarifa y las categorías/niveles que atiendes.'
+              ? 'Actualiza tus datos y las categorías/niveles que atiendes.'
               : 'Verificamos tu perfil una sola vez para proteger a los jugadores, a sus familias y a ti.'}
           </Text>
         </View>
@@ -277,13 +274,6 @@ export default function CoachRegistrationScreen({
             keyboardType="number-pad"
           />
           {experience.length > 0 && <Text style={styles.fieldHint}>Años de experiencia entrenando</Text>}
-          <IconTextInput
-            icon="cash-outline"
-            placeholder="Tarifa por hora ($)"
-            value={hourlyRate}
-            onChangeText={setHourlyRate}
-            keyboardType="number-pad"
-          />
         </Section>
 
         <Section label="País donde entrenas">

@@ -64,7 +64,6 @@ export async function registerCoachProfile(
     country: CountryCode;
     yearsExperience: number;
     specialty: string | null;
-    hourlyRate: number;
     ageCategories: AgeCategory[];
     levels: PlayingLevel[];
     documents: { docType: VerificationDocType; fileUrl: string }[];
@@ -79,7 +78,6 @@ export async function registerCoachProfile(
         country: params.country,
         yearsExperience: params.yearsExperience,
         specialty: params.specialty,
-        hourlyRate: params.hourlyRate,
       },
       client,
     );
@@ -105,8 +103,8 @@ export async function registerCoachProfile(
   return result;
 }
 
-/** CoachRegistrationScreen "Editar perfil" — datos personales/tarifa, sin tocar
- * ageCategories/levels (eso lo cubre updateCoachTraining aparte) ni documentos/verificación. */
+/** CoachRegistrationScreen "Editar perfil" — datos personales, sin tocar ageCategories/levels
+ * (eso lo cubre updateCoachTraining aparte) ni documentos/verificación. */
 export async function updateCoachProfileDetails(
   coachId: string,
   params: {
@@ -115,7 +113,6 @@ export async function updateCoachProfileDetails(
     country: CountryCode;
     yearsExperience: number;
     specialty: string | null;
-    hourlyRate: number;
   },
 ): Promise<CoachProfile> {
   return coachRepository.update(coachId, params);

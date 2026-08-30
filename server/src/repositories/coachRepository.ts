@@ -83,7 +83,6 @@ function mapCoachProfileRow(row: any): CoachProfile {
     photoUrl: row.photo_url,
     yearsExperience: row.years_experience,
     specialty: row.specialty,
-    hourlyRate: row.hourly_rate,
     verificationStatus: row.verification_status,
     ratingAvg: row.rating_avg,
     ratingCount: row.rating_count,
@@ -103,15 +102,14 @@ export async function create(
     country: CountryCode;
     yearsExperience: number;
     specialty: string | null;
-    hourlyRate: number;
   },
   db: Queryable = pool,
 ): Promise<CoachProfile> {
   try {
     await db.query(
-      `INSERT INTO coach_profiles (user_id, city, region, country, years_experience, specialty, hourly_rate)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [userId, params.city, params.region, params.country, params.yearsExperience, params.specialty, params.hourlyRate],
+      `INSERT INTO coach_profiles (user_id, city, region, country, years_experience, specialty)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [userId, params.city, params.region, params.country, params.yearsExperience, params.specialty],
     );
   } catch (err: any) {
     // user_id es la PK de coach_profiles — un segundo POST /coaches para el mismo usuario cae acá.
@@ -134,15 +132,14 @@ export async function update(
     country: CountryCode;
     yearsExperience: number;
     specialty: string | null;
-    hourlyRate: number;
   },
   db: Queryable = pool,
 ): Promise<CoachProfile> {
   await db.query(
     `UPDATE coach_profiles
-     SET city = $2, region = $3, country = $4, years_experience = $5, specialty = $6, hourly_rate = $7, updated_at = now()
+     SET city = $2, region = $3, country = $4, years_experience = $5, specialty = $6, updated_at = now()
      WHERE user_id = $1`,
-    [userId, params.city, params.region, params.country, params.yearsExperience, params.specialty, params.hourlyRate],
+    [userId, params.city, params.region, params.country, params.yearsExperience, params.specialty],
   );
   return getCoachProfile(userId, db);
 }

@@ -38,8 +38,7 @@ const VERIFICATION_LABELS: Record<VerificationStatus, string> = {
   rejected: 'Verificación no aprobada',
 };
 
-/** Sufijo junto al precio del header — null cuando el coach no fijó tarifa para este torneo
- * todavía y se muestra su hourlyRate de catálogo (sin unidad asociada). */
+/** Sufijo junto al precio del header. */
 const PRICE_SUFFIX: Record<RateMode, string> = {
   per_day: '/ día',
   per_tournament: '/ torneo completo',
@@ -92,6 +91,10 @@ export default function TrainerProfileScreen({
 }) {
   const [profile, setProfile] = useState<CoachProfileWithTrainingAndBadges | null>(null);
   const [availability, setAvailability] = useState<AvailabilityDay[] | null>(null);
+  // Aparte de `price`: price === null ahora es un estado válido en sí mismo (el coach no fijó
+  // tarifa para este torneo), no "todavía cargando" — sin esto, esa pantalla se quedaba girando
+  // el spinner para siempre en ese caso.
+  const [loaded, setLoaded] = useState(false);
   const [price, setPrice] = useState<number | null>(null);
   const [rateMode, setRateMode] = useState<RateMode | null>(null);
   const [approachDescription, setApproachDescription] = useState<string | null>(null);
@@ -114,9 +117,12 @@ export default function TrainerProfileScreen({
         if (cancelled) return;
         setProfile(profileResult);
         setAvailability(toAvailabilityDays(tournament, availabilityResult.availability));
-        setPrice(Number(availabilityResult.rate?.amount ?? profileResult.profile.hourlyRate));
+        // null = el coach todavía no fijó tarifa para este torneo — ver el aviso más abajo en vez
+        // de mostrar un precio que ni siquiera se puede reservar (ningún día aparecería disponible).
+        setPrice(availabilityResult.rate ? Number(availabilityResult.rate.amount) : null);
         setRateMode(availabilityResult.rate?.rateMode ?? null);
         setApproachDescription(availabilityResult.rate?.approachDescription ?? null);
+        setLoaded(true);
       })
       .catch((err) => {
         if (cancelled) return;
@@ -183,7 +189,7 @@ export default function TrainerProfileScreen({
     );
   }
 
-  if (!profile || !availability || price === null) {
+  if (!profile || !availability || !loaded) {
     return (
       <SafeAreaView style={[styles.container, styles.centerState]} edges={['top', 'bottom']}>
         <ActivityIndicator color={colors.courtBlue} />
@@ -211,9 +217,13 @@ export default function TrainerProfileScreen({
           </Text>
         </View>
         <View style={styles.priceBlock}>
-          <Text style={styles.price}>
-            ${price} <Text style={styles.priceSuffix}>{rateMode ? PRICE_SUFFIX[rateMode] : '/ sesión'}</Text>
-          </Text>
+          {price !== null ? (
+            <Text style={styles.price}>
+              ${price} <Text style={styles.priceSuffix}>{rateMode ? PRICE_SUFFIX[rateMode] : '/ sesión'}</Text>
+            </Text>
+          ) : (
+            <Text style={styles.noPriceText}>Sin tarifa aún</Text>
+          )}
         </View>
       </View>
 
@@ -313,16 +323,24 @@ export default function TrainerProfileScreen({
       </ScrollView>
 
       <View style={styles.footer}>
-        <Text style={styles.footerNote}>${price} · sin costo de viáticos</Text>
-        <Pressable
-          style={styles.reserveButton}
-          onPress={() => onReserve?.({ coachId, name, price, rateMode: rateMode ?? 'per_day', availability })}
-        >
-          <View style={styles.reserveContent}>
-            <Ionicons name="calendar-outline" size={17} color={colors.courtBlueDeep} />
-            <Text style={styles.reserveLabel}>Reservar con {firstName}</Text>
-          </View>
-        </Pressable>
+        {price !== null ? (
+          <>
+            <Text style={styles.footerNote}>${price} · sin costo de viáticos</Text>
+            <Pressable
+              style={styles.reserveButton}
+              onPress={() => onReserve?.({ coachId, name, price, rateMode: rateMode ?? 'per_day', availability })}
+            >
+              <View style={styles.reserveContent}>
+                <Ionicons name="calendar-outline" size={17} color={colors.courtBlueDeep} />
+                <Text style={styles.reserveLabel}>Reservar con {firstName}</Text>
+              </View>
+            </Pressable>
+          </>
+        ) : (
+          <Text style={styles.footerNote}>
+            {firstName} todavía no configuró su tarifa para este torneo — todavía no se puede reservar.
+          </Text>
+        )}
       </View>
     </SafeAreaView>
   );
@@ -388,6 +406,13 @@ const styles = StyleSheet.create({
     color: colors.textDim,
     fontSize: 12,
     fontWeight: '400',
+  },
+  noPriceText: {
+    color: colors.textDim,
+    fontSize: 12,
+    fontWeight: '700',
+    maxWidth: 90,
+    textAlign: 'right',
   },
   content: {
     padding: 20,

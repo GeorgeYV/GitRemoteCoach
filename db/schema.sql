@@ -163,7 +163,6 @@ CREATE TABLE coach_profiles (
   photo_url           TEXT,
   years_experience    SMALLINT NOT NULL CHECK (years_experience >= 0),
   specialty           TEXT,
-  hourly_rate         NUMERIC(10, 2) NOT NULL CHECK (hourly_rate >= 0),
   verification_status verification_status NOT NULL DEFAULT 'pending',
   rating_avg          NUMERIC(3, 2) NOT NULL DEFAULT 0 CHECK (rating_avg BETWEEN 0 AND 5),
   rating_count         INTEGER NOT NULL DEFAULT 0 CHECK (rating_count >= 0),
@@ -2249,4 +2248,13 @@ CREATE INDEX idx_push_tokens_user_id ON push_tokens (user_id);
 --     agregó también PUT /auth/me/email (autenticado) para poder corregir el correo típeado sin
 --     tener que pedirle a alguien con acceso a la base que lo arregle a mano — cambiar el correo
 --     vuelve a poner email_verified_at en NULL y manda un código nuevo.
+-- 49. coach_profiles.hourly_rate eliminada. Su único uso real era un fallback de precio en
+--     TrainerProfileScreen cuando el coach todavía no había fijado tarifa para el torneo puntual
+--     que el padre está mirando (coach_tournament_rates, ver decisión de la etapa de
+--     disponibilidad/tarifa por torneo) — pero en ese estado ningún día del coach aparece
+--     disponible para ese torneo tampoco, así que el precio mostrado no llevaba a ninguna reserva
+--     real y podía ni siquiera reflejar lo que cobraría ahí (la tarifa por torneo existe
+--     justamente porque puede variar de un torneo a otro). No se usaba para nada más (ni
+--     búsqueda/filtro, ni liquidaciones, ni pagos). TrainerProfileScreen ahora muestra un mensaje
+--     explícito en vez de un precio cuando no hay tarifa fijada para ese torneo.
 -- =====================================================================

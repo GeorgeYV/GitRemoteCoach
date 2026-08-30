@@ -22,7 +22,6 @@ const registerCoachSchema = z.object({
   country: z.enum(COUNTRY_CODES),
   yearsExperience: z.number().int().min(0),
   specialty: z.string().min(1).optional(),
-  hourlyRate: z.number().min(0),
   ageCategories: z.array(z.enum(AGE_CATEGORIES)),
   levels: z.array(z.enum(PLAYING_LEVELS)),
   // fileUrl viene de POST /coaches/:id/verification-documents/upload, ya subido a R2.
@@ -49,7 +48,6 @@ export async function coachRoutes(app: FastifyInstance): Promise<void> {
       country: parsed.data.country,
       yearsExperience: parsed.data.yearsExperience,
       specialty: parsed.data.specialty ?? null,
-      hourlyRate: parsed.data.hourlyRate,
       ageCategories: parsed.data.ageCategories,
       levels: parsed.data.levels,
       documents: parsed.data.documents,
@@ -95,8 +93,9 @@ export async function coachRoutes(app: FastifyInstance): Promise<void> {
     return tournamentService.listClubTagsForCoach(id);
   });
 
-  // CoachRegistrationScreen "Editar perfil" — datos personales/tarifa del propio entrenador
-  // logueado. No toca ageCategories/levels (ver /training) ni documentos/verificación.
+  // CoachRegistrationScreen "Editar perfil" — datos personales del propio entrenador logueado
+  // (la tarifa es por torneo, ver /coaches/:coachId/tournaments/:tournamentId/rate). No toca
+  // ageCategories/levels (ver /training) ni documentos/verificación.
   app.put('/coaches/:id/profile', { preHandler: app.authenticate }, async (req) => {
     const { id } = req.params as { id: string };
     const { sub } = req.user as { sub: string };
@@ -111,7 +110,6 @@ export async function coachRoutes(app: FastifyInstance): Promise<void> {
       country: parsed.data.country,
       yearsExperience: parsed.data.yearsExperience,
       specialty: parsed.data.specialty ?? null,
-      hourlyRate: parsed.data.hourlyRate,
     });
   });
 

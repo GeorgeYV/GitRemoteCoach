@@ -39,9 +39,9 @@ export async function seedFixtures(pool: Pool): Promise<Fixtures> {
   );
 
   await pool.query(
-    `INSERT INTO coach_profiles (user_id, city, years_experience, hourly_rate, verification_status, stripe_connected_account_id) VALUES
-     ($1, 'CDMX', 12, 35, 'approved', 'acct_test_coachA'),
-     ($2, 'CDMX', 8, 28, 'approved', 'acct_test_coachB')`,
+    `INSERT INTO coach_profiles (user_id, city, years_experience, verification_status, stripe_connected_account_id) VALUES
+     ($1, 'CDMX', 12, 'approved', 'acct_test_coachA'),
+     ($2, 'CDMX', 8, 'approved', 'acct_test_coachB')`,
     [COACH_A_ID, COACH_B_ID],
   );
 

@@ -1296,7 +1296,7 @@ console.log('\n=== Escenario 16: onboarding de coach (POST /coaches) ===');
   const noAuthRes = await app.inject({
     method: 'POST',
     url: '/coaches',
-    payload: { city: 'CDMX', yearsExperience: 5, hourlyRate: 30, ageCategories: ['U12'], levels: ['competitivo'] },
+    payload: { city: 'CDMX', yearsExperience: 5, ageCategories: ['U12'], levels: ['competitivo'] },
   });
   assertEqual(noAuthRes.statusCode, 401, 'POST /coaches sin Bearer token devuelve 401');
 
@@ -1310,7 +1310,6 @@ console.log('\n=== Escenario 16: onboarding de coach (POST /coaches) ===');
       country: 'EC',
       yearsExperience: 5,
       specialty: 'Saque y volea',
-      hourlyRate: 30,
       ageCategories: ['U12', 'U14'],
       levels: ['competitivo'],
     },
@@ -1325,7 +1324,7 @@ console.log('\n=== Escenario 16: onboarding de coach (POST /coaches) ===');
     method: 'POST',
     url: '/coaches',
     headers: { authorization: `Bearer ${newCoachToken}` },
-    payload: { city: 'CDMX', country: 'EC', yearsExperience: 5, hourlyRate: 30, ageCategories: [], levels: [] },
+    payload: { city: 'CDMX', country: 'EC', yearsExperience: 5, ageCategories: [], levels: [] },
   });
   assertEqual(duplicateRes.statusCode, 409, 'un segundo POST /coaches para el mismo usuario devuelve 409');
 
@@ -1842,7 +1841,6 @@ console.log('\n=== Escenario 23: documentos de verificación de coach (CoachRegi
       city: 'CDMX',
       country: 'EC',
       yearsExperience: 3,
-      hourlyRate: 25,
       ageCategories: ['U12'],
       levels: ['competitivo'],
       documents: [
@@ -2196,7 +2194,7 @@ console.log('\n=== Escenario 25: estadísticas agregadas de partidos de un coach
     method: 'POST',
     url: '/coaches',
     headers: { authorization: `Bearer ${statsCoachToken}` },
-    payload: { city: 'CDMX', country: 'EC', yearsExperience: 4, hourlyRate: 30, ageCategories: ['U14'], levels: ['competitivo'] },
+    payload: { city: 'CDMX', country: 'EC', yearsExperience: 4, ageCategories: ['U14'], levels: ['competitivo'] },
   });
 
   const noMatchesRes = await app.inject({ method: 'GET', url: `/coaches/${statsCoach.id}/report-summary` });
@@ -2279,7 +2277,7 @@ console.log('\n=== Escenario 26: reporte enriquecido de partido (semáforo, pres
     method: 'POST',
     url: '/coaches',
     headers: { authorization: `Bearer ${reportCoachToken}` },
-    payload: { city: 'CDMX', country: 'EC', yearsExperience: 4, hourlyRate: 30, ageCategories: ['U14'], levels: ['competitivo'] },
+    payload: { city: 'CDMX', country: 'EC', yearsExperience: 4, ageCategories: ['U14'], levels: ['competitivo'] },
   });
 
   const bookingRes = await requestBooking(reportCoach.id, inFuture(48));
@@ -2588,7 +2586,7 @@ console.log('\n=== Escenario 27: notas de voz (subida, borrado, "Nuevo partido")
     method: 'POST',
     url: '/coaches',
     headers: { authorization: `Bearer ${vnCoachToken}` },
-    payload: { city: 'CDMX', country: 'EC', yearsExperience: 4, hourlyRate: 30, ageCategories: ['U14'], levels: ['competitivo'] },
+    payload: { city: 'CDMX', country: 'EC', yearsExperience: 4, ageCategories: ['U14'], levels: ['competitivo'] },
   });
 
   const bookingRes = await requestBooking(vnCoach.id, inFuture(48));
@@ -2743,7 +2741,7 @@ console.log('\n=== Escenario 28: transcripción de notas de voz (job asíncrono,
     method: 'POST',
     url: '/coaches',
     headers: { authorization: `Bearer ${tCoachToken}` },
-    payload: { city: 'CDMX', country: 'EC', yearsExperience: 4, hourlyRate: 30, ageCategories: ['U14'], levels: ['competitivo'] },
+    payload: { city: 'CDMX', country: 'EC', yearsExperience: 4, ageCategories: ['U14'], levels: ['competitivo'] },
   });
 
   const bookingRes = await requestBooking(tCoach.id, inFuture(48));
@@ -2930,7 +2928,7 @@ console.log('\n=== Escenario 30: terminar el partido completa la reserva sola (e
     method: 'POST',
     url: '/coaches',
     headers: { authorization: `Bearer ${acCoachToken}` },
-    payload: { city: 'CDMX', country: 'EC', yearsExperience: 4, hourlyRate: 30, ageCategories: ['U14'], levels: ['competitivo'] },
+    payload: { city: 'CDMX', country: 'EC', yearsExperience: 4, ageCategories: ['U14'], levels: ['competitivo'] },
   });
 
   // --- Caso A: paga primero (rail manual P2P, el activo en fase 1), el partido termina después ---
@@ -3045,7 +3043,7 @@ console.log('\n=== Escenario 31: GET /coaches/:id/bookings expone matchStatus, i
     method: 'POST',
     url: '/coaches',
     headers: { authorization: `Bearer ${msCoachToken}` },
-    payload: { city: 'CDMX', country: 'EC', yearsExperience: 4, hourlyRate: 30, ageCategories: ['U14'], levels: ['competitivo'] },
+    payload: { city: 'CDMX', country: 'EC', yearsExperience: 4, ageCategories: ['U14'], levels: ['competitivo'] },
   });
 
   const bookingRes = await requestBooking(msCoach.id, inFuture(48));
@@ -3119,7 +3117,7 @@ console.log('\n=== Escenario 32: modo de captura \'detallada\' — lado y shot_t
     method: 'POST',
     url: '/coaches',
     headers: { authorization: `Bearer ${stCoachToken}` },
-    payload: { city: 'CDMX', country: 'EC', yearsExperience: 4, hourlyRate: 30, ageCategories: ['U14'], levels: ['competitivo'] },
+    payload: { city: 'CDMX', country: 'EC', yearsExperience: 4, ageCategories: ['U14'], levels: ['competitivo'] },
   });
 
   const bookingRes = await requestBooking(stCoach.id, inFuture(48));
@@ -3585,7 +3583,6 @@ console.log('\n=== Escenario 39: subir el archivo real de un documento de verifi
       city: 'Quito',
       country: 'EC',
       yearsExperience: 3,
-      hourlyRate: 20,
       ageCategories: ['U12'],
       levels: ['competitivo'],
       documents: [{ docType: 'identity', fileUrl }],
@@ -4012,7 +4009,6 @@ console.log('\n=== Escenario 44: correos de aviso — "algo pendiente de aprobar
       city: 'Cuenca',
       country: 'EC',
       yearsExperience: 3,
-      hourlyRate: 20,
       ageCategories: ['U12'],
       levels: ['competitivo'],
       documents: [{ docType: 'identity', fileUrl: 'placeholder://identity' }],
@@ -4038,7 +4034,7 @@ console.log('\n=== Escenario 44: correos de aviso — "algo pendiente de aprobar
     method: 'POST',
     url: '/coaches',
     headers: { authorization: `Bearer ${noDocsCoachReg.json().token}` },
-    payload: { city: 'Cuenca', country: 'EC', yearsExperience: 1, hourlyRate: 15, ageCategories: [], levels: [] },
+    payload: { city: 'Cuenca', country: 'EC', yearsExperience: 1, ageCategories: [], levels: [] },
   });
   assertEqual(emailState.sent.length, 0, 'un coach sin documentos no dispara ningún correo');
 

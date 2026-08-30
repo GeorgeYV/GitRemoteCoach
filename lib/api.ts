@@ -593,7 +593,6 @@ export interface CoachProfile {
   photoUrl: string | null;
   yearsExperience: number;
   specialty: string | null;
-  hourlyRate: string;
   verificationStatus: VerificationStatus;
   ratingAvg: string;
   ratingCount: number;
@@ -696,7 +695,6 @@ export function registerCoachProfile(
     country: CountryCode;
     yearsExperience: number;
     specialty?: string;
-    hourlyRate: number;
     ageCategories: AgeCategory[];
     levels: PlayingLevel[];
     documents: { docType: VerificationDocType; fileUrl: string }[];
@@ -709,8 +707,8 @@ export function registerCoachProfile(
   });
 }
 
-/** PUT /coaches/:id/profile — CoachRegistrationScreen "Editar perfil". Datos personales/tarifa,
- * sin ageCategories/levels (ver updateCoachTraining) ni documentos/verificación. */
+/** PUT /coaches/:id/profile — CoachRegistrationScreen "Editar perfil". Datos personales, sin
+ * ageCategories/levels (ver updateCoachTraining) ni documentos/verificación. */
 export function updateCoachProfileDetails(
   authToken: string,
   coachId: string,
@@ -720,7 +718,6 @@ export function updateCoachProfileDetails(
     country: CountryCode;
     yearsExperience: number;
     specialty?: string;
-    hourlyRate: number;
   },
 ): Promise<CoachProfile> {
   return request(`/coaches/${coachId}/profile`, {

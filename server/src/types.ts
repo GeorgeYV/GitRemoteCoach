@@ -256,7 +256,6 @@ export interface CoachProfile {
   photoUrl: string | null;
   yearsExperience: number;
   specialty: string | null;
-  hourlyRate: string;
   verificationStatus: VerificationStatus;
   ratingAvg: string;
   ratingCount: number;
