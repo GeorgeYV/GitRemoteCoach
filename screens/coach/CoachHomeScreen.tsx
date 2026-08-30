@@ -43,6 +43,7 @@ export default function CoachHomeScreen({
   onOpenEarnings,
   onOpenReputation,
   onOpenInvitation,
+  onOpenAvailability,
   onLogout,
   tabBar,
 }: {
@@ -63,6 +64,9 @@ export default function CoachHomeScreen({
   onOpenEarnings?: () => void;
   onOpenReputation?: () => void;
   onOpenInvitation?: () => void;
+  /** "Explora torneos" (ver más abajo) — guía a un coach sin solicitudes todavía a la pestaña
+   * Disponibilidad, que arranca en CoachTournamentSearchScreen (buscar/elegir torneo). */
+  onOpenAvailability?: () => void;
   onLogout?: () => void;
   tabBar?: React.ReactNode;
 }) {
@@ -103,6 +107,18 @@ export default function CoachHomeScreen({
           <StatChip value={money(pendingEarnings)} label="Por liberar" onPress={onOpenEarnings} />
           <StatChip value={`★ ${rating}`} label="Reputación" onPress={onOpenReputation} />
         </View>
+
+        {pendingRequests === 0 && onOpenAvailability && (
+          <Pressable style={styles.guideBanner} onPress={onOpenAvailability}>
+            <View style={styles.guideTextWrap}>
+              <Text style={styles.guideTitle}>Explora torneos disponibles</Text>
+              <Text style={styles.guideMeta}>
+                Elige un torneo y define tu disponibilidad y tarifa para empezar a recibir solicitudes.
+              </Text>
+            </View>
+            <Text style={styles.chevron}>›</Text>
+          </Pressable>
+        )}
 
         {pendingInvitation && (
           <Pressable style={styles.invitationCard} onPress={onOpenInvitation}>
@@ -327,6 +343,31 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.8,
     marginBottom: 10,
+  },
+  guideBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.panelLight,
+    borderRadius: radius,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 16,
+    marginBottom: 24,
+  },
+  guideTextWrap: {
+    flex: 1,
+    marginRight: 8,
+  },
+  guideTitle: {
+    color: colors.lineWhite,
+    fontSize: 14,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
+  guideMeta: {
+    color: colors.textSoft,
+    fontSize: 12,
+    lineHeight: 17,
   },
   invitationCard: {
     flexDirection: 'row',

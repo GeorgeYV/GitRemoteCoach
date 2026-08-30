@@ -609,6 +609,7 @@ export function CoachHomeFlow({ coachId, coachName }: { coachId: string; coachNa
       onOpenEarnings={() => setStep('earnings')}
       onOpenReputation={() => setStep('reputation')}
       onOpenInvitation={() => setStep('invitation')}
+      onOpenAvailability={() => setStep('availability')}
       onLogout={logout}
       tabBar={<CoachTabBar active="home" onSelect={setStep} />}
     />
