@@ -28,6 +28,7 @@ import {
   TournamentSummary,
 } from '../lib/api';
 import { isUpcoming, toCoachBooking } from '../lib/coachBookingDisplay';
+import { useHardwareBack } from '../lib/useHardwareBack';
 import { RateMode } from '../lib/api';
 import { mockMatchConfig, mockRoundLabel } from '../mock/players';
 import {
@@ -196,6 +197,20 @@ export function ParentBookingFlow({ initialTournamentId }: { initialTournamentId
       cancelled = true;
     };
   }, [initialTournamentId]);
+
+  // El botón/gesto físico de "atrás" (Android o navegador móvil) debe hacer lo mismo que la
+  // flechita de arriba a la izquierda de cada paso, no saltar directo a la pantalla anterior de
+  // expo-router (ver lib/useHardwareBack.ts) — 'status' no tiene flechita en pantalla a propósito
+  // (ver BookingStatusScreen más abajo), así que tampoco reacciona acá.
+  useHardwareBack(
+    step !== 'list',
+    () => {
+      if (step === 'profile') setStep('list');
+      else if (step === 'confirm') setStep('profile');
+      else if (step === 'payment') setStep('status');
+    },
+    step,
+  );
 
   if (tournamentError) {
     return (
