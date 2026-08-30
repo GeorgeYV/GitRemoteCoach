@@ -1064,6 +1064,10 @@ CREATE TABLE bookings (
   coach_id                    UUID NOT NULL REFERENCES coach_profiles (user_id),
   tournament_id                UUID NOT NULL REFERENCES tournaments (id),
   match_datetime               TIMESTAMPTZ NOT NULL,
+  -- decisión #53: false hasta que alguien reprograme con una hora real elegida a mano — al
+  -- solicitar la reserva match_datetime ya trae un valor (la columna es NOT NULL), pero nadie
+  -- eligió esa hora todavía (la disponibilidad del coach es por día completo, no por franja).
+  schedule_confirmed            BOOLEAN NOT NULL DEFAULT false,
   agreed_rate                  NUMERIC(10, 2) NOT NULL CHECK (agreed_rate >= 0),
   status                       booking_status NOT NULL DEFAULT 'requested',
 
@@ -2298,4 +2302,14 @@ CREATE INDEX idx_push_tokens_user_id ON push_tokens (user_id);
 --     oficiales). Nota: fn_club_admins_prevent_last_removal solo protege un DELETE de
 --     club_admins, no esto — un club con un solo admin puede quedar deshabilitado sin que la base
 --     lo impida; queda a criterio de platform_admin.
+-- 53. bookings.schedule_confirmed: al solicitar una reserva nadie elige una hora real (la
+--     disponibilidad del coach es por día completo, ver decisión de esa etapa) — mock/parentFlow.ts
+--     igual fabricaba una hora fija (09:00) para poder mandar un match_datetime válido (columna
+--     NOT NULL), y encima con un bug de zona horaria (el "Z" al final la marcaba como UTC, no
+--     local, mostrando 4:00 AM en vez de las 9:00 esperadas en Ecuador/Perú/Colombia — reportado
+--     desde una prueba real). En vez de solo arreglar la zona horaria, se agrega esta columna:
+--     arranca en false, y solo reschedule() (PATCH /bookings/:id/reschedule, la única pantalla
+--     donde alguien escribe una hora real a mano) la pone en true. El cliente no muestra ni cuenta
+--     regresiva a ninguna hora mientras esto sea false — CoachPreMatchReminderScreen antes corría
+--     una cuenta regresiva real contra esa hora inventada, así que el bug no era solo visual.
 -- =====================================================================

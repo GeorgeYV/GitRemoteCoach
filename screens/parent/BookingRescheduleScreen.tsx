@@ -25,7 +25,9 @@ export default function BookingRescheduleScreen({
   const { token } = useAuth();
   const initial = isoToLocalDateAndTime(booking.matchDatetime);
   const [date, setDate] = useState(initial.date);
-  const [time, setTime] = useState(initial.time);
+  // Vacío si todavía no hay una hora real confirmada (ver decisión #53) — precargar el default
+  // fabricado (9:00) dejaría pensar que ya es la hora acordada, cuando nadie la eligió todavía.
+  const [time, setTime] = useState(booking.scheduleConfirmed ? initial.time : '');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -79,7 +81,10 @@ export default function BookingRescheduleScreen({
               </View>
             </View>
             <View style={styles.summaryDivider} />
-            <Text style={styles.summaryLine}>Horario actual: {booking.date} · {booking.time}</Text>
+            <Text style={styles.summaryLine}>
+              Horario actual: {booking.date}
+              {booking.time ? ` · ${booking.time}` : ' · sin hora confirmada todavía'}
+            </Text>
             <Text style={styles.summaryLine}>{booking.venue}</Text>
           </View>
         </Section>

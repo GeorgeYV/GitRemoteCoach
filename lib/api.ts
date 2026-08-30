@@ -243,6 +243,10 @@ export interface Booking {
   coachId: string;
   tournamentId: string;
   matchDatetime: string;
+  /** false hasta que alguien reprograme con una hora real elegida a mano (ver decisión #53 en
+   * db/schema.sql) — matchDatetime siempre trae un valor, pero al solicitar la reserva nadie
+   * eligió esa hora todavía. */
+  scheduleConfirmed: boolean;
   agreedRate: string;
   status: BookingStatus;
   parentNote: string | null;

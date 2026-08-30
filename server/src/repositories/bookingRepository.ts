@@ -14,6 +14,11 @@ function mapRow(row: any): Booking {
     coachId: row.coach_id,
     tournamentId: row.tournament_id,
     matchDatetime: row.match_datetime,
+    // Decisión #53: false hasta que coach o padre reprograme con una hora real (reschedule() más
+    // abajo la pone en true) — match_datetime siempre trae ALGO (columna NOT NULL), pero al crear
+    // la reserva nadie eligió una hora de verdad todavía (disponibilidad del coach es por día
+    // completo). El cliente usa esto para no mostrar/contar una hora que nadie puso.
+    scheduleConfirmed: row.schedule_confirmed,
     agreedRate: row.agreed_rate,
     status: row.status,
     parentNote: row.parent_note,
@@ -193,7 +198,7 @@ export async function setMeetingDetails(
 export async function reschedule(id: string, matchDatetime: string, db: Queryable = pool): Promise<Booking | null> {
   try {
     const { rows } = await db.query(
-      `UPDATE bookings SET match_datetime = $2
+      `UPDATE bookings SET match_datetime = $2, schedule_confirmed = true
        WHERE id = $1 AND status NOT IN ('rejected', 'expired', 'cancelled', 'completed')
        RETURNING *`,
       [id, matchDatetime],

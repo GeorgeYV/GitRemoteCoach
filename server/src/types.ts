@@ -83,6 +83,8 @@ export interface Booking {
   coachId: string;
   tournamentId: string;
   matchDatetime: string;
+  /** Decisión #53 — false hasta que alguien reprograme con una hora real elegida a mano. */
+  scheduleConfirmed: boolean;
   agreedRate: string;
   status: BookingStatus;
   // Capturados al solicitar / confirmar la reserva (CoachRequestInboxScreen,

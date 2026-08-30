@@ -34,7 +34,10 @@ export function toCoachBooking(booking: BookingWithParticipants): CoachBooking {
     tournamentName: booking.tournamentName,
     matchDatetime: booking.matchDatetime,
     date: matchDate.toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric', month: 'short' }),
-    time: matchDate.toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit' }),
+    // null mientras nadie reprogramó con una hora real (ver decisión #53) — matchDate ahí adentro
+    // tiene UN valor, pero nadie lo eligió, así que no hay una hora de verdad que mostrar.
+    time: booking.scheduleConfirmed ? matchDate.toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit' }) : null,
+    scheduleConfirmed: booking.scheduleConfirmed,
     venue: booking.tournamentVenue,
     city: booking.tournamentCity,
     agreedRate: Number(booking.agreedRate),

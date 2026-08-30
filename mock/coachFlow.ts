@@ -162,7 +162,10 @@ export interface CoachBooking {
   /** ISO datetime crudo del partido — para ordenar/agrupar por fecha. `date`/`time` son solo para mostrar. */
   matchDatetime: string;
   date: string;
-  time: string;
+  /** null mientras scheduleConfirmed sea false — nadie eligió una hora real todavía (ver
+   * decisión #53 en db/schema.sql), no hay una hora de verdad que mostrar. */
+  time: string | null;
+  scheduleConfirmed: boolean;
   venue: string;
   city?: string;
   agreedRate: number;

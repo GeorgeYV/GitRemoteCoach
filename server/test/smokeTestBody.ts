@@ -513,6 +513,46 @@ let manualBookingAId: string;
   manualBookingAId = booking.id;
 }
 
+console.log('\n=== Escenario 8b2: schedule_confirmed — nadie eligió hora hasta reprogramar (decisión #53) ===');
+{
+  const reqRes = await requestBooking(fixtures.coachAUserId, inFuture(6), 800);
+  const booking = reqRes.json();
+  assertEqual(booking.scheduleConfirmed, false, 'una reserva recién solicitada arranca con scheduleConfirmed = false');
+
+  const acceptRes = await app.inject({
+    method: 'POST',
+    url: `/bookings/${booking.id}/accept`,
+    headers: { authorization: `Bearer ${coachAToken}` },
+  });
+  assertEqual(acceptRes.json().scheduleConfirmed, false, 'aceptar la reserva no cambia scheduleConfirmed');
+
+  const wrongActorRescheduleRes = await app.inject({
+    method: 'PATCH',
+    url: `/bookings/${booking.id}/reschedule`,
+    headers: { authorization: `Bearer ${coachBToken}` },
+    payload: { matchDatetime: inFuture(7) },
+  });
+  assertEqual(wrongActorRescheduleRes.statusCode, 403, 'reprogramar con el token de alguien ajeno a la reserva devuelve 403');
+
+  const newDatetime = inFuture(7);
+  const rescheduleRes = await app.inject({
+    method: 'PATCH',
+    url: `/bookings/${booking.id}/reschedule`,
+    headers: { authorization: `Bearer ${parentToken}` },
+    payload: { matchDatetime: newDatetime },
+  });
+  assertEqual(rescheduleRes.statusCode, 200, 'reprogramar (el padre) devuelve 200');
+  assertEqual(rescheduleRes.json().scheduleConfirmed, true, 'reprogramar pone scheduleConfirmed en true');
+  assertEqual(rescheduleRes.json().matchDatetime, newDatetime, 'reprogramar actualiza match_datetime al valor elegido');
+
+  const afterRes = await app.inject({
+    method: 'GET',
+    url: `/bookings/${booking.id}`,
+    headers: { authorization: `Bearer ${coachAToken}` },
+  });
+  assertEqual(afterRes.json().scheduleConfirmed, true, 'scheduleConfirmed queda persistido como true tras releer la reserva');
+}
+
 console.log('\n=== Escenario 8c: reembolso al cancelar una reserva pagada manualmente ===');
 {
   const reqRes = await requestBooking(fixtures.coachAUserId, inFuture(48), 1000);

@@ -776,7 +776,9 @@ export function CoachMatchDayFlow({
         onStartCapture={() => setStep('setup')}
         onOpenChat={() => setStep('chat')}
         onMeetingSaved={(details) => setBooking((b) => ({ ...b, ...details }))}
-        onRescheduled={(updated) => setBooking((b) => ({ ...b, matchDatetime: updated.matchDatetime }))}
+        onRescheduled={(updated) =>
+          setBooking((b) => ({ ...b, matchDatetime: updated.matchDatetime, scheduleConfirmed: updated.scheduleConfirmed }))
+        }
       />
     );
   }

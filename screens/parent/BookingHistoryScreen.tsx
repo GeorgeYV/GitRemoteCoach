@@ -103,6 +103,7 @@ export default function BookingHistoryScreen() {
                 matchDatetime: updated.matchDatetime,
                 date: matchDate.toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric', month: 'short' }),
                 time: matchDate.toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit' }),
+                scheduleConfirmed: updated.scheduleConfirmed,
               }
             : b,
         ) ?? null,
@@ -142,7 +143,7 @@ export default function BookingHistoryScreen() {
       <BookingPaymentScreen
         bookings={payTargets.map((b) => ({
           bookingId: b.id,
-          dayLabel: `${b.date} · ${b.time}`,
+          dayLabel: b.time ? `${b.date} · ${b.time}` : b.date,
           price: b.price,
           trainerName: b.trainerName,
           tournamentName: b.tournamentName,
@@ -337,7 +338,8 @@ function BookingRow({
           {booking.tournamentName}
         </Text>
         <Text style={styles.meta} numberOfLines={1}>
-          {booking.date} · {booking.time} · {booking.venue}
+          {booking.date}
+          {booking.time ? ` · ${booking.time}` : ''} · {booking.venue}
         </Text>
         {booking.status === 'cancelled' && !!booking.refundAmount && (
           <Text style={styles.refundNote}>Te devolvemos ${booking.refundAmount.toFixed(2)}</Text>

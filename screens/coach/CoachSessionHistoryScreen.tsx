@@ -209,7 +209,8 @@ function BookingRow({
           {booking.tournamentName}
         </Text>
         <Text style={styles.meta} numberOfLines={1}>
-          {booking.date} · {booking.time} · {booking.venue}
+          {booking.date}
+          {booking.time ? ` · ${booking.time}` : ''} · {booking.venue}
         </Text>
         {retired && (
           <View style={styles.retiredBadge}>

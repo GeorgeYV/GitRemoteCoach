@@ -1,4 +1,5 @@
 import type { CountryCode, MatchStatus } from '../lib/api';
+import { localDateAndTimeToIso } from '../lib/dateSlots';
 
 export interface Trainer {
   id: string;
@@ -49,11 +50,16 @@ export const REAL_COMPLETED_BOOKING_ID = '44444444-4444-4444-8444-444444444444';
  * encuentro real se coordina por chat una vez aceptada la reserva (igual que ya pasa con el
  * lugar exacto). Un valor fijo aquí es lo que le da sentido a matchDatetime como campo de
  * unicidad de la reserva sin reintroducir una franja horaria que ya se decidió simplificar. */
-const DEFAULT_MATCH_TIME = '09:00:00';
+const DEFAULT_MATCH_TIME = '09:00';
 
-/** Traduce el día elegido a un ISO datetime real para POST /bookings. */
+/** Traduce el día elegido a un ISO datetime real para POST /bookings — hora local del
+ * dispositivo (no UTC, ver localDateAndTimeToIso): con el "Z" que tenía antes, 09:00 se guardaba
+ * como 09:00 UTC, que en Ecuador/Perú/Colombia son las 4:00 AM — el bug real detrás de la
+ * decisión #53. Ya no importa mucho qué hora exacta sea (nada la muestra mientras
+ * scheduleConfirmed sea false, ver lib/parentBookingDisplay.ts), pero tampoco tiene sentido
+ * dejarla mal calculada. */
 export function buildMatchDatetime(selection: BookingSlotSelection): string {
-  return `${selection.isoDate}T${DEFAULT_MATCH_TIME}.000Z`;
+  return localDateAndTimeToIso(selection.isoDate, DEFAULT_MATCH_TIME);
 }
 
 export interface PaymentMethod {
@@ -107,7 +113,10 @@ export interface BookingHistoryEntry {
    * formateado para mostrar. */
   matchDatetime: string;
   date: string;
-  time: string;
+  /** null mientras scheduleConfirmed sea false — nadie eligió una hora real todavía (ver
+   * decisión #53 en db/schema.sql), no hay una hora de verdad que mostrar. */
+  time: string | null;
+  scheduleConfirmed: boolean;
   venue: string;
   price: number;
   status: BookingHistoryStatus;

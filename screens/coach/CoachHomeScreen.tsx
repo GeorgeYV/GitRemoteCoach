@@ -166,7 +166,8 @@ export default function CoachHomeScreen({
                   <View style={styles.nextDivider} />
                   <View style={styles.nextDateRow}>
                     <Text style={[styles.nextLine, styles.nextDateText]}>
-                      {session.date} · {session.time}
+                      {session.date}
+                      {session.time ? ` · ${session.time}` : ''}
                     </Text>
                     {countdown && (
                       <Text style={[styles.countdown, { color: countdown.color }]}>{countdown.text}</Text>

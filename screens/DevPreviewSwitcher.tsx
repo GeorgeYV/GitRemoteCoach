@@ -103,7 +103,8 @@ const PREVIEW_COACH_CHAT_BOOKING: CoachBooking = {
   tournamentName: '—',
   matchDatetime: new Date().toISOString(),
   date: '—',
-  time: '—',
+  time: null,
+  scheduleConfirmed: false,
   venue: '—',
   agreedRate: 0,
   status: 'completed',
@@ -118,6 +119,10 @@ const PREVIEW_COACH_MATCH_BOOKING: BookingWithParticipants = {
   coachId: '—',
   tournamentId: '—',
   matchDatetime: new Date(Date.now() + 45 * 60000).toISOString(),
+  // true a propósito (a diferencia de las demás fixtures de este archivo): esta vista previa
+  // existe para mostrar la cuenta regresiva de CoachPreMatchReminderScreen, que ahora solo se
+  // muestra con un horario ya confirmado (ver decisión #53).
+  scheduleConfirmed: true,
   agreedRate: '0',
   status: 'accepted',
   parentNote: null,
@@ -171,7 +176,8 @@ const PREVIEW_PARENT_CHAT_BOOKING: BookingHistoryEntry = {
   tournamentName: '—',
   matchDatetime: new Date().toISOString(),
   date: '—',
-  time: '—',
+  time: null,
+  scheduleConfirmed: false,
   venue: '—',
   price: 0,
   status: 'completed',

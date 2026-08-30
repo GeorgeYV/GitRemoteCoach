@@ -62,7 +62,9 @@ export default function CoachPreMatchReminderScreen({
 
   const initialSchedule = isoToLocalDateAndTime(booking.matchDatetime);
   const [scheduleDate, setScheduleDate] = useState(initialSchedule.date);
-  const [scheduleTime, setScheduleTime] = useState(initialSchedule.time);
+  // Vacío si todavía no hay una hora real confirmada (ver decisión #53) — precargar el default
+  // fabricado dejaría pensar que ya es la hora acordada, cuando nadie la eligió todavía.
+  const [scheduleTime, setScheduleTime] = useState(booking.scheduleConfirmed ? initialSchedule.time : '');
   const [editingSchedule, setEditingSchedule] = useState(false);
   const [savingSchedule, setSavingSchedule] = useState(false);
   const [scheduleError, setScheduleError] = useState<string | null>(null);
@@ -130,34 +132,48 @@ export default function CoachPreMatchReminderScreen({
         </View>
       )}
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.notifCaption}>Así llega a tu teléfono</Text>
-        <View style={styles.notifCard}>
-          <View style={styles.notifIcon}>
-            <Text style={styles.notifIconLabel}>RC</Text>
-          </View>
-          <View style={styles.notifTextWrap}>
-            <View style={styles.notifTitleRow}>
-              <Text style={styles.notifApp}>Remote Coach</Text>
-              <Text style={styles.notifTime}>ahora</Text>
+        {booking.scheduleConfirmed ? (
+          <>
+            <Text style={styles.notifCaption}>Así llega a tu teléfono</Text>
+            <View style={styles.notifCard}>
+              <View style={styles.notifIcon}>
+                <Text style={styles.notifIconLabel}>RC</Text>
+              </View>
+              <View style={styles.notifTextWrap}>
+                <View style={styles.notifTitleRow}>
+                  <Text style={styles.notifApp}>Remote Coach</Text>
+                  <Text style={styles.notifTime}>ahora</Text>
+                </View>
+                <Text style={styles.notifTitle}>Tu partido con {playerFirstName} empieza pronto</Text>
+                <Text style={styles.notifBody}>
+                  {timeLabel} · {courtLabel || 'Cancha sin asignar'}, {booking.tournamentVenue}
+                </Text>
+              </View>
             </View>
-            <Text style={styles.notifTitle}>Tu partido con {playerFirstName} empieza pronto</Text>
-            <Text style={styles.notifBody}>
-              {timeLabel} · {courtLabel || 'Cancha sin asignar'}, {booking.tournamentVenue}
+
+            <View style={[styles.countdownCard, urgent && styles.countdownCardUrgent]}>
+              <Text style={[styles.countdownEyebrow, urgent && styles.countdownEyebrowUrgent]}>
+                {startingNow ? 'Tu partido está por comenzar' : 'Tu partido comienza en'}
+              </Text>
+              {!startingNow && (
+                <Text style={[styles.countdownValue, urgent && styles.countdownValueUrgent]}>{minutesLeft} min</Text>
+              )}
+              <Text style={styles.countdownMeta}>
+                {dateLabel} · {timeLabel}
+              </Text>
+            </View>
+          </>
+        ) : (
+          // Sin una hora real confirmada (ver decisión #53), no hay nada real contra qué contar
+          // regresivamente — antes esta pantalla corría la cuenta contra una hora inventada.
+          <View style={styles.noScheduleCard}>
+            <Ionicons name="time-outline" size={22} color={colors.textDim} />
+            <Text style={styles.noScheduleTitle}>Todavía no fijaste una hora para este partido</Text>
+            <Text style={styles.noScheduleBody}>
+              Coordina la hora con {parentFirstName} y después confírmala acá abajo, en "Reprogramar".
             </Text>
           </View>
-        </View>
-
-        <View style={[styles.countdownCard, urgent && styles.countdownCardUrgent]}>
-          <Text style={[styles.countdownEyebrow, urgent && styles.countdownEyebrowUrgent]}>
-            {startingNow ? 'Tu partido está por comenzar' : 'Tu partido comienza en'}
-          </Text>
-          {!startingNow && (
-            <Text style={[styles.countdownValue, urgent && styles.countdownValueUrgent]}>{minutesLeft} min</Text>
-          )}
-          <Text style={styles.countdownMeta}>
-            {dateLabel} · {timeLabel}
-          </Text>
-        </View>
+        )}
 
         <Section
           label="Horario"
@@ -180,7 +196,7 @@ export default function CoachPreMatchReminderScreen({
                   style={styles.editCancelButton}
                   onPress={() => {
                     setScheduleDate(initialSchedule.date);
-                    setScheduleTime(initialSchedule.time);
+                    setScheduleTime(booking.scheduleConfirmed ? initialSchedule.time : '');
                     setScheduleError(null);
                     setEditingSchedule(false);
                   }}
@@ -442,6 +458,29 @@ const styles = StyleSheet.create({
   countdownMeta: {
     color: colors.textDim,
     fontSize: 12,
+  },
+  noScheduleCard: {
+    backgroundColor: colors.panel,
+    borderRadius: radius,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 20,
+    alignItems: 'center',
+    marginBottom: 26,
+  },
+  noScheduleTitle: {
+    color: colors.lineWhite,
+    fontSize: 14,
+    fontWeight: '800',
+    marginTop: 10,
+    textAlign: 'center',
+  },
+  noScheduleBody: {
+    color: colors.textDim,
+    fontSize: 12,
+    lineHeight: 17,
+    textAlign: 'center',
+    marginTop: 6,
   },
   section: {
     marginBottom: 22,
