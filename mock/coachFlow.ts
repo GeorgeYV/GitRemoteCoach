@@ -1,4 +1,4 @@
-import type { MatchStatus, VerificationDocType } from '../lib/api';
+import type { BookingStatus, MatchStatus, VerificationDocType } from '../lib/api';
 
 export interface DocumentItem {
   id: VerificationDocType;
@@ -172,6 +172,10 @@ export interface CoachBooking {
   /** Monto real ya calculado por el servidor. Ausente si la reserva aún no llega a 'paid'. */
   coachNetAmount?: number;
   status: CoachBookingStatus;
+  /** Enum crudo del servidor (BookingStatus, ver lib/api.ts) — status ya lo colapsa a 3 valores
+   * para el resto de las pantallas, pero CoachBookingDetailScreen necesita esta granularidad para
+   * su stepper de progreso (ver lib/bookingProgress.ts#getCoachBookingProgress). */
+  rawStatus: BookingStatus;
   /** true solo cuando el estado real (no el colapsado) es 'paid' — el único momento en que
    * POST /bookings/:id/complete puede liberar el pago. */
   readyToComplete: boolean;

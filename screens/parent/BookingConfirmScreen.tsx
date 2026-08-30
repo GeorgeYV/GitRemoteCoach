@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -21,6 +22,12 @@ export interface CreatedDayBooking {
  * estados que bloquean una nueva solicitud para el mismo jugador+coach+horario. rejected/expired/
  * cancelled/payment_failed no cuentan — el padre puede volver a solicitar ese día. */
 const BLOCKING_STATUSES: Booking['status'][] = ['requested', 'accepted', 'paid', 'completed'];
+
+/** "Así funciona" (ver más abajo) — se muestra una sola vez, antes de la primera reserva de
+ * cualquier padre en este dispositivo. El proceso real dura horas/días (el entrenador tiene una
+ * ventana para aceptar, después hay que pagar y esperar a que se verifique), así que conviene
+ * que el padre sepa eso ANTES de solicitar, no que le extrañe que nadie responda en 5 minutos. */
+const INTRO_SEEN_KEY = 'tennis-live-capture:seen-booking-intro-v1';
 
 export default function BookingConfirmScreen({
   playerId,
@@ -57,6 +64,18 @@ export default function BookingConfirmScreen({
   // se muestran bloqueados con su estado real en vez de dejar que el padre los vuelva a pedir y
   // se entere recién al fallar el POST (ver duplicate_booking en requestBooking).
   const [bookedStatusByIsoDate, setBookedStatusByIsoDate] = useState<Map<string, Booking['status']>>(new Map());
+  const [showIntro, setShowIntro] = useState(false);
+
+  useEffect(() => {
+    AsyncStorage.getItem(INTRO_SEEN_KEY)
+      .then((seen) => setShowIntro(!seen))
+      .catch(() => {});
+  }, []);
+
+  function dismissIntro() {
+    setShowIntro(false);
+    AsyncStorage.setItem(INTRO_SEEN_KEY, '1').catch(() => {});
+  }
 
   useEffect(() => {
     if (!token || !user) return;
@@ -190,6 +209,19 @@ export default function BookingConfirmScreen({
         keyboardVerticalOffset={8}
       >
       <ScrollView contentContainerStyle={styles.content}>
+        {showIntro && (
+          <View style={styles.introCard}>
+            <View style={styles.introHeaderRow}>
+              <Ionicons name="information-circle-outline" size={18} color={colors.courtBlue} />
+              <Text style={styles.introTitle}>Así funciona</Text>
+            </View>
+            <Text style={styles.introStep}>1. Elegís los días · 2. {trainerName.split(' ')[0]} confirma (unas horas) · 3. pagás · 4. ¡listo!</Text>
+            <Pressable style={styles.introDismiss} onPress={dismissIntro} hitSlop={8}>
+              <Text style={styles.introDismissLabel}>Entendido</Text>
+            </Pressable>
+          </View>
+        )}
+
         <Section label="Elige uno o más días">
           <View style={styles.daysGrid}>
             {availability.map((day) => {
@@ -328,6 +360,39 @@ const styles = StyleSheet.create({
   content: {
     padding: 20,
     paddingBottom: 24,
+  },
+  introCard: {
+    backgroundColor: withOpacity(colors.courtBlue, 0.08),
+    borderRadius: radius,
+    borderWidth: 1,
+    borderColor: withOpacity(colors.courtBlue, 0.25),
+    padding: 14,
+    marginBottom: 22,
+  },
+  introHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 6,
+  },
+  introTitle: {
+    color: colors.courtBlue,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  introStep: {
+    color: colors.textSoft,
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  introDismiss: {
+    alignSelf: 'flex-end',
+    marginTop: 8,
+  },
+  introDismissLabel: {
+    color: colors.courtBlue,
+    fontSize: 12,
+    fontWeight: '700',
   },
   section: {
     marginBottom: 26,

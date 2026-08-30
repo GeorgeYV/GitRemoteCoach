@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import StepperProgress from '../../components/shared/StepperProgress';
 import VerificationRow from '../../components/shared/VerificationRow';
 import { useAuth } from '../../context/AuthContext';
 import {
@@ -124,26 +125,8 @@ export default function CoachVerificationPendingScreen({
         <Text style={styles.title}>{error ? 'No se pudo cargar tu estado' : TITLE_FOR_STATUS[status]}</Text>
         <Text style={styles.subtitle}>{error ?? SUBTITLE_FOR_STATUS[status]}</Text>
 
-        <View style={styles.stepperRow}>
-          {STEPS.map((step, i) => (
-            <View key={step} style={styles.stepAndLine}>
-              <View style={styles.stepItem}>
-                <View
-                  style={[
-                    styles.stepDot,
-                    i <= currentStepIndex && styles.stepDotActive,
-                    i === currentStepIndex && styles.stepDotCurrent,
-                  ]}
-                >
-                  {i < currentStepIndex && <Text style={styles.stepDotCheck}>✓</Text>}
-                </View>
-                <Text style={[styles.stepLabel, i <= currentStepIndex && styles.stepLabelActive]}>{step}</Text>
-              </View>
-              {i < STEPS.length - 1 && (
-                <View style={[styles.stepLine, i < currentStepIndex && styles.stepLineActive]} />
-              )}
-            </View>
-          ))}
+        <View style={styles.stepperWrap}>
+          <StepperProgress steps={STEPS} currentIndex={currentStepIndex} />
         </View>
 
         <View style={styles.card}>
@@ -232,60 +215,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 30,
   },
-  stepperRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+  stepperWrap: {
     alignSelf: 'stretch',
     marginBottom: 28,
-  },
-  stepAndLine: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  stepItem: {
-    alignItems: 'center',
-  },
-  stepDot: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: colors.panel,
-    borderWidth: 2,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 6,
-  },
-  stepDotActive: {
-    borderColor: colors.ballLime,
-  },
-  stepDotCurrent: {
-    backgroundColor: colors.ballLime,
-  },
-  stepDotCheck: {
-    color: colors.courtBlueDeep,
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  stepLabel: {
-    color: colors.textDim,
-    fontSize: 10,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  stepLabelActive: {
-    color: colors.courtBlue,
-  },
-  stepLine: {
-    flex: 1,
-    height: 2,
-    backgroundColor: colors.border,
-    marginHorizontal: 4,
-    marginBottom: 16,
-  },
-  stepLineActive: {
-    backgroundColor: colors.ballLime,
   },
   card: {
     backgroundColor: colors.panel,

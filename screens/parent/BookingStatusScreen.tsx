@@ -2,9 +2,11 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import StepperProgress from '../../components/shared/StepperProgress';
 import TrainerAvatarPlaceholder from '../../components/shared/TrainerAvatarPlaceholder';
 import { useAuth } from '../../context/AuthContext';
 import { AlternativeCoach, ApiError, Booking, getBooking, getBookingAlternatives, TournamentSearchResult } from '../../lib/api';
+import { BOOKING_PROGRESS_STEPS } from '../../lib/bookingProgress';
 import { colors, radius, withOpacity } from '../../lib/theme';
 
 export interface StatusDayBooking {
@@ -124,6 +126,15 @@ export default function BookingStatusScreen({
           <Text style={styles.statusBody}>
             {statusBody(allLoaded, error, allDecided, acceptedBookings.length, bookings.length, trainerName.split(' ')[0])}
           </Text>
+          {/* Sin esto no había forma de ver de un vistazo cuántas etapas faltan hasta el partido
+             — el padre solo tenía un cartel de texto. No se muestra si nadie aceptó: ahí la
+             "línea de tiempo hacia adelante" ya no tiene sentido, el cartel negativo de arriba
+             ya lo explica. */}
+          {!noneAccepted && (
+            <View style={styles.stepperWrap}>
+              <StepperProgress steps={BOOKING_PROGRESS_STEPS} currentIndex={allDecided ? 1 : 0} />
+            </View>
+          )}
         </View>
 
         <Section label="Detalle de la reserva">
@@ -301,6 +312,10 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
     textAlign: 'center',
+  },
+  stepperWrap: {
+    alignSelf: 'stretch',
+    marginTop: 18,
   },
   section: {
     marginBottom: 22,

@@ -43,6 +43,7 @@ export function toCoachBooking(booking: BookingWithParticipants): CoachBooking {
     agreedRate: Number(booking.agreedRate),
     coachNetAmount: booking.coachNetAmount !== null ? Number(booking.coachNetAmount) : undefined,
     status: STATUS_MAP[booking.status],
+    rawStatus: booking.status,
     readyToComplete: booking.status === 'paid',
     hasUnreadMessages: booking.hasUnreadMessages,
     matchStatus: booking.matchStatus ?? null,

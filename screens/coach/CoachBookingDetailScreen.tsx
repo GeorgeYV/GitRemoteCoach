@@ -4,16 +4,12 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { SafeAreaView } from 'react-native-safe-area-context';
 import CoachBookingStatusPill from '../../components/coach/CoachBookingStatusPill';
 import InitialAvatar from '../../components/shared/InitialAvatar';
+import StepperProgress from '../../components/shared/StepperProgress';
 import { useAuth } from '../../context/AuthContext';
 import { ApiError, completeBooking } from '../../lib/api';
+import { BOOKING_PROGRESS_STEPS, getCoachBookingProgress } from '../../lib/bookingProgress';
 import { colors, radius, withOpacity } from '../../lib/theme';
 import { CoachBooking, PLATFORM_COMMISSION_RATE } from '../../mock/coachFlow';
-
-const STATUS_MESSAGE: Record<CoachBooking['status'], string> = {
-  confirmed: 'Sesión confirmada. Usa el chat para coordinar el punto de encuentro con el padre.',
-  completed: 'Esta sesión ya se completó y el reporte del partido quedó registrado.',
-  cancelled: 'Esta sesión fue cancelada.',
-};
 
 function money(amount: number): string {
   return `$${amount.toFixed(2)}`;
@@ -40,6 +36,10 @@ export default function CoachBookingDetailScreen({
   const net = booking.coachNetAmount ?? booking.agreedRate * (1 - PLATFORM_COMMISSION_RATE);
   const commission = booking.agreedRate - net;
   const confirmed = booking.status === 'confirmed';
+  // Reemplaza el STATUS_MESSAGE fijo de antes (3 mensajes genéricos, uno por status colapsado) —
+  // usa rawStatus para dar la misma granularidad que ya ve el padre (pagado/verificando/
+  // confirmado), no solo "confirmada".
+  const progress = getCoachBookingProgress(booking.rawStatus, booking.parentName.split(' ')[0]);
   // El estado del partido (booking.matchStatus) es independiente del estado de pago de la reserva
   // (booking.status) — una reserva puede seguir "confirmada" (pago sin verificar) aunque el
   // partido ya haya terminado, así que el botón tiene que reflejar lo que realmente va a pasar al
@@ -81,7 +81,12 @@ export default function CoachBookingDetailScreen({
       <ScrollView contentContainerStyle={styles.content}>
         <View style={[styles.statusCard, confirmed && styles.statusCardConfirmed]}>
           <CoachBookingStatusPill status={booking.status} />
-          <Text style={styles.statusBody}>{STATUS_MESSAGE[booking.status]}</Text>
+          <Text style={styles.statusBody}>{progress.hint}</Text>
+          {progress.kind === 'progress' && (
+            <View style={styles.stepperWrap}>
+              <StepperProgress steps={BOOKING_PROGRESS_STEPS} currentIndex={progress.stepIndex} />
+            </View>
+          )}
         </View>
 
         <Section label="Jugador">
@@ -233,6 +238,10 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
     textAlign: 'center',
+  },
+  stepperWrap: {
+    alignSelf: 'stretch',
+    marginTop: 6,
   },
   section: {
     marginBottom: 22,

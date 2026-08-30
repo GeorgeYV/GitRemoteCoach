@@ -108,6 +108,7 @@ const PREVIEW_COACH_CHAT_BOOKING: CoachBooking = {
   venue: '—',
   agreedRate: 0,
   status: 'completed',
+  rawStatus: 'completed',
   readyToComplete: false,
 };
 

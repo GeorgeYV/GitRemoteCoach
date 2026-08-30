@@ -7,6 +7,7 @@ import BookingStatusPill from '../../components/parent/BookingStatusPill';
 import InitialAvatar from '../../components/shared/InitialAvatar';
 import { useAuth } from '../../context/AuthContext';
 import { ApiError, Booking, listParentBookings, markParentBookingDecisionsSeen } from '../../lib/api';
+import { getParentBookingProgress } from '../../lib/bookingProgress';
 import { toBookingHistoryEntry } from '../../lib/parentBookingDisplay';
 import { colors, radius, withOpacity } from '../../lib/theme';
 import { BookingHistoryEntry } from '../../mock/parentFlow';
@@ -344,6 +345,9 @@ function BookingRow({
         {booking.status === 'cancelled' && !!booking.refundAmount && (
           <Text style={styles.refundNote}>Te devolvemos ${booking.refundAmount.toFixed(2)}</Text>
         )}
+        <Text style={styles.progressHint} numberOfLines={2}>
+          {getParentBookingProgress(booking.status, booking.trainerName.split(' ')[0]).hint}
+        </Text>
         <View style={styles.statusRow}>
           <BookingStatusPill status={booking.status} />
           <View style={styles.rowActions}>
@@ -504,6 +508,12 @@ const styles = StyleSheet.create({
     color: colors.courtBlue,
     fontSize: 12,
     fontWeight: '700',
+    marginBottom: 8,
+  },
+  progressHint: {
+    color: colors.textSoft,
+    fontSize: 12,
+    lineHeight: 16,
     marginBottom: 8,
   },
   statusRow: {
