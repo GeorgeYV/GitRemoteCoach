@@ -1525,6 +1525,11 @@ export function getTournamentRoster(tournamentId: string): Promise<TournamentRos
   return request(`/tournaments/${tournamentId}/coaches`);
 }
 
+/** GET /tournaments/:id/official-coach-ids — TrainerListScreen: "Oficial" + ordenar primero. */
+export function listOfficialCoachIds(tournamentId: string): Promise<{ coachIds: string[] }> {
+  return request(`/tournaments/${tournamentId}/official-coach-ids`);
+}
+
 /** POST /tournaments/:id/settle — ClubTournamentDetailScreen "Liquidar". Solo un admin del
  * club dueño del torneo puede liquidarlo (verificado en el server contra la sesión). */
 export function settleTournament(

@@ -1,12 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import ClubTagBadge from '../../components/coach/ClubTagBadge';
 import TrainerAvatarPlaceholder from '../../components/shared/TrainerAvatarPlaceholder';
 import {
   ApiError,
   BookedPlayer,
   CoachSearchResult,
+  getCoachTournamentAvailability,
   getCoachTournamentBookedPlayers,
+  listOfficialCoachIds,
+  RateMode,
   searchCoaches,
   TournamentSearchResult,
 } from '../../lib/api';
@@ -14,6 +18,13 @@ import { dateRangeLabel } from '../../lib/dateSlots';
 import { colors, radius } from '../../lib/theme';
 
 const MIN_RATING_THRESHOLD = 4;
+
+/** Mismo criterio que TrainerProfileScreen#PRICE_SUFFIX — duplicado a propósito (mismo patrón ya
+ * usado por dateRangeLabel entre las dos pantallas), no vale la pena compartirlo por dos líneas. */
+const PRICE_SUFFIX: Record<RateMode, string> = {
+  per_day: '/ día',
+  per_tournament: '/ torneo',
+};
 
 export default function TrainerListScreen({
   tournament,
@@ -28,6 +39,10 @@ export default function TrainerListScreen({
   const [trainers, setTrainers] = useState<CoachSearchResult[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [bookedPlayersByCoach, setBookedPlayersByCoach] = useState<Record<string, BookedPlayer[]>>({});
+  // Entrenadores oficiales de este torneo — se muestran primero y con una insignia (ver
+  // sortedTrainers más abajo). undefined mientras carga, para no reordenar la lista dos veces.
+  const [officialIds, setOfficialIds] = useState<Set<string> | undefined>(undefined);
+  const [ratesByCoach, setRatesByCoach] = useState<Record<string, { amount: number; rateMode: RateMode } | null>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -44,6 +59,47 @@ export default function TrainerListScreen({
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    listOfficialCoachIds(tournament.id)
+      .then(({ coachIds }) => {
+        if (!cancelled) setOfficialIds(new Set(coachIds));
+      })
+      .catch(() => {
+        if (!cancelled) setOfficialIds(new Set());
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [tournament.id]);
+
+  // Tarifa de catálogo de cada coach para ESTE torneo (ver decisión #49 — ya no hay una tarifa
+  // general de perfil que mostrar como respaldo). Mismo criterio de "una llamada por coach
+  // visible" que bookedPlayersByCoach, abajo.
+  useEffect(() => {
+    if (!trainers || trainers.length === 0) return;
+    let cancelled = false;
+    Promise.all(
+      trainers.map((t) =>
+        getCoachTournamentAvailability(t.id, tournament.id)
+          .then(
+            (result) =>
+              [
+                t.id,
+                result.rate ? { amount: Number(result.rate.amount), rateMode: result.rate.rateMode } : null,
+              ] as const,
+          )
+          .catch(() => [t.id, null] as const),
+      ),
+    ).then((entries) => {
+      if (cancelled) return;
+      setRatesByCoach(Object.fromEntries(entries));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [trainers, tournament.id]);
 
   // Un coach puede aceptar varios alumnos el mismo torneo — el padre necesita ver quiénes ya
   // reservaron antes de elegir. Una llamada por coach visible (la lista es corta) en vez de una
@@ -66,7 +122,14 @@ export default function TrainerListScreen({
     };
   }, [trainers, tournament.id]);
 
-  const visibleTrainers = trainers?.filter((t) => !minRatingOnly || Number(t.ratingAvg) >= MIN_RATING_THRESHOLD) ?? null;
+  // Los oficiales de este torneo van primero — Array#sort es estable, así que dentro de cada
+  // grupo (oficial / no oficial) se conserva el orden que ya traía searchCoaches.
+  const visibleTrainers = trainers
+    ? trainers
+        .filter((t) => !minRatingOnly || Number(t.ratingAvg) >= MIN_RATING_THRESHOLD)
+        .slice()
+        .sort((a, b) => Number(!!officialIds?.has(b.id)) - Number(!!officialIds?.has(a.id)))
+    : null;
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -113,6 +176,8 @@ export default function TrainerListScreen({
                 key={trainer.id}
                 trainer={trainer}
                 bookedPlayers={bookedPlayersByCoach[trainer.id]}
+                official={!!officialIds?.has(trainer.id)}
+                rate={ratesByCoach[trainer.id]}
                 onPress={() => onSelectTrainer?.(trainer)}
               />
             ))}
@@ -134,10 +199,15 @@ export default function TrainerListScreen({
 function TrainerCard({
   trainer,
   bookedPlayers,
+  official,
+  rate,
   onPress,
 }: {
   trainer: CoachSearchResult;
   bookedPlayers?: BookedPlayer[];
+  official: boolean;
+  /** undefined mientras carga, null si el coach no fijó tarifa para este torneo todavía. */
+  rate?: { amount: number; rateMode: RateMode } | null;
   onPress?: () => void;
 }) {
   const metaParts = [trainer.city, trainer.specialty, `${trainer.yearsExperience} años`].filter(Boolean);
@@ -146,11 +216,19 @@ function TrainerCard({
       <View style={styles.cardTopRow}>
         <TrainerAvatarPlaceholder size={60} />
         <View style={styles.cardInfo}>
-          <Text style={styles.trainerName}>{trainer.name}</Text>
+          <View style={styles.nameRow}>
+            <Text style={styles.trainerName}>{trainer.name}</Text>
+            {official && <ClubTagBadge />}
+          </View>
           <Text style={styles.trainerMeta}>
             ★ {trainer.ratingAvg} · {metaParts.join(' · ')}
           </Text>
         </View>
+        {rate && (
+          <Text style={styles.price}>
+            ${rate.amount} <Text style={styles.priceSuffix}>{PRICE_SUFFIX[rate.rateMode]}</Text>
+          </Text>
+        )}
       </View>
       {bookedPlayers && bookedPlayers.length > 0 && (
         <View style={styles.bookedRow}>
@@ -263,11 +341,27 @@ const styles = StyleSheet.create({
     marginLeft: 12,
     marginRight: 8,
   },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 3,
+  },
   trainerName: {
     color: colors.lineWhite,
     fontSize: 15,
     fontWeight: '700',
-    marginBottom: 3,
+  },
+  price: {
+    color: colors.courtBlue,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  priceSuffix: {
+    color: colors.textDim,
+    fontSize: 10,
+    fontWeight: '400',
   },
   trainerMeta: {
     color: colors.textDim,

@@ -758,6 +758,33 @@ console.log('\n=== Escenario 11: invitación de club (CoachClubInvitationScreen)
     !listAfter.some((i: any) => i.id === invitation.id),
     'la invitación ya respondida deja de aparecer en el listado de pendientes',
   );
+
+  // TrainerListScreen (padre): "Oficial" + ordenar primero — pública, sin token. coachA ya
+  // viene taggeado para fixtures.tournamentId desde el seed (ver test/seed.ts), así que se
+  // verifica junto al recién aceptado acá, y la ausencia se prueba contra un torneo distinto
+  // (activeTournamentId) donde el seed no taggeó a nadie.
+  const officialIdsRes = await app.inject({
+    method: 'GET',
+    url: `/tournaments/${fixtures.tournamentId}/official-coach-ids`,
+  });
+  assertEqual(officialIdsRes.statusCode, 200, 'GET official-coach-ids devuelve 200 sin token');
+  assertTrue(
+    officialIdsRes.json().coachIds.includes(fixtures.coachBUserId),
+    'el coach recién aceptado como oficial aparece en la lista',
+  );
+  assertTrue(
+    officialIdsRes.json().coachIds.includes(fixtures.coachAUserId),
+    'el coach taggeado desde el seed también aparece',
+  );
+
+  const noneOfficialRes = await app.inject({
+    method: 'GET',
+    url: `/tournaments/${fixtures.activeTournamentId}/official-coach-ids`,
+  });
+  assertTrue(
+    noneOfficialRes.json().coachIds.length === 0,
+    'un torneo sin nadie taggeado devuelve la lista vacía',
+  );
 }
 
 console.log('\n=== Escenario 11b: disponibilidad y tarifa de torneo (CoachAvailabilityScreen) ===');

@@ -30,6 +30,14 @@ export async function getTournamentRoster(tournamentId: string): Promise<Tournam
   return { officialCoaches, pendingInvitations, pendingCommissionAmount };
 }
 
+/** TrainerListScreen (padre): solo los ids, para marcar "Oficial" y ordenarlos primero — a
+ * diferencia de getTournamentRoster (club_admin), no expone pendingCommissionAmount ni
+ * pendingInvitations, dato financiero/interno del club que un padre no debería ver. */
+export async function listOfficialCoachIds(tournamentId: string): Promise<string[]> {
+  const tags = await tournamentCoachTagRepository.listTagsWithProfilesForTournament(tournamentId);
+  return tags.map((t) => t.coachId);
+}
+
 /** CoachTournamentSearchScreen/ParentHomeScreen: torneos activos, opcionalmente filtrados por
  * texto, país del club organizador, y/o categoría de edad (ver decisión #45). */
 export async function searchTournaments(

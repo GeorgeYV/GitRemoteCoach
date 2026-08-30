@@ -43,6 +43,14 @@ export async function tournamentRoutes(app: FastifyInstance): Promise<void> {
     return tournamentService.getTournamentRoster(id);
   });
 
+  // TrainerListScreen (padre): "Oficial" + ordenar primero — pública como el resto de la
+  // búsqueda de torneos/entrenadores, sin los datos financieros de /tournaments/:id/coaches.
+  app.get('/tournaments/:id/official-coach-ids', async (req) => {
+    const { id } = req.params as { id: string };
+    const coachIds = await tournamentService.listOfficialCoachIds(id);
+    return { coachIds };
+  });
+
   // PlatformAdminTournamentScreen: siembra un torneo sin club (ver decisión #36 en db/schema.sql)
   // para que cualquier club de ese país lo pueda reclamar después.
   app.post('/tournaments', { preHandler: app.authenticate }, async (req, reply) => {

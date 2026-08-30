@@ -2,11 +2,14 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { colors, withOpacity } from '../../lib/theme';
 
-/** Compact badge shown wherever a coach's official-club tagging for a specific tournament needs to surface. */
-export default function ClubTagBadge({ clubName }: { clubName: string }) {
+/** Compact badge shown wherever a coach's official-club tagging for a specific tournament needs
+ * to surface. clubName es opcional — TrainerListScreen (padre) ya está mirando un solo torneo, el
+ * club/federación queda implícito por contexto (título de la pantalla), así que ahí alcanza con
+ * "Oficial" solo. */
+export default function ClubTagBadge({ clubName }: { clubName?: string }) {
   return (
     <View style={styles.pill}>
-      <Text style={styles.label}>Oficial · {clubName}</Text>
+      <Text style={styles.label}>{clubName ? `Oficial · ${clubName}` : 'Oficial'}</Text>
     </View>
   );
 }
