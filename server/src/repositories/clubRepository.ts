@@ -1,7 +1,7 @@
 import type { Pool, PoolClient } from 'pg';
 import { pool } from '../lib/db.js';
 import { NotFoundError } from '../lib/errors.js';
-import type { Club, ClubSearchResult, CountryCode } from '../types.js';
+import type { AdminAccountSummary, Club, ClubSearchResult, CountryCode } from '../types.js';
 
 type Queryable = Pool | PoolClient;
 
@@ -69,6 +69,52 @@ export async function getClubIdForAdminUser(userId: string, db: Queryable = pool
 export async function listAdminUserIds(clubId: string, db: Queryable = pool): Promise<string[]> {
   const { rows } = await db.query(`SELECT user_id FROM club_admins WHERE club_id = $1`, [clubId]);
   return rows.map((r) => r.user_id);
+}
+
+/** PlatformAdminAccountsScreen, pestaña "Administradores de club" (decisión #52) — igual que
+ * coachRepository.listAllForAdmin, NO filtra por verification_status del club ni excluye a los
+ * ya deshabilitados. Segunda consulta + merge en memoria para clubNames (no un array_agg
+ * correlacionado en el SELECT principal): mismo motivo que
+ * tournamentRepository.fetchAgeCategoriesByTournament — pg-mem (smoke tests) no resuelve una
+ * referencia a la tabla externa dentro de una subconsulta. */
+export async function listClubAdminsForAdmin(search: string | undefined, db: Queryable = pool): Promise<AdminAccountSummary[]> {
+  const conditions: string[] = [`primary_role = 'club_admin'`];
+  const values: unknown[] = [];
+  if (search) {
+    values.push(`%${search}%`);
+    conditions.push(`(full_name ILIKE $${values.length} OR email ILIKE $${values.length})`);
+  }
+  const { rows } = await db.query(
+    `SELECT id, full_name, email, created_at, disabled_at, disabled_reason FROM users
+     WHERE ${conditions.join(' AND ')}
+     ORDER BY full_name
+     LIMIT 100`,
+    values,
+  );
+  if (rows.length === 0) return [];
+
+  const userIds: string[] = rows.map((r) => r.id);
+  const placeholders = userIds.map((_, i) => `$${i + 1}`).join(', ');
+  const { rows: clubRows } = await db.query(
+    `SELECT ca.user_id, c.name FROM club_admins ca JOIN clubs c ON c.id = ca.club_id WHERE ca.user_id IN (${placeholders})`,
+    userIds,
+  );
+  const clubNamesByUser = new Map<string, string[]>();
+  for (const row of clubRows) {
+    const existing = clubNamesByUser.get(row.user_id) ?? [];
+    existing.push(row.name);
+    clubNamesByUser.set(row.user_id, existing);
+  }
+
+  return rows.map((r) => ({
+    id: r.id,
+    fullName: r.full_name,
+    email: r.email,
+    createdAt: r.created_at,
+    disabledAt: r.disabled_at,
+    disabledReason: r.disabled_reason,
+    clubNames: clubNamesByUser.get(r.id) ?? [],
+  }));
 }
 
 /** ClubRegistrationScreen: crea el club nuevo. Vincular al admin (club_admins) es

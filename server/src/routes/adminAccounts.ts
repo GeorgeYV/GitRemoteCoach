@@ -11,8 +11,9 @@ function assertPlatformAdmin(role: string): void {
   }
 }
 
-/** PlatformAdminAccountsScreen (decisión #51): listar y deshabilitar/habilitar cuentas de
- * coach/parent — federaciones (club_admin) quedan fuera de este alcance por ahora. */
+/** PlatformAdminAccountsScreen (decisión #51 + #52): listar y deshabilitar/habilitar cuentas de
+ * coach/parent/club_admin — deshabilitar el club/federación entero (no solo la cuenta de uno de
+ * sus admins) queda fuera de este alcance por ahora. */
 export async function adminAccountRoutes(app: FastifyInstance): Promise<void> {
   app.get('/admin/coaches', { preHandler: app.authenticate }, async (req) => {
     const { role } = req.user as { role: string };
@@ -26,6 +27,13 @@ export async function adminAccountRoutes(app: FastifyInstance): Promise<void> {
     assertPlatformAdmin(role);
     const { search } = req.query as { search?: string };
     return adminAccountService.listParentsForAdmin(search);
+  });
+
+  app.get('/admin/club-admins', { preHandler: app.authenticate }, async (req) => {
+    const { role } = req.user as { role: string };
+    assertPlatformAdmin(role);
+    const { search } = req.query as { search?: string };
+    return adminAccountService.listClubAdminsForAdmin(search);
   });
 
   app.post('/admin/users/:id/disable', { preHandler: app.authenticate }, async (req, reply) => {

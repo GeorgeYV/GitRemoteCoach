@@ -9,12 +9,31 @@ import {
   ApiError,
   disableAccount,
   enableAccount,
+  listClubAdminsForAdmin,
   listCoachesForAdmin,
   listParentsForAdmin,
 } from '../../lib/api';
 import { colors, radius, withOpacity } from '../../lib/theme';
 
-type AccountTab = 'coaches' | 'parents';
+type AccountTab = 'coaches' | 'parents' | 'clubAdmins';
+
+const TAB_FETCHERS: Record<AccountTab, typeof listCoachesForAdmin> = {
+  coaches: listCoachesForAdmin,
+  parents: listParentsForAdmin,
+  clubAdmins: listClubAdminsForAdmin,
+};
+
+const TAB_LABELS: Record<AccountTab, string> = {
+  coaches: 'Entrenadores',
+  parents: 'Padres',
+  clubAdmins: 'Admins de club',
+};
+
+const TAB_EMPTY_LABELS: Record<AccountTab, string> = {
+  coaches: 'Todavía no hay entrenadores.',
+  parents: 'Todavía no hay padres.',
+  clubAdmins: 'Todavía no hay administradores de club.',
+};
 
 const VERIFICATION_STATUS_LABELS: Record<string, string> = {
   pending: 'Pendiente',
@@ -27,9 +46,10 @@ function formatDate(iso: string): string {
 }
 
 /**
- * PlatformAdminFlow, pestaña "Cuentas" (decisión #51): listar y deshabilitar/habilitar coaches y
- * padres — reversible, no un borrado. Federaciones (club_admin) quedan fuera del alcance por
- * ahora. Deshabilitar no cancela reservas/torneos ya en curso: eso queda a criterio del admin.
+ * PlatformAdminFlow, pestaña "Cuentas" (decisión #51 + #52): listar y deshabilitar/habilitar
+ * coaches, padres y admins de club — reversible, no un borrado. Deshabilitar el club/federación
+ * entero (no solo la cuenta de uno de sus admins) queda fuera del alcance por ahora. Deshabilitar
+ * no cancela reservas/torneos ya en curso: eso queda a criterio del admin.
  */
 export default function PlatformAdminAccountsScreen() {
   const { token } = useAuth();
@@ -43,8 +63,7 @@ export default function PlatformAdminAccountsScreen() {
   function load() {
     if (!token) return;
     setError(null);
-    const fetcher = tab === 'coaches' ? listCoachesForAdmin : listParentsForAdmin;
-    fetcher(token, query.trim() || undefined)
+    TAB_FETCHERS[tab](token, query.trim() || undefined)
       .then(setAccounts)
       .catch((err) => {
         setAccounts(null);
@@ -84,12 +103,11 @@ export default function PlatformAdminAccountsScreen() {
       </View>
 
       <View style={styles.tabRow}>
-        <Pressable style={[styles.tab, tab === 'coaches' && styles.tabActive]} onPress={() => setTab('coaches')}>
-          <Text style={[styles.tabLabel, tab === 'coaches' && styles.tabLabelActive]}>Entrenadores</Text>
-        </Pressable>
-        <Pressable style={[styles.tab, tab === 'parents' && styles.tabActive]} onPress={() => setTab('parents')}>
-          <Text style={[styles.tabLabel, tab === 'parents' && styles.tabLabelActive]}>Padres</Text>
-        </Pressable>
+        {(Object.keys(TAB_LABELS) as AccountTab[]).map((t) => (
+          <Pressable key={t} style={[styles.tab, tab === t && styles.tabActive]} onPress={() => setTab(t)}>
+            <Text style={[styles.tabLabel, tab === t && styles.tabLabelActive]}>{TAB_LABELS[t]}</Text>
+          </Pressable>
+        ))}
       </View>
 
       <IconTextInput
@@ -110,9 +128,7 @@ export default function PlatformAdminAccountsScreen() {
         </View>
       ) : accounts.length === 0 ? (
         <View style={styles.emptyState}>
-          <Text style={styles.emptyText}>
-            {query ? 'Nadie coincide con esa búsqueda.' : tab === 'coaches' ? 'Todavía no hay entrenadores.' : 'Todavía no hay padres.'}
-          </Text>
+          <Text style={styles.emptyText}>{query ? 'Nadie coincide con esa búsqueda.' : TAB_EMPTY_LABELS[tab]}</Text>
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.content}>
@@ -123,6 +139,9 @@ export default function PlatformAdminAccountsScreen() {
                   <Text style={styles.accountName}>{account.fullName}</Text>
                   <Text style={styles.accountMeta}>{account.email}</Text>
                   <Text style={styles.accountMeta}>Registrado: {formatDate(account.createdAt)}</Text>
+                  {account.clubNames && account.clubNames.length > 0 && (
+                    <Text style={styles.accountMeta}>Club: {account.clubNames.join(', ')}</Text>
+                  )}
                 </View>
                 {account.disabledAt ? (
                   <View style={styles.disabledBadge}>
@@ -283,6 +302,7 @@ const styles = StyleSheet.create({
   },
   tabRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
     paddingHorizontal: 20,
     paddingTop: 14,

@@ -60,8 +60,8 @@ export interface PublicUser {
   disabledReason: string | null;
 }
 
-/** PlatformAdminAccountsScreen: fila liviana de la lista de coaches/padres — no el perfil
- * completo, solo lo necesario para reconocer la cuenta y decidir si deshabilitarla. */
+/** PlatformAdminAccountsScreen: fila liviana de la lista de coaches/padres/admins de club — no el
+ * perfil completo, solo lo necesario para reconocer la cuenta y decidir si deshabilitarla. */
 export interface AdminAccountSummary {
   id: string;
   fullName: string;
@@ -72,6 +72,9 @@ export interface AdminAccountSummary {
   /** Solo presente para coaches (ver adminAccountService.listCoachesForAdmin) — un padre no tiene
    * verification_status propio. */
   coachVerificationStatus?: VerificationStatus;
+  /** Solo presente para admins de club (ver adminAccountService.listClubAdminsForAdmin) — club_admins
+   * es N:M en el schema, aunque en la práctica casi siempre es un solo club. */
+  clubNames?: string[];
 }
 
 export interface Booking {

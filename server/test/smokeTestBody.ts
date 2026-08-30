@@ -4467,7 +4467,7 @@ console.log('\n=== Escenario 47: correo de reclutamiento a entrenadores sin cobe
   assertEqual(emailState.sent.length, 0, 'el segundo corrido no manda ningún correo nuevo para ese torneo');
 }
 
-console.log('\n=== Escenario 48: deshabilitar/habilitar cuentas de coach y padre (decisión #51) ===');
+console.log('\n=== Escenario 48: deshabilitar/habilitar cuentas de coach, padre y admin de club (decisión #51 + #52) ===');
 {
   // --- Solo platform_admin puede listar/actuar ---
   const forbiddenListRes = await app.inject({
@@ -4508,14 +4508,55 @@ console.log('\n=== Escenario 48: deshabilitar/habilitar cuentas de coach y padre
   });
   assertEqual(emptyReasonRes.statusCode, 422, 'deshabilitar sin motivo devuelve 422 (ValidationError)');
 
-  // --- Alcance: solo coach/parent, todavía no club_admin/platform_admin ---
+  // --- Alcance: coach/parent/club_admin (decisión #52), todavía no platform_admin ---
+  const disablePlatformAdminRes = await app.inject({
+    method: 'POST',
+    url: `/admin/users/${fixtures.platformAdminUserId}/disable`,
+    headers: { authorization: `Bearer ${platformAdminToken}` },
+    payload: { reason: 'probando alcance' },
+  });
+  assertEqual(disablePlatformAdminRes.statusCode, 403, 'todavía no se puede deshabilitar un platform_admin → 403');
+
+  // --- Administradores de club (decisión #52): listar, ver el club al que pertenecen,
+  // deshabilitar/habilitar con el mismo mecanismo que coach/parent ---
+  const clubAdminListRes = await app.inject({
+    method: 'GET',
+    url: '/admin/club-admins',
+    headers: { authorization: `Bearer ${platformAdminToken}` },
+  });
+  assertEqual(clubAdminListRes.statusCode, 200, 'platform_admin puede listar admins de club → 200');
+  const clubAdminEntry = clubAdminListRes.json().find((c: any) => c.id === fixtures.clubAdminUserId);
+  assertTrue(!!clubAdminEntry, 'la lista de admins de club incluye al club_admin sembrado');
+  assertTrue(
+    Array.isArray(clubAdminEntry?.clubNames) && clubAdminEntry.clubNames.includes('Club Deportivo Bosques'),
+    'el club_admin aparece con el nombre de su club',
+  );
+
   const disableClubAdminRes = await app.inject({
     method: 'POST',
     url: `/admin/users/${fixtures.clubAdminUserId}/disable`,
     headers: { authorization: `Bearer ${platformAdminToken}` },
-    payload: { reason: 'probando alcance' },
+    payload: { reason: 'prueba de admin de club' },
   });
-  assertEqual(disableClubAdminRes.statusCode, 403, 'todavía no se puede deshabilitar un club_admin → 403');
+  assertEqual(disableClubAdminRes.statusCode, 204, 'ahora sí se puede deshabilitar un club_admin → 204');
+
+  const clubAdminAfterDisableRes = await app.inject({
+    method: 'GET',
+    url: '/admin/club-admins',
+    headers: { authorization: `Bearer ${platformAdminToken}` },
+  });
+  const disabledClubAdminEntry = clubAdminAfterDisableRes.json().find((c: any) => c.id === fixtures.clubAdminUserId);
+  assertTrue(
+    !!disabledClubAdminEntry && disabledClubAdminEntry.disabledAt !== null,
+    'el club_admin deshabilitado aparece con disabledAt poblado',
+  );
+
+  const enableClubAdminRes = await app.inject({
+    method: 'POST',
+    url: `/admin/users/${fixtures.clubAdminUserId}/enable`,
+    headers: { authorization: `Bearer ${platformAdminToken}` },
+  });
+  assertEqual(enableClubAdminRes.statusCode, 204, 'habilitar de nuevo al club_admin devuelve 204');
 
   // --- Registrar un coach nuevo (contraseña real) para probar el rechazo de login ---
   const disableEmail = 'coach.deshabilitado@example.com';

@@ -830,6 +830,7 @@ export interface AdminAccountSummary {
   disabledAt: string | null;
   disabledReason: string | null;
   coachVerificationStatus?: VerificationStatus;
+  clubNames?: string[];
 }
 
 /** GET /admin/coaches?search= — PlatformAdminAccountsScreen, pestaña "Entrenadores". */
@@ -842,6 +843,13 @@ export function listCoachesForAdmin(authToken: string, search?: string): Promise
 export function listParentsForAdmin(authToken: string, search?: string): Promise<AdminAccountSummary[]> {
   const qs = search ? `?search=${encodeURIComponent(search)}` : '';
   return request(`/admin/parents${qs}`, { headers: { Authorization: `Bearer ${authToken}` } });
+}
+
+/** GET /admin/club-admins?search= — PlatformAdminAccountsScreen, pestaña "Administradores de
+ * club" (decisión #52 en db/schema.sql). */
+export function listClubAdminsForAdmin(authToken: string, search?: string): Promise<AdminAccountSummary[]> {
+  const qs = search ? `?search=${encodeURIComponent(search)}` : '';
+  return request(`/admin/club-admins${qs}`, { headers: { Authorization: `Bearer ${authToken}` } });
 }
 
 /** POST /admin/users/:id/disable — motivo obligatorio (ver decisión #51 en db/schema.sql). */

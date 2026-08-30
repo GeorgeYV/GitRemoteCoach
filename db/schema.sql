@@ -2289,4 +2289,13 @@ CREATE INDEX idx_push_tokens_user_id ON push_tokens (user_id);
 --     coachRepository.search() (no aparece en listados nuevos), igual que uno todavía no aprobado.
 --     Federaciones/clubes quedan fuera de este alcance por ahora — deshabilitar un club arrastra
 --     sus torneos y coaches oficiales, más para pensar que esto (queda para una segunda vuelta).
+-- 52. La "segunda vuelta" de la decisión #51 resultó más chica de lo pensado: deshabilitar la
+--     CUENTA puntual de un club_admin (no el club/federación entero) usa el mismo mecanismo
+--     simple que coach/parent — no toca clubs ni tournaments, solo bloquea el login de esa
+--     persona. Se agrega 'club_admin' a DISABLEABLE_ROLES (adminAccountService.ts) y una tercera
+--     pestaña "Administradores de club" en PlatformAdminAccountsScreen. Lo que sigue realmente
+--     pendiente es deshabilitar el club/federación en sí (eso sí arrastra torneos/coaches
+--     oficiales). Nota: fn_club_admins_prevent_last_removal solo protege un DELETE de
+--     club_admins, no esto — un club con un solo admin puede quedar deshabilitado sin que la base
+--     lo impida; queda a criterio de platform_admin.
 -- =====================================================================
