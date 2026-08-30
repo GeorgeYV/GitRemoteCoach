@@ -18,6 +18,8 @@ function toPublicUser(user: userRepository.UserRecord): PublicUser {
     phone: user.phone,
     primaryRole: user.primaryRole,
     emailVerifiedAt: user.emailVerifiedAt,
+    disabledAt: user.disabledAt,
+    disabledReason: user.disabledReason,
   };
 }
 

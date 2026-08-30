@@ -10,6 +10,7 @@ import PlatformAdminFlow from '../screens/admin/PlatformAdminFlow';
 import CoachRegistrationScreen from '../screens/coach/CoachRegistrationScreen';
 import CoachVerificationPendingScreen from '../screens/coach/CoachVerificationPendingScreen';
 import ParentHomeScreen from '../screens/parent/ParentHomeScreen';
+import AccountDisabledScreen from '../screens/auth/AccountDisabledScreen';
 import VerifyEmailGateScreen from '../screens/auth/VerifyEmailGateScreen';
 
 /**
@@ -97,6 +98,12 @@ export default function AuthenticatedHome() {
 
   // Stack.Protected en app/_layout.tsx garantiza que esta ruta solo se monta con sesión activa.
   if (!user) return null;
+
+  // Ver decisión #51 en db/schema.sql — antes que el gate de correo: una cuenta deshabilitada no
+  // debería poder esquivarlo reenviando/cambiando su correo. authService.login/googleAuthService
+  // ya rechazan el login de una cuenta deshabilitada, así que esto en la práctica solo cubre una
+  // sesión que ya estaba abierta cuando el admin deshabilitó la cuenta.
+  if (user.disabledAt) return <AccountDisabledScreen />;
 
   // Ver decisión #48 en db/schema.sql — cuentas ya existentes antes de esta funcionalidad quedan
   // verificadas por defecto (backfill en el schema), así que esto solo frena a cuentas nuevas por

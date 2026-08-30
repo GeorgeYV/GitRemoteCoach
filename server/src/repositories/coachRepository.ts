@@ -1,7 +1,7 @@
 import type { Pool, PoolClient } from 'pg';
 import { pool } from '../lib/db.js';
 import { ConflictError, NotFoundError, ValidationError } from '../lib/errors.js';
-import type { AgeCategory, CoachProfile, CoachSearchResult, CountryCode, PlayingLevel } from '../types.js';
+import type { AdminAccountSummary, AgeCategory, CoachProfile, CoachSearchResult, CountryCode, PlayingLevel } from '../types.js';
 
 type Queryable = Pool | PoolClient;
 
@@ -33,6 +33,38 @@ export async function listApprovedEmailsByCountry(country: CountryCode, db: Quer
   return rows.map((r) => r.email);
 }
 
+/** PlatformAdminAccountsScreen, pestaña "Entrenadores" (decisión #51) — a diferencia de search(),
+ * NO filtra por verification_status ni excluye a los ya deshabilitados: el admin necesita ver a
+ * todos para poder deshabilitar/habilitar a cualquiera, sin importar su estado. Parte de users (no
+ * de coach_profiles) con LEFT JOIN — un coach que se registró pero todavía no completó su perfil
+ * (sin fila en coach_profiles todavía) también tiene que poder verse y deshabilitarse. */
+export async function listAllForAdmin(search: string | undefined, db: Queryable = pool): Promise<AdminAccountSummary[]> {
+  const conditions: string[] = [`u.primary_role = 'coach'`];
+  const values: unknown[] = [];
+  if (search) {
+    values.push(`%${search}%`);
+    conditions.push(`(u.full_name ILIKE $${values.length} OR u.email ILIKE $${values.length})`);
+  }
+  const { rows } = await db.query(
+    `SELECT u.id, u.full_name, u.email, u.created_at, u.disabled_at, u.disabled_reason, cp.verification_status
+     FROM users u
+     LEFT JOIN coach_profiles cp ON cp.user_id = u.id
+     WHERE ${conditions.join(' AND ')}
+     ORDER BY u.full_name
+     LIMIT 100`,
+    values,
+  );
+  return rows.map((r) => ({
+    id: r.id,
+    fullName: r.full_name,
+    email: r.email,
+    createdAt: r.created_at,
+    disabledAt: r.disabled_at,
+    disabledReason: r.disabled_reason,
+    coachVerificationStatus: r.verification_status,
+  }));
+}
+
 /**
  * ClubInviteCoachScreen: entrenadores aprobados que coinciden con el texto de búsqueda
  * (nombre o ciudad), excluyendo a quienes ya son oficiales o ya tienen invitación
@@ -48,7 +80,10 @@ export async function search(
   params: { query?: string; excludeTournamentId?: string; configuredForTournamentId?: string },
   db: Queryable = pool,
 ): Promise<CoachSearchResult[]> {
-  const conditions: string[] = [`cp.verification_status = 'approved'`];
+  // u.disabled_at IS NULL (decisión #51): un coach deshabilitado sale de toda búsqueda nueva, con
+  // el mismo criterio que uno todavía no aprobado — no rompe reservas/torneos ya en curso, que no
+  // pasan por acá.
+  const conditions: string[] = [`cp.verification_status = 'approved'`, `u.disabled_at IS NULL`];
   const values: unknown[] = [];
   let rateJoin = '';
 

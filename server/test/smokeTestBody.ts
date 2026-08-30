@@ -18,6 +18,8 @@ import { runExpireBookingsJob } from '../src/jobs/expireBookings.js';
 import { MAX_TRANSCRIPTION_ATTEMPTS, runTranscribeVoiceNotesJob } from '../src/jobs/transcribeVoiceNotes.js';
 import { runRecruitCoachesForUncoveredTournamentsJob } from '../src/jobs/recruitCoachesForUncoveredTournaments.js';
 import { findTournamentsReadyForSettlement } from '../src/services/settlementService.js';
+import { login as loginViaService } from '../src/services/authService.js';
+import { AppError } from '../src/lib/errors.js';
 
 let passed = 0;
 let failed = 0;
@@ -4463,6 +4465,140 @@ console.log('\n=== Escenario 47: correo de reclutamiento a entrenadores sin cobe
   const run2 = await runRecruitCoachesForUncoveredTournamentsJob();
   assertTrue(!run2.notifiedTournamentIds.includes(uncoveredId), 'el mismo torneo no se vuelve a notificar en un segundo corrido');
   assertEqual(emailState.sent.length, 0, 'el segundo corrido no manda ningún correo nuevo para ese torneo');
+}
+
+console.log('\n=== Escenario 48: deshabilitar/habilitar cuentas de coach y padre (decisión #51) ===');
+{
+  // --- Solo platform_admin puede listar/actuar ---
+  const forbiddenListRes = await app.inject({
+    method: 'GET',
+    url: '/admin/coaches',
+    headers: { authorization: `Bearer ${coachAToken}` },
+  });
+  assertEqual(forbiddenListRes.statusCode, 403, 'un coach no puede listar cuentas de admin → 403');
+
+  const coachListRes = await app.inject({
+    method: 'GET',
+    url: '/admin/coaches',
+    headers: { authorization: `Bearer ${platformAdminToken}` },
+  });
+  assertEqual(coachListRes.statusCode, 200, 'platform_admin puede listar entrenadores → 200');
+  assertTrue(
+    coachListRes.json().some((c: any) => c.id === fixtures.coachAUserId),
+    'la lista de entrenadores incluye a coachA',
+  );
+
+  const parentListRes = await app.inject({
+    method: 'GET',
+    url: '/admin/parents',
+    headers: { authorization: `Bearer ${platformAdminToken}` },
+  });
+  assertEqual(parentListRes.statusCode, 200, 'platform_admin puede listar padres → 200');
+  assertTrue(
+    parentListRes.json().some((p: any) => p.id === fixtures.parentUserId),
+    'la lista de padres incluye al padre sembrado',
+  );
+
+  // --- Motivo obligatorio ---
+  const emptyReasonRes = await app.inject({
+    method: 'POST',
+    url: `/admin/users/${fixtures.coachAUserId}/disable`,
+    headers: { authorization: `Bearer ${platformAdminToken}` },
+    payload: { reason: '' },
+  });
+  assertEqual(emptyReasonRes.statusCode, 422, 'deshabilitar sin motivo devuelve 422 (ValidationError)');
+
+  // --- Alcance: solo coach/parent, todavía no club_admin/platform_admin ---
+  const disableClubAdminRes = await app.inject({
+    method: 'POST',
+    url: `/admin/users/${fixtures.clubAdminUserId}/disable`,
+    headers: { authorization: `Bearer ${platformAdminToken}` },
+    payload: { reason: 'probando alcance' },
+  });
+  assertEqual(disableClubAdminRes.statusCode, 403, 'todavía no se puede deshabilitar un club_admin → 403');
+
+  // --- Registrar un coach nuevo (contraseña real) para probar el rechazo de login ---
+  const disableEmail = 'coach.deshabilitado@example.com';
+  const registerDisableRes = await app.inject({
+    method: 'POST',
+    url: '/auth/register',
+    payload: { email: disableEmail, password: 'super-secreta-456', fullName: 'Coach A Deshabilitar', primaryRole: 'coach' },
+  });
+  const newCoachId = registerDisableRes.json().user.id;
+
+  const disableRes = await app.inject({
+    method: 'POST',
+    url: `/admin/users/${newCoachId}/disable`,
+    headers: { authorization: `Bearer ${platformAdminToken}` },
+    payload: { reason: 'Documento de identidad no coincide con el nombre registrado' },
+  });
+  assertEqual(disableRes.statusCode, 204, 'deshabilitar con motivo devuelve 204');
+
+  const disabledListRes = await app.inject({
+    method: 'GET',
+    url: '/admin/coaches',
+    headers: { authorization: `Bearer ${platformAdminToken}` },
+  });
+  const disabledEntry = disabledListRes.json().find((c: any) => c.id === newCoachId);
+  assertTrue(
+    !!disabledEntry && disabledEntry.disabledAt !== null,
+    'el coach recién deshabilitado (sin coach_profiles todavía) aparece en la lista con disabledAt poblado',
+  );
+  assertEqual(
+    disabledEntry?.disabledReason,
+    'Documento de identidad no coincide con el nombre registrado',
+    'el motivo queda guardado y visible para el admin',
+  );
+
+  // Llama a authService.login directamente (no vía HTTP): Escenario 46 agota a propósito el
+  // rate limit de POST /auth/login para el resto del proceso, así que un app.inject acá
+  // devolvería 429 en vez de reflejar el rechazo real por cuenta deshabilitada.
+  let loginBlockedError: AppError | null = null;
+  try {
+    await loginViaService({ email: disableEmail, password: 'super-secreta-456' });
+  } catch (err) {
+    loginBlockedError = err instanceof AppError ? err : null;
+  }
+  assertEqual(loginBlockedError?.statusCode, 403, 'una cuenta deshabilitada no puede loguearse → 403');
+  assertEqual(loginBlockedError?.code, 'account_disabled', 'el código de error es el esperado');
+
+  // --- Habilitar de nuevo ---
+  const enableRes = await app.inject({
+    method: 'POST',
+    url: `/admin/users/${newCoachId}/enable`,
+    headers: { authorization: `Bearer ${platformAdminToken}` },
+  });
+  assertEqual(enableRes.statusCode, 204, 'habilitar de nuevo devuelve 204');
+
+  const loggedInAfterEnable = await loginViaService({ email: disableEmail, password: 'super-secreta-456' });
+  assertEqual(loggedInAfterEnable.disabledAt, null, 'después de habilitar, el login vuelve a funcionar');
+
+  // --- Un coach deshabilitado sale de la búsqueda pública, igual que uno todavía no aprobado ---
+  const beforeSearchRes = await app.inject({ method: 'GET', url: '/coaches' });
+  assertTrue(
+    beforeSearchRes.json().some((c: any) => c.id === fixtures.coachAUserId),
+    'coachA (habilitado) aparece en la búsqueda pública antes de deshabilitarlo',
+  );
+
+  await app.inject({
+    method: 'POST',
+    url: `/admin/users/${fixtures.coachAUserId}/disable`,
+    headers: { authorization: `Bearer ${platformAdminToken}` },
+    payload: { reason: 'prueba de búsqueda' },
+  });
+  const afterSearchRes = await app.inject({ method: 'GET', url: '/coaches' });
+  assertTrue(
+    !afterSearchRes.json().some((c: any) => c.id === fixtures.coachAUserId),
+    'coachA (deshabilitado) ya no aparece en la búsqueda pública',
+  );
+
+  // Se revierte para no afectar el estado de coachA de cara a una posible corrida futura de este
+  // mismo archivo (aunque este es el último escenario, mismo criterio de higiene que el resto).
+  await app.inject({
+    method: 'POST',
+    url: `/admin/users/${fixtures.coachAUserId}/enable`,
+    headers: { authorization: `Bearer ${platformAdminToken}` },
+  });
 }
 
 console.log(`\n=== Resultado: ${passed} pasaron, ${failed} fallaron ===`);

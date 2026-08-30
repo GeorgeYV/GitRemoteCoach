@@ -23,13 +23,18 @@ export async function signInWithGoogle(params: {
 
   const existingIdentity = await oauthIdentityRepository.findByProviderAndProviderUserId('google', identity.googleId);
   if (existingIdentity) {
-    return { status: 'loggedIn', user: toPublicUser(await userRepository.findById(existingIdentity.userId)) };
+    const user = await userRepository.findById(existingIdentity.userId);
+    // Mismo rechazo temprano que authService.login (decisión #51) — Google no tiene por qué
+    // dejarlo pasar del gate solo porque no pasa por contraseña.
+    if (user.disabledAt) throw new AppError('Esta cuenta fue deshabilitada', 403, 'account_disabled');
+    return { status: 'loggedIn', user: toPublicUser(user) };
   }
 
   // El correo ya está verificado por Google — si ya existe una cuenta con ese correo (creada con
   // contraseña o con otro flujo), se vincula la identidad en vez de crear una cuenta duplicada.
   const existingUserByEmail = await userRepository.findByEmail(identity.email);
   if (existingUserByEmail) {
+    if (existingUserByEmail.disabledAt) throw new AppError('Esta cuenta fue deshabilitada', 403, 'account_disabled');
     await oauthIdentityRepository.create({
       userId: existingUserByEmail.id,
       provider: 'google',

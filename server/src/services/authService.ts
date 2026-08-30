@@ -14,6 +14,8 @@ export function toPublicUser(user: userRepository.UserRecord): PublicUser {
     phone: user.phone,
     primaryRole: user.primaryRole,
     emailVerifiedAt: user.emailVerifiedAt,
+    disabledAt: user.disabledAt,
+    disabledReason: user.disabledReason,
   };
 }
 
@@ -56,6 +58,11 @@ export async function login(params: { email: string; password: string }): Promis
   // db/schema.sql) — no hay nada que verificar ahí, y verifyPassword truena con null.
   if (!user || !user.passwordHash || !verifyPassword(params.password, user.passwordHash)) {
     throw new AppError('Correo o contraseña incorrectos', 401, 'invalid_credentials');
+  }
+  // Rechazar acá (no solo con el gate de AuthenticatedHome, ver decisión #51) da un mensaje claro
+  // en la propia pantalla de login en vez de dejarlo entrar y recién ahí frenarlo.
+  if (user.disabledAt) {
+    throw new AppError('Esta cuenta fue deshabilitada', 403, 'account_disabled');
   }
   return toPublicUser(user);
 }

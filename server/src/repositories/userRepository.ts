@@ -1,7 +1,7 @@
 import type { Pool, PoolClient } from 'pg';
 import { pool } from '../lib/db.js';
 import { NotFoundError } from '../lib/errors.js';
-import type { PublicUser, UserRole } from '../types.js';
+import type { AdminAccountSummary, PublicUser, UserRole } from '../types.js';
 
 type Queryable = Pool | PoolClient;
 
@@ -19,6 +19,8 @@ function mapRow(row: any): UserRecord {
     primaryRole: row.primary_role,
     passwordHash: row.password_hash,
     emailVerifiedAt: row.email_verified_at,
+    disabledAt: row.disabled_at,
+    disabledReason: row.disabled_reason,
   };
 }
 
@@ -99,4 +101,61 @@ export async function update(
   );
   if (rows.length === 0) throw new NotFoundError('User', userId);
   return mapRow(rows[0]);
+}
+
+/** PlatformAdminAccountsScreen (decisión #51): deshabilita la cuenta de un coach o padre/madre —
+ * reversible (ver enable), no un borrado. Motivo obligatorio (lo valida la capa de arriba, acá
+ * solo se persiste) para que quede un rastro de por qué se actuó. */
+export async function disable(
+  userId: string,
+  params: { disabledBy: string; reason: string },
+  db: Queryable = pool,
+): Promise<UserRecord> {
+  const { rows } = await db.query(
+    `UPDATE users SET disabled_at = now(), disabled_by = $2, disabled_reason = $3, updated_at = now()
+     WHERE id = $1 RETURNING *`,
+    [userId, params.disabledBy, params.reason],
+  );
+  if (rows.length === 0) throw new NotFoundError('User', userId);
+  return mapRow(rows[0]);
+}
+
+export async function enable(userId: string, db: Queryable = pool): Promise<UserRecord> {
+  const { rows } = await db.query(
+    `UPDATE users SET disabled_at = NULL, disabled_by = NULL, disabled_reason = NULL, updated_at = now()
+     WHERE id = $1 RETURNING *`,
+    [userId],
+  );
+  if (rows.length === 0) throw new NotFoundError('User', userId);
+  return mapRow(rows[0]);
+}
+
+/** PlatformAdminAccountsScreen, pestaña "Padres" — a diferencia de listCoachesForAdmin
+ * (adminAccountService), acá no hace falta ningún JOIN: un padre no tiene perfil aparte. */
+export async function listByRole(
+  role: UserRole,
+  search: string | undefined,
+  db: Queryable = pool,
+): Promise<AdminAccountSummary[]> {
+  const conditions = [`primary_role = $1`];
+  const values: unknown[] = [role];
+  if (search) {
+    values.push(`%${search}%`);
+    conditions.push(`(full_name ILIKE $${values.length} OR email ILIKE $${values.length})`);
+  }
+  const { rows } = await db.query(
+    `SELECT id, full_name, email, created_at, disabled_at, disabled_reason FROM users
+     WHERE ${conditions.join(' AND ')}
+     ORDER BY full_name
+     LIMIT 100`,
+    values,
+  );
+  return rows.map((r) => ({
+    id: r.id,
+    fullName: r.full_name,
+    email: r.email,
+    createdAt: r.created_at,
+    disabledAt: r.disabled_at,
+    disabledReason: r.disabled_reason,
+  }));
 }

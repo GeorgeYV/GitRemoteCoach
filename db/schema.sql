@@ -99,8 +99,16 @@ CREATE TABLE users (
   -- NULL = sin verificar (ver decisión #48). Se pobla al registrarse por Google (el correo ya
   -- viene confirmado por Google) o al canjear el código de email_verification_tokens.
   email_verified_at TIMESTAMPTZ,
+  -- Deshabilitar una cuenta (decisión #51) — reversible, no un borrado: bloquea el login/acceso
+  -- (ver AuthenticatedHome en app/index.tsx) y saca al coach de las búsquedas, pero conserva su
+  -- historial intacto. Las tres columnas se pisan/limpian juntas (ver chk_users_disabled_fields).
+  disabled_at        TIMESTAMPTZ,
+  disabled_by        UUID REFERENCES users (id),
+  disabled_reason    TEXT,
   created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT chk_users_disabled_fields
+    CHECK ((disabled_at IS NULL) = (disabled_by IS NULL) AND (disabled_at IS NULL) = (disabled_reason IS NULL))
 );
 
 CREATE INDEX idx_users_primary_role ON users (primary_role);
@@ -2270,4 +2278,15 @@ CREATE INDEX idx_push_tokens_user_id ON push_tokens (user_id);
 --     manda y el job nunca vuelve a mirar ese torneo) — sin reintentos/escalación en esta primera
 --     entrega. El asunto siempre remarca ciudad y sede, para que un entrenador reconozca de un
 --     vistazo si le queda cerca antes de abrir el correo.
+-- 51. users.disabled_at/disabled_by/disabled_reason: platform_admin puede deshabilitar una
+--     cuenta de coach o de padre/madre (PlatformAdminAccountsScreen) — reversible (se puede volver
+--     a habilitar), no un borrado, mismo espíritu que players.active (#44). Vive en users (no en
+--     coach_profiles) porque el mismo mecanismo sirve para cualquier rol con cuenta propia; motivo
+--     obligatorio para que quede un rastro de por qué. AuthenticatedHome (app/index.tsx) bloquea
+--     el acceso completo apenas se recarga la sesión (mismo lugar/criterio que el gate de
+--     email_verified_at, #48) — no cancela reservas/torneos ya en curso automáticamente, eso queda
+--     a criterio del admin caso por caso. Un coach deshabilitado también sale de
+--     coachRepository.search() (no aparece en listados nuevos), igual que uno todavía no aprobado.
+--     Federaciones/clubes quedan fuera de este alcance por ahora — deshabilitar un club arrastra
+--     sus torneos y coaches oficiales, más para pensar que esto (queda para una segunda vuelta).
 -- =====================================================================

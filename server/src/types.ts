@@ -54,6 +54,24 @@ export interface PublicUser {
   /** NULL = correo sin verificar (ver decisión #48). ISO string, no Date — mismo criterio que el
    * resto de PublicUser, que viaja tal cual al cliente. */
   emailVerifiedAt: string | null;
+  /** NULL = cuenta habilitada. Ver decisión #51 — AuthenticatedHome bloquea el acceso completo
+   * mientras esto no sea NULL. */
+  disabledAt: string | null;
+  disabledReason: string | null;
+}
+
+/** PlatformAdminAccountsScreen: fila liviana de la lista de coaches/padres — no el perfil
+ * completo, solo lo necesario para reconocer la cuenta y decidir si deshabilitarla. */
+export interface AdminAccountSummary {
+  id: string;
+  fullName: string;
+  email: string;
+  createdAt: string;
+  disabledAt: string | null;
+  disabledReason: string | null;
+  /** Solo presente para coaches (ver adminAccountService.listCoachesForAdmin) — un padre no tiene
+   * verification_status propio. */
+  coachVerificationStatus?: VerificationStatus;
 }
 
 export interface Booking {

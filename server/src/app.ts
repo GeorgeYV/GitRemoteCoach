@@ -25,6 +25,7 @@ import { bookingMessageRoutes } from './routes/bookingMessages.js';
 import { reviewRoutes } from './routes/reviews.js';
 import { matchRoutes } from './routes/matches.js';
 import { pushTokenRoutes } from './routes/pushTokens.js';
+import { adminAccountRoutes } from './routes/adminAccounts.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -111,6 +112,7 @@ export function buildApp() {
   app.register(bookingMessageRoutes);
   app.register(reviewRoutes);
   app.register(matchRoutes);
+  app.register(adminAccountRoutes);
 
   return app;
 }

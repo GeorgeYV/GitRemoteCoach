@@ -56,6 +56,9 @@ export interface PublicUser {
   primaryRole: UserRole;
   /** NULL = correo sin verificar (ver decisión #48 en db/schema.sql). */
   emailVerifiedAt: string | null;
+  /** NULL = cuenta habilitada (ver decisión #51 en db/schema.sql). */
+  disabledAt: string | null;
+  disabledReason: string | null;
 }
 
 export interface AuthSession {
@@ -815,6 +818,46 @@ export function reviewVerificationDocument(
     method: 'PUT',
     headers: { Authorization: `Bearer ${authToken}` },
     body: JSON.stringify({ status }),
+  });
+}
+
+/** Espeja server/src/types.ts#AdminAccountSummary. */
+export interface AdminAccountSummary {
+  id: string;
+  fullName: string;
+  email: string;
+  createdAt: string;
+  disabledAt: string | null;
+  disabledReason: string | null;
+  coachVerificationStatus?: VerificationStatus;
+}
+
+/** GET /admin/coaches?search= — PlatformAdminAccountsScreen, pestaña "Entrenadores". */
+export function listCoachesForAdmin(authToken: string, search?: string): Promise<AdminAccountSummary[]> {
+  const qs = search ? `?search=${encodeURIComponent(search)}` : '';
+  return request(`/admin/coaches${qs}`, { headers: { Authorization: `Bearer ${authToken}` } });
+}
+
+/** GET /admin/parents?search= — PlatformAdminAccountsScreen, pestaña "Padres". */
+export function listParentsForAdmin(authToken: string, search?: string): Promise<AdminAccountSummary[]> {
+  const qs = search ? `?search=${encodeURIComponent(search)}` : '';
+  return request(`/admin/parents${qs}`, { headers: { Authorization: `Bearer ${authToken}` } });
+}
+
+/** POST /admin/users/:id/disable — motivo obligatorio (ver decisión #51 en db/schema.sql). */
+export function disableAccount(authToken: string, userId: string, reason: string): Promise<void> {
+  return request(`/admin/users/${userId}/disable`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${authToken}` },
+    body: JSON.stringify({ reason }),
+  });
+}
+
+/** POST /admin/users/:id/enable. */
+export function enableAccount(authToken: string, userId: string): Promise<void> {
+  return request(`/admin/users/${userId}/enable`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${authToken}` },
   });
 }
 
