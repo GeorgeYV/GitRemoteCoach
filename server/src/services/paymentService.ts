@@ -476,6 +476,11 @@ export async function verifyPayment(
     parentUserIds.add(await bookingRepository.getParentUserIdForBooking(booking.id));
   }
   const plural = verifiedBookings.length > 1;
+  const emailSubject = decision === 'verified' ? 'Pago confirmado — Remote Coach' : 'Pago rechazado — Remote Coach';
+  const emailHtml =
+    decision === 'verified'
+      ? `<p>Confirmamos el pago de tu${plural ? 's' : ''} reserva${plural ? 's' : ''} — abre la app y revísala${plural ? 's' : ''} en "Reservas".</p>`
+      : `<p>No pudimos verificar tu comprobante — abre la app y revisa "Reservas" para reenviarlo.</p>`;
   for (const parentUserId of parentUserIds) {
     await notificationService.notifyUser(parentUserId, {
       title: decision === 'verified' ? 'Pago confirmado' : 'Pago rechazado',
@@ -485,6 +490,9 @@ export async function verifyPayment(
           : `No pudimos verificar tu comprobante — revisa "Reservas" para reenviarlo.`,
       data: { bookingIds: verifiedBookings.map((b) => b.id) },
     });
+    // Respaldo por correo: mismo criterio que bookingService.ts#acceptBooking — el push no llega
+    // en el target web, que es como se usa esta app en la práctica.
+    await notificationService.notifyUserByEmail(parentUserId, { subject: emailSubject, html: emailHtml });
   }
 
   return verifiedBookings;
@@ -543,8 +551,14 @@ export async function completeBooking(bookingId: string): Promise<Booking> {
   const parentUserId = await bookingRepository.getParentUserIdForBooking(updated.id);
   await notificationService.notifyUser(parentUserId, {
     title: 'Tu reporte ya está listo',
-    body: 'El reporte del partido ya está disponible — entrá a la app para verlo.',
+    body: 'El reporte del partido ya está disponible — entra a la app para verlo.',
     data: { bookingId: updated.id },
+  });
+  // Respaldo por correo: mismo criterio que bookingService.ts#acceptBooking — el push no llega en
+  // el target web, que es como se usa esta app en la práctica.
+  await notificationService.notifyUserByEmail(parentUserId, {
+    subject: 'Tu reporte ya está listo — Remote Coach',
+    html: '<p>El reporte del partido ya está disponible — abre la app para verlo.</p>',
   });
 
   return updated;

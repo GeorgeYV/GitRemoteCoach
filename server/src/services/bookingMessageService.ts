@@ -30,11 +30,17 @@ export async function sendMessage(params: SendMessageParams): Promise<BookingMes
     params.body.length > MESSAGE_PREVIEW_LENGTH
       ? `${params.body.slice(0, MESSAGE_PREVIEW_LENGTH)}…`
       : params.body;
+  // Respaldo por correo además del push (ver mismo criterio en bookingService.ts#acceptBooking):
+  // el push no llega en el target web, que es como se usa esta app en la práctica.
   if (params.senderType === 'parent') {
     await notificationService.notifyUser(booking.coachId, {
       title: 'Nuevo mensaje',
       body: preview,
       data: { bookingId: params.bookingId },
+    });
+    await notificationService.notifyUserByEmail(booking.coachId, {
+      subject: 'Nuevo mensaje sobre tu reserva — Remote Coach',
+      html: `<p>Tienes un mensaje nuevo: "${preview}"</p><p>Abre la app para responder.</p>`,
     });
   } else if (params.senderType === 'coach') {
     const parentUserId = await bookingRepository.getParentUserIdForBooking(params.bookingId);
@@ -42,6 +48,10 @@ export async function sendMessage(params: SendMessageParams): Promise<BookingMes
       title: 'Nuevo mensaje',
       body: preview,
       data: { bookingId: params.bookingId },
+    });
+    await notificationService.notifyUserByEmail(parentUserId, {
+      subject: 'Nuevo mensaje sobre tu reserva — Remote Coach',
+      html: `<p>Tienes un mensaje nuevo: "${preview}"</p><p>Abre la app para responder.</p>`,
     });
   }
 

@@ -78,6 +78,14 @@ export async function acceptBooking(bookingId: string): Promise<Booking> {
     body: 'Tu entrenador aceptó tu solicitud — coordina el punto de encuentro en el chat.',
     data: { bookingId },
   });
+  // Respaldo por correo: el push depende de un token de dispositivo que hoy nunca se registra en
+  // el target web (ver lib/notifications.ts) — que es como se usa esta app en la práctica — así
+  // que sin esto el padre no se entera de nada. Mismo criterio en rescheduleBooking/rejectBooking
+  // más abajo, verifyPayment (paymentService.ts) y sendMessage (bookingMessageService.ts).
+  await notificationService.notifyUserByEmail(parentUserId, {
+    subject: 'Reserva confirmada — Remote Coach',
+    html: '<p>Tu entrenador aceptó tu solicitud — abre la app y coordina el punto de encuentro en el chat.</p>',
+  });
 
   return updated;
 }
@@ -135,6 +143,10 @@ export async function rescheduleBooking(params: {
     body: 'Se cambió la hora de tu partido — revisa los nuevos detalles.',
     data: { bookingId: params.bookingId },
   });
+  await notificationService.notifyUserByEmail(notifyUserId, {
+    subject: 'Horario del partido actualizado — Remote Coach',
+    html: '<p>Se cambió la hora de tu partido — abre la app para ver los nuevos detalles.</p>',
+  });
 
   return updated;
 }
@@ -158,6 +170,10 @@ export async function rejectBooking(bookingId: string): Promise<Booking> {
     title: 'Solicitud rechazada',
     body: 'Tu entrenador no pudo aceptar tu solicitud — busca otra fecha u otro entrenador.',
     data: { bookingId },
+  });
+  await notificationService.notifyUserByEmail(parentUserId, {
+    subject: 'Solicitud rechazada — Remote Coach',
+    html: '<p>Tu entrenador no pudo aceptar tu solicitud — abre la app y busca otra fecha u otro entrenador.</p>',
   });
 
   return updated;

@@ -380,6 +380,7 @@ let manualBookingAId: string;
   // Escenario 14 para el mismo patrón) para poder medir el push que verify-payment le manda —
   // faltaba por completo antes de esta corrección.
   const manualPaymentDeviceToken = 'ExponentPushToken[smoke-test-manual-payment]';
+  const parentEmail = 'maria@example.com'; // fixtures.parentUserId, ver test/seed.ts
   await app.inject({
     method: 'POST',
     url: '/push-tokens',
@@ -425,6 +426,7 @@ let manualBookingAId: string;
   assertEqual(wrongRoleVerifyRes.statusCode, 403, 'verify-payment con token de entrenador devuelve 403');
 
   pushState.sent.length = 0;
+  emailState.sent.length = 0;
   const rejectRes = await app.inject({
     method: 'PUT',
     url: '/bookings/verify-payment',
@@ -442,6 +444,9 @@ let manualBookingAId: string;
   assertEqual(pushState.sent.length, 1, 'rechazar un pago manual dispara exactamente un push al padre');
   assertEqual(pushState.sent[0]?.to, manualPaymentDeviceToken, 'el push de rechazo va al device token del padre');
   assertEqual(pushState.sent[0]?.title, 'Pago rechazado', 'el título del push de rechazo de pago es el esperado');
+  assertEqual(emailState.sent.length, 1, 'rechazar un pago manual también dispara un correo de respaldo al padre');
+  assertEqual(emailState.sent[0]?.to, parentEmail, 'el correo de rechazo va al correo del padre');
+  assertEqual(emailState.sent[0]?.subject, 'Pago rechazado — Remote Coach', 'el asunto del correo de rechazo de pago es el esperado');
 
   await app.inject({
     method: 'POST',
@@ -450,6 +455,7 @@ let manualBookingAId: string;
     payload: { bookingIds: [booking.id], provider: 'deuna', referenceCode: 'REF-A-002' },
   });
   pushState.sent.length = 0;
+  emailState.sent.length = 0;
   const verifyRes = await app.inject({
     method: 'PUT',
     url: '/bookings/verify-payment',
@@ -468,6 +474,9 @@ let manualBookingAId: string;
   assertEqual(pushState.sent.length, 1, 'verificar un pago manual dispara exactamente un push al padre (antes faltaba)');
   assertEqual(pushState.sent[0]?.to, manualPaymentDeviceToken, 'el push de verificación va al device token del padre');
   assertEqual(pushState.sent[0]?.title, 'Pago confirmado', 'el título del push de pago confirmado es el esperado');
+  assertEqual(emailState.sent.length, 1, 'verificar un pago manual también dispara un correo de respaldo al padre');
+  assertEqual(emailState.sent[0]?.to, parentEmail, 'el correo de confirmación de pago va al correo del padre');
+  assertEqual(emailState.sent[0]?.subject, 'Pago confirmado — Remote Coach', 'el asunto del correo de pago confirmado es el esperado');
 
   // Un mismo padre puede pagar/verificar varias reservas juntas en un solo lote (BookingConfirmScreen
   // "Pagar todas") — un solo push, no uno por reserva (mismo criterio que el correo de submitPaymentProof).
@@ -484,6 +493,7 @@ let manualBookingAId: string;
     payload: { bookingIds: [batchA.id, batchB.id], provider: 'deuna', referenceCode: 'REF-A-BATCH' },
   });
   pushState.sent.length = 0;
+  emailState.sent.length = 0;
   const batchVerifyRes = await app.inject({
     method: 'PUT',
     url: '/bookings/verify-payment',
@@ -500,6 +510,15 @@ let manualBookingAId: string;
   assertTrue(
     pushState.sent[0]?.body?.includes('reservas') ?? false,
     'el cuerpo del push de lote usa plural porque son 2 reservas',
+  );
+  assertEqual(
+    emailState.sent.length,
+    1,
+    'verificar un lote de 2 reservas del mismo padre también dispara UN solo correo, no uno por reserva',
+  );
+  assertTrue(
+    emailState.sent[0]?.html.includes('reservas') ?? false,
+    'el cuerpo del correo de lote usa plural porque son 2 reservas',
   );
 
   // Sin esto, este device token del padre queda registrado para el resto de la corrida y rompe
@@ -534,6 +553,9 @@ console.log('\n=== Escenario 8b2: schedule_confirmed — nadie eligió hora hast
   });
   assertEqual(wrongActorRescheduleRes.statusCode, 403, 'reprogramar con el token de alguien ajeno a la reserva devuelve 403');
 
+  // Reprogramar no tenía ninguna cobertura de notificación (ni push ni correo) — el padre reprograma,
+  // así que el aviso le toca al coach (carlos@example.com, ver test/seed.ts).
+  emailState.sent.length = 0;
   const newDatetime = inFuture(7);
   const rescheduleRes = await app.inject({
     method: 'PATCH',
@@ -544,6 +566,13 @@ console.log('\n=== Escenario 8b2: schedule_confirmed — nadie eligió hora hast
   assertEqual(rescheduleRes.statusCode, 200, 'reprogramar (el padre) devuelve 200');
   assertEqual(rescheduleRes.json().scheduleConfirmed, true, 'reprogramar pone scheduleConfirmed en true');
   assertEqual(rescheduleRes.json().matchDatetime, newDatetime, 'reprogramar actualiza match_datetime al valor elegido');
+  assertEqual(emailState.sent.length, 1, 'reprogramar dispara un correo de respaldo al coach (el padre fue quien reprogramó)');
+  assertEqual(emailState.sent[0]?.to, 'carlos@example.com', 'el correo de reprogramación va a la dirección del coach');
+  assertEqual(
+    emailState.sent[0]?.subject,
+    'Horario del partido actualizado — Remote Coach',
+    'el asunto del correo de reprogramación es el esperado',
+  );
 
   const afterRes = await app.inject({
     method: 'GET',
@@ -1407,6 +1436,7 @@ console.log('\n=== Escenario 14: push notifications (nueva solicitud avisa al co
   );
 
   pushState.sent.length = 0; // limpia antes de medir el push de aceptación
+  emailState.sent.length = 0;
   await app.inject({
     method: 'POST',
     url: `/bookings/${bookingToAccept.id}/accept`,
@@ -1415,10 +1445,13 @@ console.log('\n=== Escenario 14: push notifications (nueva solicitud avisa al co
   assertEqual(pushState.sent.length, 1, 'aceptar la reserva dispara exactamente un push');
   assertEqual(pushState.sent[0]?.to, deviceToken, 'el push va al device token del padre');
   assertEqual(pushState.sent[0]?.title, 'Reserva confirmada', 'el título del push de aceptación es el esperado');
+  assertEqual(emailState.sent.length, 1, 'aceptar la reserva también dispara un correo de respaldo al padre');
+  assertEqual(emailState.sent[0]?.subject, 'Reserva confirmada — Remote Coach', 'el asunto del correo de aceptación es el esperado');
 
   const rejectReq = await requestBooking(fixtures.coachBUserId, inFuture(55));
   const bookingToReject = rejectReq.json();
   pushState.sent.length = 0;
+  emailState.sent.length = 0;
   await app.inject({
     method: 'POST',
     url: `/bookings/${bookingToReject.id}/reject`,
@@ -1426,6 +1459,8 @@ console.log('\n=== Escenario 14: push notifications (nueva solicitud avisa al co
   });
   assertEqual(pushState.sent.length, 1, 'rechazar la reserva también dispara un push');
   assertEqual(pushState.sent[0]?.title, 'Solicitud rechazada', 'el título del push de rechazo es el esperado');
+  assertEqual(emailState.sent.length, 1, 'rechazar la reserva también dispara un correo de respaldo al padre');
+  assertEqual(emailState.sent[0]?.subject, 'Solicitud rechazada — Remote Coach', 'el asunto del correo de rechazo es el esperado');
 
   const deleteRes = await app.inject({
     method: 'DELETE',
@@ -1775,6 +1810,7 @@ console.log('\n=== Escenario 19b: mensajes nuevos — push, hasUnreadMessages y 
 
   // El coach escribe primero → debe avisarle al padre (push) y marcar la reserva como no-vista para el padre.
   pushState.sent.length = 0;
+  emailState.sent.length = 0;
   await app.inject({
     method: 'POST',
     url: `/bookings/${booking19b.id}/messages`,
@@ -1784,6 +1820,13 @@ console.log('\n=== Escenario 19b: mensajes nuevos — push, hasUnreadMessages y 
   assertEqual(pushState.sent.length, 1, 'el mensaje del coach dispara exactamente un push');
   assertEqual(pushState.sent[0]?.to, parentDeviceToken, 'el push de nuevo mensaje va al device token del padre');
   assertEqual(pushState.sent[0]?.title, 'Nuevo mensaje', 'el título del push de nuevo mensaje es el esperado');
+  assertEqual(emailState.sent.length, 1, 'el mensaje del coach también dispara un correo de respaldo al padre');
+  assertEqual(emailState.sent[0]?.to, 'maria@example.com', 'el correo de nuevo mensaje va a la dirección del padre');
+  assertEqual(
+    emailState.sent[0]?.subject,
+    'Nuevo mensaje sobre tu reserva — Remote Coach',
+    'el asunto del correo de nuevo mensaje es el esperado',
+  );
 
   const parentListAfterCoachMsg = await (
     await app.inject({ method: 'GET', url: parentBookingsUrl, headers: { authorization: `Bearer ${parentToken}` } })
@@ -1837,6 +1880,7 @@ console.log('\n=== Escenario 19b: mensajes nuevos — push, hasUnreadMessages y 
 
   // Ahora el padre escribe → debe avisarle al coach y marcar la reserva como no-vista para el coach.
   pushState.sent.length = 0;
+  emailState.sent.length = 0;
   await app.inject({
     method: 'POST',
     url: `/bookings/${booking19b.id}/messages`,
@@ -1845,6 +1889,13 @@ console.log('\n=== Escenario 19b: mensajes nuevos — push, hasUnreadMessages y 
   });
   assertEqual(pushState.sent.length, 1, 'el mensaje del padre dispara exactamente un push');
   assertEqual(pushState.sent[0]?.to, coachDeviceToken, 'el push de nuevo mensaje va al device token del coach');
+  assertEqual(emailState.sent.length, 1, 'el mensaje del padre también dispara un correo de respaldo al coach');
+  assertEqual(emailState.sent[0]?.to, 'carlos@example.com', 'el correo de nuevo mensaje va a la dirección del coach');
+  assertEqual(
+    emailState.sent[0]?.subject,
+    'Nuevo mensaje sobre tu reserva — Remote Coach',
+    'el asunto del correo de nuevo mensaje es el esperado',
+  );
 
   const coachListAfterParentMsg = await (
     await app.inject({ method: 'GET', url: coachBookingsUrl, headers: { authorization: `Bearer ${coachAToken}` } })
@@ -3149,6 +3200,10 @@ console.log('\n=== Escenario 30: terminar el partido completa la reserva sola (e
     pushState.sent.some((m) => m.data?.bookingId === bookingA.id && m.title === 'Tu reporte ya está listo'),
     'caso A: completar la reserva sola también avisa al padre por push que el reporte ya está listo',
   );
+  assertTrue(
+    emailState.sent.some((m) => m.to === 'maria@example.com' && m.subject === 'Tu reporte ya está listo — Remote Coach'),
+    'caso A: completar la reserva sola también avisa al padre por correo que el reporte ya está listo',
+  );
 
   // --- Caso B: el partido termina primero (pago manual todavía sin verificar), se verifica después ---
   const bookingBRes = await requestBooking(acCoach.id, inFuture(48));
@@ -3200,6 +3255,14 @@ console.log('\n=== Escenario 30: terminar el partido completa la reserva sola (e
     'caso B: al verificar el pago de un partido ya terminado, la reserva se completa directo (salta "paid")',
   );
   assertTrue(!!bookingBAfter.completedAt, 'caso B: completedAt queda fijado');
+  assertTrue(
+    pushState.sent.some((m) => m.data?.bookingId === bookingB.id && m.title === 'Tu reporte ya está listo'),
+    'caso B: completarse directo desde verify-payment también avisa al padre por push que el reporte ya está listo',
+  );
+  assertTrue(
+    emailState.sent.some((m) => m.to === 'maria@example.com' && m.subject === 'Tu reporte ya está listo — Remote Coach'),
+    'caso B: completarse directo desde verify-payment también avisa al padre por correo que el reporte ya está listo',
+  );
 }
 
 console.log('\n=== Escenario 31: GET /coaches/:id/bookings expone matchStatus, incluso con el pago sin verificar ===');
