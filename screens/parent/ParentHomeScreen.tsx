@@ -55,15 +55,24 @@ function daysUntilCountdown(startIso: string): { text: string; color: string } |
 const ACTIVE_ENGAGEMENT_STATUSES = new Set<BookingForParent['status']>(['requested', 'accepted', 'paid', 'completed']);
 
 /** "Torneo(s) con reservas": todos los torneos donde el padre ya tiene una reserva en curso,
- * mientras sigan vigentes (fecha de fin no pasada), ordenados por el que empieza más pronto.
- * Lista vacía si no hay ninguna reserva activa en un torneo todavía vigente — a diferencia del
- * comportamiento anterior, esta sección ya no cae a "mostrar cualquier torneo" cuando está vacía,
- * porque eso confundía al padre con un torneo sin relación a la categoría de su hijo/a. */
+ * mientras sigan vigentes (fecha de fin no pasada), ordenados por el que empieza más pronto. Es
+ * por TORNEO, no por reserva — reservar 3 días del mismo torneo con el mismo (o distinto) coach
+ * sigue mostrando una sola tarjeta, para seguir buscando más días/entrenadores de ESE torneo, no
+ * una tarjeta duplicada por cada reserva (reportado desde una prueba real). Lista vacía si no hay
+ * ninguna reserva activa en un torneo todavía vigente — a diferencia del comportamiento anterior,
+ * esta sección ya no cae a "mostrar cualquier torneo" cuando está vacía, porque eso confundía al
+ * padre con un torneo sin relación a la categoría de su hijo/a. */
 function bookedTournamentsFeatured(bookings: BookingForParent[]): TournamentSearchResult[] {
   const now = Date.now();
+  const seenTournamentIds = new Set<string>();
   return bookings
     .filter((b) => ACTIVE_ENGAGEMENT_STATUSES.has(b.status) && new Date(b.tournamentEndDate).getTime() >= now)
     .sort((a, b) => new Date(a.tournamentStartDate).getTime() - new Date(b.tournamentStartDate).getTime())
+    .filter((b) => {
+      if (seenTournamentIds.has(b.tournamentId)) return false;
+      seenTournamentIds.add(b.tournamentId);
+      return true;
+    })
     .map((next) => ({
       id: next.tournamentId,
       name: next.tournamentName,
