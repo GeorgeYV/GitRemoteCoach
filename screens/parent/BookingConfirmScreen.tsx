@@ -232,7 +232,7 @@ export default function BookingConfirmScreen({
         <Section label="Elige uno o más días">
           <View style={styles.multiDayTip}>
             <Ionicons name="checkmark-done-outline" size={13} color={colors.courtBlue} />
-            <Text style={styles.multiDayTipText}>Podés tocar varios días a la vez, no hace falta reservar de a uno</Text>
+            <Text style={styles.multiDayTipText}>Puedes tocar varios días a la vez, no hace falta reservar de a uno</Text>
           </View>
           <View style={styles.daysGrid}>
             {availability.map((day) => {

@@ -40,7 +40,7 @@ export async function runRecruitCoachesForUncoveredTournamentsJob(): Promise<Rec
       subject: `Buscan entrenadores en ${tournament.city} — ${tournament.venue} — Remote Coach`,
       html: `<p><strong>${tournament.name}</strong> (${tournament.venue}, ${tournament.city}) todavía no tiene
         ningún entrenador con disponibilidad cargada. Se juega del ${tournament.startDate} al ${tournament.endDate}.</p>
-        <p>Si te interesa, abrí la app, buscalo en "Torneos activos" y configurá tu disponibilidad y tarifa.</p>`,
+        <p>Si te interesa, abre la app, búscalo en "Torneos activos" y configura tu disponibilidad y tarifa.</p>`,
     });
     await tournamentRepository.markRecruitmentEmailSent(tournament.id);
     notifiedTournamentIds.push(tournament.id);

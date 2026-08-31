@@ -318,7 +318,7 @@ export default function TrainerProfileScreen({
           {price !== null && (
             <View style={styles.availabilityTipRow}>
               <Ionicons name="hand-left-outline" size={13} color={colors.courtBlue} />
-              <Text style={styles.availabilityTipText}>Tocá un día disponible para reservarlo directo</Text>
+              <Text style={styles.availabilityTipText}>Toca un día disponible para reservarlo directo</Text>
             </View>
           )}
           <View style={styles.availabilityGrid}>

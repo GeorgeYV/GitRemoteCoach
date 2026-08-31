@@ -607,7 +607,7 @@ function DetailedServeStep({
         <>
           <TerminalCard
             label={pending.server === 'player2' ? 'Ace / saque ganador rival' : 'Ace / saque ganador'}
-            hint={pending.serveDirection ? '3 TOQUES' : 'ELEGÍ DIRECCIÓN'}
+            hint={pending.serveDirection ? '3 TOQUES' : 'ELIGE DIRECCIÓN'}
             disabled={!pending.serveDirection}
             onPress={onAce}
           />

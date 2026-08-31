@@ -1562,7 +1562,7 @@ export interface TournamentReport {
 }
 
 /** POST /tournaments/:id/reports — ParentHomeScreen/CoachTournamentSearchScreen "Reportar un
- * posible error". Solo padre o entrenador; 409 si ya tenés un reporte abierto sobre este torneo. */
+ * posible error". Solo padre o entrenador; 409 si ya tienes un reporte abierto sobre este torneo. */
 export function reportTournament(authToken: string, tournamentId: string, message: string): Promise<TournamentReport> {
   return request(`/tournaments/${tournamentId}/reports`, {
     method: 'POST',
