@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors, withOpacity } from '../../lib/theme';
 import { BOOKING_HISTORY_STATUS_LABELS, BookingHistoryStatus } from '../../mock/parentFlow';
 
@@ -13,12 +13,22 @@ const TONE: Record<BookingHistoryStatus, 'positive' | 'neutral' | 'negative' | '
   rejected: 'negative',
 };
 
-export default function BookingStatusPill({ status }: { status: BookingHistoryStatus }) {
+/** onPress opcional: la píldora "Por pagar" (status 'accepted') tiene fondo de color y borde —
+ * visualmente se ve como un botón mucho antes que el link de texto plano "Pagar" al lado — así
+ * que BookingHistoryScreen le suma el mismo gesto de pago acá, sin sacar el link existente. El
+ * resto de los estados sigue siendo solo informativo (sin onPress, View normal). */
+export default function BookingStatusPill({ status, onPress }: { status: BookingHistoryStatus; onPress?: () => void }) {
   const tone = TONE[status];
-  return (
+  const content = (
     <View style={[styles.pill, styles[`pill_${tone}`]]}>
       <Text style={[styles.label, styles[`label_${tone}`]]}>{BOOKING_HISTORY_STATUS_LABELS[status]}</Text>
     </View>
+  );
+  if (!onPress) return content;
+  return (
+    <Pressable onPress={onPress} hitSlop={4}>
+      {content}
+    </Pressable>
   );
 }
 

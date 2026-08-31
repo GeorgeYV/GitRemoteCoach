@@ -130,6 +130,9 @@ interface SelectedTrainer {
   price: number;
   rateMode: RateMode;
   availability: AvailabilityDay[];
+  /** Ver TrainerProfileScreen#onReserve — llega cuando el padre tocó un día directo desde
+   * "Disponibilidad" en vez de arrancar la selección desde cero en BookingConfirmScreen. */
+  initialIsoDate?: string;
 }
 
 export function ParentBookingFlow({ initialTournamentId }: { initialTournamentId?: string } = {}) {
@@ -306,6 +309,7 @@ export function ParentBookingFlow({ initialTournamentId }: { initialTournamentId
         price={selectedTrainer.price}
         rateMode={selectedTrainer.rateMode}
         availability={selectedTrainer.availability}
+        initialIsoDate={selectedTrainer.initialIsoDate}
         onBack={() => setStep('profile')}
         onContinue={(created, nextNote) => {
           setCreatedBookings(created);

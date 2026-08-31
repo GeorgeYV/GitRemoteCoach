@@ -349,7 +349,7 @@ function BookingRow({
           {getParentBookingProgress(booking.status, booking.trainerName.split(' ')[0]).hint}
         </Text>
         <View style={styles.statusRow}>
-          <BookingStatusPill status={booking.status} />
+          <BookingStatusPill status={booking.status} onPress={onPay} />
           <View style={styles.rowActions}>
             {onPay && (
               <Pressable style={styles.payLink} onPress={onPay}>

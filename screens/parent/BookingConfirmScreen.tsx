@@ -38,6 +38,7 @@ export default function BookingConfirmScreen({
   price,
   rateMode,
   availability,
+  initialIsoDate,
   onBack,
   onContinue,
 }: {
@@ -49,11 +50,17 @@ export default function BookingConfirmScreen({
   price: number;
   rateMode: RateMode;
   availability: AvailabilityDay[];
+  /** Preselecciona un día — llega cuando el padre tocó un día disponible directo desde la
+   * "Disponibilidad" de solo lectura del perfil (TrainerProfileScreen), en vez de arrancar acá
+   * sin nada elegido. Sigue pudiendo sumar más días como cualquier otra selección. */
+  initialIsoDate?: string;
   onBack: () => void;
   onContinue: (created: CreatedDayBooking[], note: string) => void;
 }) {
   const { token, user } = useAuth();
-  const [selectedIsoDates, setSelectedIsoDates] = useState<Set<string>>(new Set());
+  const [selectedIsoDates, setSelectedIsoDates] = useState<Set<string>>(
+    () => new Set(initialIsoDate ? [initialIsoDate] : []),
+  );
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -223,6 +230,10 @@ export default function BookingConfirmScreen({
         )}
 
         <Section label="Elige uno o más días">
+          <View style={styles.multiDayTip}>
+            <Ionicons name="checkmark-done-outline" size={13} color={colors.courtBlue} />
+            <Text style={styles.multiDayTipText}>Podés tocar varios días a la vez, no hace falta reservar de a uno</Text>
+          </View>
           <View style={styles.daysGrid}>
             {availability.map((day) => {
               const active = selectedIsoDates.has(day.isoDate);
@@ -260,11 +271,9 @@ export default function BookingConfirmScreen({
               );
             })}
           </View>
-          <Text style={[styles.hint, selectedDays.length > 0 && styles.hintSelected]}>
-            {selectedDays.length > 0
-              ? `Elegiste: ${selectedDays.map((d) => d.dayLabel).join(', ')}`
-              : 'Elige uno o más días disponibles para continuar'}
-          </Text>
+          {selectedDays.length > 0 && (
+            <Text style={styles.hintSelected}>Elegiste: {selectedDays.map((d) => d.dayLabel).join(', ')}</Text>
+          )}
         </Section>
 
         <Section label="Nota para el entrenador (opcional)">
@@ -405,6 +414,18 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
     marginBottom: 14,
   },
+  multiDayTip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 14,
+  },
+  multiDayTipText: {
+    flex: 1,
+    color: colors.courtBlue,
+    fontSize: 12,
+    fontWeight: '600',
+  },
   daysGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -479,14 +500,11 @@ const styles = StyleSheet.create({
   slotLabelBooked: {
     color: colors.courtBlue,
   },
-  hint: {
-    color: colors.textDim,
-    fontSize: 12,
-    textAlign: 'left',
-  },
   hintSelected: {
     color: colors.courtBlue,
+    fontSize: 12,
     fontWeight: '700',
+    textAlign: 'left',
   },
   noteInput: {
     minHeight: 70,

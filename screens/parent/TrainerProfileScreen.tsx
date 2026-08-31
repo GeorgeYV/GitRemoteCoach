@@ -87,7 +87,16 @@ export default function TrainerProfileScreen({
   coachId: string;
   tournament: TournamentSearchResult;
   onBack?: () => void;
-  onReserve?: (info: { coachId: string; name: string; price: number; rateMode: RateMode; availability: AvailabilityDay[] }) => void;
+  onReserve?: (info: {
+    coachId: string;
+    name: string;
+    price: number;
+    rateMode: RateMode;
+    availability: AvailabilityDay[];
+    /** Cuando el padre toca un día directo desde "Disponibilidad" más abajo, en vez de tocar el
+     * botón "Reservar" del footer sin haber elegido nada todavía. */
+    initialIsoDate?: string;
+  }) => void;
 }) {
   const [profile, setProfile] = useState<CoachProfileWithTrainingAndBadges | null>(null);
   const [availability, setAvailability] = useState<AvailabilityDay[] | null>(null);
@@ -306,14 +315,37 @@ export default function TrainerProfileScreen({
         )}
 
         <Section label="Disponibilidad">
+          {price !== null && (
+            <View style={styles.availabilityTipRow}>
+              <Ionicons name="hand-left-outline" size={13} color={colors.courtBlue} />
+              <Text style={styles.availabilityTipText}>Tocá un día disponible para reservarlo directo</Text>
+            </View>
+          )}
           <View style={styles.availabilityGrid}>
             {availability.map((day) => {
               const exception = day.available ? exceptionLabel(day) : null;
+              // Antes esto decía siempre "Disponible" (solo cambiaba el color del borde) — ahora
+              // que el día disponible es tocable, ese texto engañoso en un día NO disponible
+              // generaría un toque muerto (parece tocable, no hace nada). Ver mismo patrón
+              // preexistente en BookingConfirmScreen, donde no importa porque ahí el pill sigue
+              // siendo no-tocable incluso cuando no está disponible.
+              const pill = <AvailabilitySlotPill label={day.available ? 'Disponible' : 'No disponible'} available={day.available} />;
               return (
                 <View key={day.isoDate} style={styles.availabilityColumn}>
                   <Text style={styles.availabilityDay}>{day.dayLabel}</Text>
                   <Text style={styles.availabilityPreTag}>{day.isPreTournament ? 'Previo' : ' '}</Text>
-                  <AvailabilitySlotPill label="Disponible" available={day.available} />
+                  {day.available && price !== null ? (
+                    <Pressable
+                      hitSlop={4}
+                      onPress={() =>
+                        onReserve?.({ coachId, name, price, rateMode: rateMode ?? 'per_day', availability, initialIsoDate: day.isoDate })
+                      }
+                    >
+                      {pill}
+                    </Pressable>
+                  ) : (
+                    pill
+                  )}
                   {exception && <Text style={styles.availabilityException}>{exception}</Text>}
                 </View>
               );
@@ -526,6 +558,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
+  },
+  availabilityTipRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 14,
+  },
+  availabilityTipText: {
+    flex: 1,
+    color: colors.courtBlue,
+    fontSize: 12,
+    fontWeight: '600',
   },
   availabilityGrid: {
     flexDirection: 'row',
