@@ -13,15 +13,26 @@ const TONE: Record<BookingHistoryStatus, 'positive' | 'neutral' | 'negative' | '
   rejected: 'negative',
 };
 
-/** onPress opcional: la píldora "Por pagar" (status 'accepted') tiene fondo de color y borde —
- * visualmente se ve como un botón mucho antes que el link de texto plano "Pagar" al lado — así
- * que BookingHistoryScreen le suma el mismo gesto de pago acá, sin sacar el link existente. El
- * resto de los estados sigue siendo solo informativo (sin onPress, View normal). */
-export default function BookingStatusPill({ status, onPress }: { status: BookingHistoryStatus; onPress?: () => void }) {
+/**
+ * onPress opcional: para 'accepted' (por pagar) esta píldora ES el botón de pago — no un
+ * indicador aparte del link "Pagar" (que ya no existe como elemento separado, ver
+ * BookingHistoryScreen#BookingRow). `label` la reemplaza por "Pagar" en ese caso, para que el
+ * texto describa la acción en vez del estado — el resto de los estados sigue siendo solo
+ * informativo (sin onPress ni label, mostrando BOOKING_HISTORY_STATUS_LABELS tal cual).
+ */
+export default function BookingStatusPill({
+  status,
+  label,
+  onPress,
+}: {
+  status: BookingHistoryStatus;
+  label?: string;
+  onPress?: () => void;
+}) {
   const tone = TONE[status];
   const content = (
     <View style={[styles.pill, styles[`pill_${tone}`]]}>
-      <Text style={[styles.label, styles[`label_${tone}`]]}>{BOOKING_HISTORY_STATUS_LABELS[status]}</Text>
+      <Text style={[styles.label, styles[`label_${tone}`]]}>{label ?? BOOKING_HISTORY_STATUS_LABELS[status]}</Text>
     </View>
   );
   if (!onPress) return content;

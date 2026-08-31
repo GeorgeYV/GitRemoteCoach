@@ -349,33 +349,30 @@ function BookingRow({
           {getParentBookingProgress(booking.status, booking.trainerName.split(' ')[0]).hint}
         </Text>
         <View style={styles.statusRow}>
-          <BookingStatusPill status={booking.status} onPress={onPay} />
+          {/* Para 'accepted' la píldora ES el botón de pago (texto "Pagar", no un status aparte
+             del link que ya no existe) — para el resto sigue siendo solo informativa. */}
+          <BookingStatusPill status={booking.status} label={onPay ? 'Pagar' : undefined} onPress={onPay} />
           <View style={styles.rowActions}>
-            {onPay && (
-              <Pressable style={styles.payLink} onPress={onPay}>
-                <Text style={styles.payLinkLabel}>Pagar</Text>
-              </Pressable>
-            )}
             {onChat && (
-              <Pressable style={styles.chatLink} onPress={onChat}>
+              <Pressable style={[styles.actionPill, styles.actionPillChat]} onPress={onChat}>
                 {booking.hasUnreadMessages && <View style={styles.unreadDot} />}
-                <Text style={styles.chatLinkLabel}>Chat</Text>
+                <Text style={[styles.actionPillLabel, styles.actionPillLabelChat]}>Chatear</Text>
               </Pressable>
             )}
             {onReschedule && (
-              <Pressable style={styles.rescheduleLink} onPress={onReschedule}>
-                <Text style={styles.rescheduleLinkLabel}>Reprogramar</Text>
+              <Pressable style={[styles.actionPill, styles.actionPillReschedule]} onPress={onReschedule}>
+                <Text style={[styles.actionPillLabel, styles.actionPillLabelReschedule]}>Reprogramar</Text>
               </Pressable>
             )}
             {onCancel && (
-              <Pressable style={styles.cancelLink} onPress={onCancel}>
-                <Text style={styles.cancelLinkLabel}>Cancelar</Text>
+              <Pressable style={[styles.actionPill, styles.actionPillCancel]} onPress={onCancel}>
+                <Text style={[styles.actionPillLabel, styles.actionPillLabelCancel]}>Cancelar</Text>
               </Pressable>
             )}
             {booking.status === 'completed' &&
               (onReview ? (
-                <Pressable style={styles.reviewLink} onPress={onReview}>
-                  <Text style={styles.reviewLinkLabel}>Dejar reseña</Text>
+                <Pressable style={[styles.actionPill, styles.actionPillReschedule]} onPress={onReview}>
+                  <Text style={[styles.actionPillLabel, styles.actionPillLabelReschedule]}>Dejar reseña</Text>
                 </Pressable>
               ) : booking.reviewed ? (
                 <Text style={styles.reviewedLabel}>✓ Reseñada</Text>
@@ -521,29 +518,33 @@ const styles = StyleSheet.create({
   },
   rowActions: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
-    marginLeft: -8,
+    gap: 8,
   },
-  payLink: {
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-  },
-  payLinkLabel: {
-    color: colors.amber,
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  chatLink: {
+  // Base compartida por Chatear/Reprogramar/Cancelar/Dejar reseña — antes eran texto plano sin
+  // borde, así que se veían menos tocables que la píldora de estado de al lado (mismo problema
+  // que ya se corrigió para "Pagar"). Borde + fondo leve las deja todas con la misma pinta de
+  // botón, sin depender de que alguien "sepa" que el texto es tocable.
+  actionPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
+    borderRadius: 12,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderWidth: 1,
   },
-  chatLinkLabel: {
-    color: colors.textSoft,
+  actionPillLabel: {
     fontSize: 12,
     fontWeight: '700',
+  },
+  actionPillChat: {
+    backgroundColor: colors.panelLight,
+    borderColor: colors.border,
+  },
+  actionPillLabelChat: {
+    color: colors.textSoft,
   },
   unreadDot: {
     width: 7,
@@ -551,32 +552,19 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: colors.amber,
   },
-  rescheduleLink: {
-    paddingVertical: 4,
-    paddingHorizontal: 8,
+  actionPillReschedule: {
+    backgroundColor: withOpacity(colors.courtBlue, 0.1),
+    borderColor: withOpacity(colors.courtBlue, 0.35),
   },
-  rescheduleLinkLabel: {
+  actionPillLabelReschedule: {
     color: colors.courtBlue,
-    fontSize: 12,
-    fontWeight: '700',
   },
-  cancelLink: {
-    paddingVertical: 4,
-    paddingHorizontal: 8,
+  actionPillCancel: {
+    backgroundColor: withOpacity(colors.errorCoral, 0.1),
+    borderColor: withOpacity(colors.errorCoral, 0.35),
   },
-  cancelLinkLabel: {
+  actionPillLabelCancel: {
     color: colors.errorCoral,
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  reviewLink: {
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-  },
-  reviewLinkLabel: {
-    color: colors.courtBlue,
-    fontSize: 12,
-    fontWeight: '700',
   },
   reviewedLabel: {
     color: colors.textDim,
