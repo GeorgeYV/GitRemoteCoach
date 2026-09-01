@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { getLocales } from 'expo-localization';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ParentTabBar from '../../components/parent/ParentTabBar';
@@ -103,20 +103,26 @@ export default function ParentHomeScreen() {
   const [bookings, setBookings] = useState<BookingForParent[]>([]);
   const [showTournamentRequestModal, setShowTournamentRequestModal] = useState(false);
 
-  // Alimenta tanto el recordatorio de pago pendiente como el destacado de "Continuar con" — una
-  // sola carga para ambos en vez de repetir la misma llamada.
-  useEffect(() => {
-    if (!user || !token) return;
-    let cancelled = false;
-    listParentBookings(token, user.id)
-      .then((result) => {
-        if (!cancelled) setBookings(result);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [user, token]);
+  // Alimenta tanto el recordatorio de pago pendiente como el destacado de "Torneo(s) con mi(s)
+  // reserva(s)" — una sola carga para ambos en vez de repetir la misma llamada. useFocusEffect
+  // (no useEffect) porque expo-router mantiene esta pantalla montada en segundo plano al navegar
+  // afuera (a "Reservar con [coach]", por ejemplo) — un useEffect con [user, token] no se vuelve a
+  // correr al volver, así que una reserva recién solicitada no aparecía acá hasta recargar toda la
+  // app (reportado desde una prueba real, mismo bug que ya se corrigió del lado del coach).
+  useFocusEffect(
+    useCallback(() => {
+      if (!user || !token) return;
+      let cancelled = false;
+      listParentBookings(token, user.id)
+        .then((result) => {
+          if (!cancelled) setBookings(result);
+        })
+        .catch(() => {});
+      return () => {
+        cancelled = true;
+      };
+    }, [user, token]),
+  );
 
   const pendingPaymentCount = bookings.filter((b) => b.status === 'accepted').length;
 

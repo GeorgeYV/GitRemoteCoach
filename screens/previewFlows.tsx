@@ -345,7 +345,12 @@ export function ParentBookingFlow({ initialTournamentId }: { initialTournamentId
           setPayableBookings(accepted);
           setStep('payment');
         }}
-        onDone={() => setStep('profile')}
+        // "Volver al inicio" decía eso pero mandaba de vuelta al perfil del entrenador (un paso
+        // atrás dentro del propio flujo, no afuera de él) — mismo router.back() que ya usa el
+        // otro "Volver al inicio" de este archivo (rama tournamentError, más arriba), consistente
+        // con que a esta pantalla siempre se entra desde Inicio (ver goToTrainers en
+        // ParentHomeScreen).
+        onDone={() => router.back()}
         onSelectAlternative={(nextCoachId) => {
           setCoachId(nextCoachId);
           setSelectedTrainer(null);
