@@ -94,7 +94,7 @@ export async function upsertRate(
   return mapRateRow(rows[0]);
 }
 
-/** CoachTournamentSearchScreen ("Disponibilidad lista" + filtro "Con disponibilidad") y
+/** CoachTournamentSearchScreen ("Disponibilidad lista" + filtro "Mi disponibilidad") y
  * CoachHomeScreen (píldora con la cantidad, en "Mis torneos con disponibilidad") — qué torneos
  * VIGENTES ya tienen disponibilidad configurada por este coach. coach_tournament_rates (no
  * _availability) es la fuente: se escribe una sola vez, al guardar de verdad desde

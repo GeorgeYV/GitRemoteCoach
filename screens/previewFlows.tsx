@@ -102,6 +102,11 @@ export function CoachAvailabilityFlow({
   initialConfiguredFilter,
 }: { onBack?: () => void; tabBar?: React.ReactNode; initialConfiguredFilter?: boolean } = {}) {
   const [tournament, setTournament] = useState<TournamentSearchResult | null>(null);
+  // Se activa al guardar disponibilidad con éxito (CoachAvailabilityScreen#onSaved) — el coach
+  // vuelve a la lista viendo de inmediato que su torneo ya quedó en "Mi disponibilidad", sin tener
+  // que tocar el filtro él mismo. No se resetea después: si acaba de configurar uno, es más
+  // probable que siga configurando otros en la misma pasada que no.
+  const [justSavedFilter, setJustSavedFilter] = useState(false);
 
   useHardwareBack(tournament !== null, () => setTournament(null), tournament?.id);
 
@@ -111,12 +116,21 @@ export function CoachAvailabilityFlow({
         onSelect={setTournament}
         onBack={onBack}
         tabBar={tabBar}
-        initialConfiguredFilter={initialConfiguredFilter}
+        initialConfiguredFilter={initialConfiguredFilter || justSavedFilter}
       />
     );
   }
 
-  return <CoachAvailabilityScreen tournament={tournament} onBack={() => setTournament(null)} />;
+  return (
+    <CoachAvailabilityScreen
+      tournament={tournament}
+      onBack={() => setTournament(null)}
+      onSaved={() => {
+        setJustSavedFilter(true);
+        setTournament(null);
+      }}
+    />
+  );
 }
 
 /**

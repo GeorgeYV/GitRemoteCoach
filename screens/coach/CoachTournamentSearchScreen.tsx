@@ -173,8 +173,11 @@ export default function CoachTournamentSearchScreen({
             style={[styles.countryToggleChip, configuredFilterOn && styles.countryToggleChipActive]}
             onPress={() => setConfiguredFilterOn((v) => !v)}
           >
+            {/* "Mi disponibilidad", no "Con disponibilidad" — ese nombre sonaba ambiguo (¿disponibilidad
+               de quién?); reusa el mismo vocabulario que ya usa esta pantalla más abajo ("Disponibilidad
+               lista", "Editar disponibilidad"). */}
             <Text style={[styles.countryToggleLabel, configuredFilterOn && styles.countryToggleLabelActive]}>
-              Con disponibilidad
+              Mi disponibilidad
             </Text>
           </Pressable>
         </View>

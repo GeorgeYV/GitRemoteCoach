@@ -65,9 +65,16 @@ const API_RATE_MODE_TO_LOCAL: Record<ApiRateMode, RateMode> = {
 export default function CoachAvailabilityScreen({
   tournament,
   onBack,
+  onSaved,
 }: {
   tournament: TournamentSearchResult;
   onBack: () => void;
+  /** Guardar con éxito navega afuera de esta pantalla (CoachAvailabilityFlow vuelve a la lista de
+   * torneos con "Mi disponibilidad" ya activado) en vez de quedarse acá con un texto de "guardado"
+   * — el torneo apareciendo en esa lista filtrada YA es la confirmación, sin depender de que el
+   * coach lea un mensaje que además podía perderse de vista si scrolleó. Opcional, con el texto
+   * inline como respaldo, por si algún día se reusa esta pantalla sin ese flujo alrededor. */
+  onSaved?: () => void;
 }) {
   const { user, token } = useAuth();
   const [clubTags, setClubTags] = useState<CoachClubTag[]>([]);
@@ -190,7 +197,11 @@ export default function CoachAvailabilityScreen({
         amount: Number(rateAmount),
         approachDescription: approachDescription.trim() || undefined,
       });
-      setSaved(true);
+      if (onSaved) {
+        onSaved();
+      } else {
+        setSaved(true);
+      }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'No se pudo guardar tu disponibilidad. Intenta de nuevo.');
     } finally {

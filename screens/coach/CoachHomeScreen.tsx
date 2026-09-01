@@ -74,7 +74,7 @@ export default function CoachHomeScreen({
    * Disponibilidad, que arranca en CoachTournamentSearchScreen (buscar/elegir torneo). */
   onOpenAvailability?: () => void;
   /** "Mis torneos con disponibilidad" en Accesos rápidos — mismo destino que onOpenAvailability
-   * pero con el filtro "Con disponibilidad" ya activado (ver CoachTournamentSearchScreen). */
+   * pero con el filtro "Mi disponibilidad" ya activado (ver CoachTournamentSearchScreen). */
   onOpenConfiguredTournaments?: () => void;
   /** Píldora con la cantidad, en el mismo link — 0 no muestra nada (ver QUICK_LINKS.map). */
   configuredTournamentsCount?: number;

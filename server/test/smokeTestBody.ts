@@ -965,7 +965,7 @@ console.log('\n=== Escenario 11b: disponibilidad y tarifa de torneo (CoachAvaila
   });
   assertEqual(rateRes.statusCode, 200, 'el propio coach puede fijar su tarifa → 200');
 
-  // CoachTournamentSearchScreen: píldora "Disponibilidad lista" + filtro "Con disponibilidad" —
+  // CoachTournamentSearchScreen: píldora "Disponibilidad lista" + filtro "Mi disponibilidad" —
   // y la píldora con la cantidad en CoachHomeScreen. fixtures.tournamentId está 'completed' y en
   // el pasado (ver test/seed.ts) — sirve acá para probar que "configurado pero ya no vigente" NO
   // cuenta. fixtures.activeTournamentId sí es vigente.
