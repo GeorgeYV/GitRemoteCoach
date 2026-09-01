@@ -219,7 +219,7 @@ export default function ParentHomeScreen() {
 
         {featuredList.length > 0 && (
           <>
-            <Text style={styles.sectionLabel}>{featuredList.length === 1 ? 'Torneo con reserva' : 'Torneos con reservas'}</Text>
+            <Text style={styles.sectionLabel}>{featuredList.length === 1 ? 'Torneo con mi reserva' : 'Torneos con mis reservas'}</Text>
             {featuredList.map((featured) => (
               <View key={featured.id} style={styles.featuredCard}>
                 {tournamentBadgeLabel(featured) && (
