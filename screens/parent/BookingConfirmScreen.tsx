@@ -29,6 +29,18 @@ const BLOCKING_STATUSES: Booking['status'][] = ['requested', 'accepted', 'paid',
  * que el padre sepa eso ANTES de solicitar, no que le extrañe que nadie responda en 5 minutos. */
 const INTRO_SEEN_KEY = 'tennis-live-capture:seen-booking-intro-v1';
 
+/** Los tiempos de "confirma"/"pagas" son los reales (businessRules.coachResponseWindowHours=4 y
+ * paymentWindowHours=6 en server/src/config.ts), no estimaciones inventadas — mismo criterio que
+ * el resto de la app usa para no prometer algo que el backend no garantiza. */
+function introSteps(coachFirstName: string): { title: string; hint?: string }[] {
+  return [
+    { title: 'Eliges los días' },
+    { title: `${coachFirstName} confirma`, hint: 'Normalmente en minutos, hasta 4 horas.' },
+    { title: 'Pagas', hint: 'Tienes hasta 6 horas desde que confirma.' },
+    { title: '¡Listo!', hint: 'Coordina el punto de encuentro por el chat.' },
+  ];
+}
+
 export default function BookingConfirmScreen({
   playerId,
   playerName,
@@ -222,7 +234,17 @@ export default function BookingConfirmScreen({
               <Ionicons name="information-circle-outline" size={18} color={colors.courtBlue} />
               <Text style={styles.introTitle}>Así funciona</Text>
             </View>
-            <Text style={styles.introStep}>1. Eliges los días · 2. {trainerName.split(' ')[0]} confirma (unas horas) · 3. pagas · 4. ¡listo!</Text>
+            {introSteps(trainerName.split(' ')[0]).map((step, i) => (
+              <View key={step.title} style={styles.introStepRow}>
+                <View style={styles.introStepCircle}>
+                  <Text style={styles.introStepNumber}>{i + 1}</Text>
+                </View>
+                <View style={styles.introStepTextWrap}>
+                  <Text style={styles.introStepTitle}>{step.title}</Text>
+                  {step.hint && <Text style={styles.introStepHint}>{step.hint}</Text>}
+                </View>
+              </View>
+            ))}
             <Pressable style={styles.introDismiss} onPress={dismissIntro} hitSlop={8}>
               <Text style={styles.introDismissLabel}>Entendido</Text>
             </Pressable>
@@ -389,10 +411,41 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '800',
   },
-  introStep: {
+  introStepRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    marginBottom: 10,
+  },
+  introStepCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1.5,
+    borderColor: colors.courtBlue,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 1,
+  },
+  introStepNumber: {
+    color: colors.courtBlue,
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  introStepTextWrap: {
+    flex: 1,
+  },
+  introStepTitle: {
     color: colors.textSoft,
-    fontSize: 12,
+    fontSize: 13,
+    fontWeight: '700',
     lineHeight: 18,
+  },
+  introStepHint: {
+    color: colors.textDim,
+    fontSize: 11,
+    lineHeight: 15,
+    marginTop: 1,
   },
   introDismiss: {
     alignSelf: 'flex-end',
