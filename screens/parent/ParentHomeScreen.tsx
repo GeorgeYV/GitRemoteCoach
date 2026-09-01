@@ -4,6 +4,7 @@ import { getLocales } from 'expo-localization';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import BookingStatusPill from '../../components/parent/BookingStatusPill';
 import ParentTabBar from '../../components/parent/ParentTabBar';
 import IconTextInput from '../../components/shared/IconTextInput';
 import InitialAvatar from '../../components/shared/InitialAvatar';
@@ -19,8 +20,10 @@ import {
   TournamentSearchResult,
 } from '../../lib/api';
 import { dateRangeLabel } from '../../lib/dateSlots';
+import { STATUS_MAP } from '../../lib/parentBookingDisplay';
 import { colors, radius, withOpacity } from '../../lib/theme';
 import { AGE_CATEGORY_OPTIONS, COUNTRY_LABELS, COUNTRY_OPTIONS } from '../../mock/coachFlow';
+import { BookingHistoryStatus } from '../../mock/parentFlow';
 
 /** País del dispositivo (Region de iOS/Android) si está entre los soportados, si no Ecuador —
  * usado como arranque del toggle "mi país" antes de saber el país de los hijos del padre. */
@@ -86,6 +89,35 @@ function bookedTournamentsFeatured(bookings: BookingForParent[]): TournamentSear
       startDate: next.tournamentStartDate,
       endDate: next.tournamentEndDate,
     }));
+}
+
+/** Orden de "menos avanzado" a "más avanzado" — con varias reservas activas con el mismo coach en
+ * distintos estados, se muestra la menos avanzada (la que todavía necesita algo del padre o del
+ * coach), no la más reciente ni un promedio sin sentido. */
+const STATUS_PRIORITY: BookingHistoryStatus[] = ['requested', 'accepted', 'paymentSubmitted', 'confirmed', 'completed'];
+
+interface CoachBookingSummary {
+  coachId: string;
+  coachName: string;
+  count: number;
+  status: BookingHistoryStatus;
+}
+
+/** Reservas activas de ESTE torneo, agrupadas por entrenador — un padre puede reservar días
+ * sueltos con más de un coach para el mismo torneo, así que puede haber más de un grupo. */
+function activeBookingsByCoach(bookings: BookingForParent[], tournamentId: string): CoachBookingSummary[] {
+  const byCoach = new Map<string, BookingForParent[]>();
+  for (const b of bookings) {
+    if (b.tournamentId !== tournamentId || !ACTIVE_ENGAGEMENT_STATUSES.has(b.status)) continue;
+    const group = byCoach.get(b.coachId);
+    if (group) group.push(b);
+    else byCoach.set(b.coachId, [b]);
+  }
+  return [...byCoach.entries()].map(([coachId, group]) => {
+    const statuses = group.map((b) => STATUS_MAP[b.status]);
+    const status = STATUS_PRIORITY.find((s) => statuses.includes(s)) ?? statuses[0];
+    return { coachId, coachName: group[0].coachName, count: group.length, status };
+  });
 }
 
 export default function ParentHomeScreen() {
@@ -238,9 +270,19 @@ export default function ParentHomeScreen() {
                   {featured.venue} · {featured.city}
                 </Text>
                 <Text style={styles.featuredMeta}>{dateRangeLabel(featured.startDate, featured.endDate)}</Text>
+                <View style={styles.coachSummaryList}>
+                  {activeBookingsByCoach(bookings, featured.id).map((summary) => (
+                    <View key={summary.coachId} style={styles.coachSummaryRow}>
+                      <Text style={styles.coachSummaryText} numberOfLines={1}>
+                        {summary.count} reserva{summary.count === 1 ? '' : 's'} con {summary.coachName}
+                      </Text>
+                      <BookingStatusPill status={summary.status} />
+                    </View>
+                  ))}
+                </View>
                 <Pressable style={styles.ctaButton} onPress={() => goToTrainers(featured.id)}>
                   <View style={styles.ctaContent}>
-                    <Text style={styles.ctaLabel}>Ver entrenadores</Text>
+                    <Text style={styles.ctaLabel}>Nuevas reservas</Text>
                     <Ionicons name="arrow-forward-outline" size={16} color={colors.courtBlueDeep} />
                   </View>
                 </Pressable>
@@ -460,6 +502,22 @@ const styles = StyleSheet.create({
     color: colors.textSoft,
     fontSize: 13,
     marginBottom: 2,
+  },
+  coachSummaryList: {
+    marginTop: 10,
+    gap: 6,
+  },
+  coachSummaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  coachSummaryText: {
+    flex: 1,
+    color: colors.textSoft,
+    fontSize: 12,
+    fontWeight: '600',
   },
   ctaButton: {
     backgroundColor: colors.ballLime,
