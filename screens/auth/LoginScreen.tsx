@@ -194,6 +194,10 @@ export default function LoginScreen({
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.header}>
         <BrandLogo />
+        {/* Bajada liviana, no una descripción larga — eso va en la página de marketing (todavía
+           pendiente), no acá. Sirve solo para quien llega a este login sin contexto previo (un
+           link reenviado sin explicación) y no tiene idea de qué es "Remote Coach". */}
+        <Text style={styles.tagline}>Entrenadores, padres y torneos de tenis, en un solo lugar.</Text>
         <Text style={styles.headerTitle}>Iniciar sesión</Text>
         <Text style={styles.headerSubtitle}>Accede con tu correo y contraseña.</Text>
       </View>
@@ -279,6 +283,11 @@ const styles = StyleSheet.create({
     paddingBottom: 18,
     borderBottomWidth: 1,
     borderBottomColor: colors.borderSoft,
+  },
+  tagline: {
+    color: colors.textDim,
+    fontSize: 12,
+    marginTop: 10,
   },
   headerTitle: {
     color: colors.lineWhite,
