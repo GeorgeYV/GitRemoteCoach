@@ -11,7 +11,10 @@ import { CoachBooking } from '../../mock/coachFlow';
 // acá los accesos que la barra no cubre, para no duplicar el mismo destino en dos lugares.
 const QUICK_LINKS = [
   { key: 'configuredTournaments', label: 'Mis torneos con disponibilidad', hint: 'Revisa o edita lo que ya configuraste' },
-  { key: 'sessions', label: 'Historial de sesiones', hint: 'Revisa partidos pasados y en curso' },
+  // "Sesiones", no "Historial" — el nombre viejo sonaba a solo pasado (aunque el hint ya
+  // aclaraba "y en curso"), y la propia pantalla a la que lleva se llama "Sesiones", no
+  // "Historial" (ver CoachSessionHistoryScreen#headerTitle).
+  { key: 'sessions', label: 'Sesiones', hint: 'Revisa partidos pasados y en curso' },
   { key: 'reputation', label: 'Reputación', hint: 'Reseñas y estadísticas de actividad' },
 ] as const;
 

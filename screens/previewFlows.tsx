@@ -391,11 +391,17 @@ export function CoachHomeFlow({ coachId, coachName }: { coachId: string; coachNa
     | 'resumeSuspended'
   >('home');
 
+  // Depende de `step` (no solo de montar una vez), mismo criterio que el efecto de
+  // configuredTournamentsCount más abajo: sin esto, aceptar/rechazar una solicitud y volver a
+  // Inicio dejaba "Solicitudes" y "Próxima sesión" con el dato viejo hasta recargar toda la app
+  // — la reserva recién aceptada en realidad ya estaba en Sesiones/Historial, pero en Inicio
+  // parecía haberse perdido (reportado desde una prueba real).
   useEffect(() => {
     if (!token) {
       setLoadError('No hay una sesión activa.');
       return;
     }
+    if (step !== 'home') return;
     let cancelled = false;
     setLoadError(null);
     Promise.all([listCoachBookings(token, coachId), getCoachProfile(coachId)])
@@ -412,7 +418,7 @@ export function CoachHomeFlow({ coachId, coachName }: { coachId: string; coachNa
     return () => {
       cancelled = true;
     };
-  }, [coachId, token]);
+  }, [coachId, token, step]);
 
   // Depende de `step`, no solo de montar una vez: sin esto, configurar un torneo nuevo desde
   // "Explora torneos disponibles" y volver a Inicio dejaba la píldora con el número viejo hasta
