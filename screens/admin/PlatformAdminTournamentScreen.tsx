@@ -205,7 +205,7 @@ export default function PlatformAdminTournamentScreen() {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Crear torneo sin club/federación</Text>
         <Text style={styles.headerSubtitle}>
-          Para torneos con demanda conocida que ningún club o federación creó todavía — cualquiera de ese país podrá reclamarlo después, o lo asignás vos mismo abajo.
+          Para torneos con demanda conocida que ningún club o federación creó todavía — cualquiera de ese país podrá reclamarlo después, o lo asignas tú mismo abajo.
         </Text>
       </View>
 

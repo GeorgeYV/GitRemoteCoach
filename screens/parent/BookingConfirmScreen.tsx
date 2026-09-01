@@ -222,7 +222,7 @@ export default function BookingConfirmScreen({
               <Ionicons name="information-circle-outline" size={18} color={colors.courtBlue} />
               <Text style={styles.introTitle}>Así funciona</Text>
             </View>
-            <Text style={styles.introStep}>1. Elegís los días · 2. {trainerName.split(' ')[0]} confirma (unas horas) · 3. pagás · 4. ¡listo!</Text>
+            <Text style={styles.introStep}>1. Eliges los días · 2. {trainerName.split(' ')[0]} confirma (unas horas) · 3. pagas · 4. ¡listo!</Text>
             <Pressable style={styles.introDismiss} onPress={dismissIntro} hitSlop={8}>
               <Text style={styles.introDismissLabel}>Entendido</Text>
             </Pressable>
