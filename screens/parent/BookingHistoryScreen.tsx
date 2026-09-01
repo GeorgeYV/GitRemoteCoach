@@ -349,9 +349,16 @@ function BookingRow({
           {getParentBookingProgress(booking.status, booking.trainerName.split(' ')[0]).hint}
         </Text>
         <View style={styles.statusRow}>
-          {/* Para 'accepted' la píldora ES el botón de pago (texto "Pagar", no un status aparte
-             del link que ya no existe) — para el resto sigue siendo solo informativa. */}
-          <BookingStatusPill status={booking.status} label={onPay ? 'Pagar' : undefined} onPress={onPay} />
+          {/* Para 'accepted' (por pagar), un botón verde de ancho completo en vez de la píldora
+             de estado — se ve como el CTA que es, no como un indicador informativo más. Para el
+             resto de los estados, la píldora sigue siendo solo informativa. */}
+          {onPay ? (
+            <Pressable style={styles.payButton} onPress={onPay}>
+              <Text style={styles.payButtonLabel}>Pagar</Text>
+            </Pressable>
+          ) : (
+            <BookingStatusPill status={booking.status} />
+          )}
           <View style={styles.rowActions}>
             {onChat && (
               <Pressable style={[styles.actionPill, styles.actionPillChat]} onPress={onChat}>
@@ -514,7 +521,21 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   statusRow: {
-    gap: 6,
+    gap: 8,
+  },
+  // Ancho completo (mismo alignSelf 'stretch' por default de un View hijo en un padre en columna
+  // sin alignItems propio) — a diferencia de BookingStatusPill (alignSelf: 'flex-start'), esto se
+  // ve como el botón de acción principal de la fila, no como una píldora informativa más.
+  payButton: {
+    backgroundColor: colors.ballLime,
+    borderRadius: 14,
+    paddingVertical: 11,
+    alignItems: 'center',
+  },
+  payButtonLabel: {
+    color: colors.courtBlueDeep,
+    fontSize: 13,
+    fontWeight: '800',
   },
   rowActions: {
     flexDirection: 'row',

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { colors, withOpacity } from '../../lib/theme';
 import { BOOKING_HISTORY_STATUS_LABELS, BookingHistoryStatus } from '../../mock/parentFlow';
 
@@ -13,33 +13,15 @@ const TONE: Record<BookingHistoryStatus, 'positive' | 'neutral' | 'negative' | '
   rejected: 'negative',
 };
 
-/**
- * onPress opcional: para 'accepted' (por pagar) esta píldora ES el botón de pago — no un
- * indicador aparte del link "Pagar" (que ya no existe como elemento separado, ver
- * BookingHistoryScreen#BookingRow). `label` la reemplaza por "Pagar" en ese caso, para que el
- * texto describa la acción en vez del estado — el resto de los estados sigue siendo solo
- * informativo (sin onPress ni label, mostrando BOOKING_HISTORY_STATUS_LABELS tal cual).
- */
-export default function BookingStatusPill({
-  status,
-  label,
-  onPress,
-}: {
-  status: BookingHistoryStatus;
-  label?: string;
-  onPress?: () => void;
-}) {
+/** Puramente informativa — para 'accepted' (por pagar), BookingHistoryScreen#BookingRow ya no
+ * reusa esto como botón de pago: es un botón verde de ancho completo aparte (ver payButton), no
+ * una píldora. */
+export default function BookingStatusPill({ status }: { status: BookingHistoryStatus }) {
   const tone = TONE[status];
-  const content = (
-    <View style={[styles.pill, styles[`pill_${tone}`]]}>
-      <Text style={[styles.label, styles[`label_${tone}`]]}>{label ?? BOOKING_HISTORY_STATUS_LABELS[status]}</Text>
-    </View>
-  );
-  if (!onPress) return content;
   return (
-    <Pressable onPress={onPress} hitSlop={4}>
-      {content}
-    </Pressable>
+    <View style={[styles.pill, styles[`pill_${tone}`]]}>
+      <Text style={[styles.label, styles[`label_${tone}`]]}>{BOOKING_HISTORY_STATUS_LABELS[status]}</Text>
+    </View>
   );
 }
 
