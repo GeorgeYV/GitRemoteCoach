@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import ParentTabBar from '../../components/parent/ParentTabBar';
 import IconTextInput from '../../components/shared/IconTextInput';
 import InitialAvatar from '../../components/shared/InitialAvatar';
+import RequestTournamentModal from '../../components/shared/RequestTournamentModal';
 import { useAuth } from '../../context/AuthContext';
 import {
   AgeCategory,
@@ -100,6 +101,7 @@ export default function ParentHomeScreen() {
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState<TournamentSearchResult[] | null>(null);
   const [bookings, setBookings] = useState<BookingForParent[]>([]);
+  const [showTournamentRequestModal, setShowTournamentRequestModal] = useState(false);
 
   // Alimenta tanto el recordatorio de pago pendiente como el destacado de "Continuar con" — una
   // sola carga para ambos en vez de repetir la misma llamada.
@@ -295,7 +297,13 @@ export default function ParentHomeScreen() {
         {visibleList === null ? (
           <Text style={styles.tournamentMeta}>{isSearching ? 'Buscando…' : 'Cargando torneos…'}</Text>
         ) : visibleList.length === 0 && isSearching ? (
-          <Text style={styles.tournamentMeta}>No encontramos torneos con ese nombre, sede o ciudad.</Text>
+          <View style={styles.noResultsWrap}>
+            <Text style={styles.tournamentMeta}>No encontramos torneos con ese nombre, sede o ciudad.</Text>
+            <Pressable style={styles.requestTournamentButton} onPress={() => setShowTournamentRequestModal(true)}>
+              <Ionicons name="add-circle-outline" size={15} color={colors.courtBlue} />
+              <Text style={styles.requestTournamentLabel}>Solicitar que agreguen este torneo</Text>
+            </Pressable>
+          </View>
         ) : visibleList.length === 0 && featuredList.length === 0 ? (
           <Text style={styles.tournamentMeta}>No hay torneos activos por ahora.</Text>
         ) : (
@@ -308,6 +316,16 @@ export default function ParentHomeScreen() {
       </ScrollView>
 
       <ParentTabBar active="inicio" />
+
+      {token && (
+        <RequestTournamentModal
+          visible={showTournamentRequestModal}
+          initialName={query}
+          defaultCountry={activeCountry ?? defaultCountry}
+          authToken={token}
+          onClose={() => setShowTournamentRequestModal(false)}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -518,6 +536,25 @@ const styles = StyleSheet.create({
     color: colors.textDim,
     fontSize: 12,
     marginBottom: 2,
+  },
+  noResultsWrap: {
+    alignItems: 'center',
+    gap: 12,
+  },
+  requestTournamentButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderRadius: 14,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: withOpacity(colors.courtBlue, 0.35),
+  },
+  requestTournamentLabel: {
+    color: colors.courtBlue,
+    fontSize: 12,
+    fontWeight: '700',
   },
   tournamentDateLine: {
     color: colors.textDim,

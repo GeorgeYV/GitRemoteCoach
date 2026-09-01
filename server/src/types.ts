@@ -435,6 +435,23 @@ export interface TournamentReport {
   createdAt: string;
 }
 
+/** tournament_creation_requests (decisión #55) — un padre o entrenador pidió que se agregue un
+ * torneo que buscó y no encontró. requesterName viene de un JOIN. resolvedAt null = pendiente;
+ * createdTournamentId queda seteado solo si se resolvió creando el torneo (no si se descartó). */
+export interface TournamentCreationRequest {
+  id: string;
+  requestedBy: string;
+  requesterName: string;
+  tournamentName: string;
+  city: string;
+  country: CountryCode;
+  note: string | null;
+  createdTournamentId: string | null;
+  resolvedBy: string | null;
+  resolvedAt: string | null;
+  createdAt: string;
+}
+
 /** Torneo sembrado por platform_admin sin club todavía (PlatformAdminTournamentScreen,
  * ClubTournamentListScreen — sección "Torneos disponibles para reclamar"). */
 export interface UnclaimedTournament {

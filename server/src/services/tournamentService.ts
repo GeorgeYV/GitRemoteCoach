@@ -1,8 +1,10 @@
 import * as clubInvitationRepository from '../repositories/clubInvitationRepository.js';
 import * as clubRepository from '../repositories/clubRepository.js';
 import * as tournamentCoachTagRepository from '../repositories/tournamentCoachTagRepository.js';
+import * as tournamentCreationRequestRepository from '../repositories/tournamentCreationRequestRepository.js';
 import * as tournamentRepository from '../repositories/tournamentRepository.js';
 import { ConflictError } from '../lib/errors.js';
+import * as notificationService from './notificationService.js';
 import type {
   AgeCategory,
   ClubCoachInvitationWithCoachName,
@@ -54,8 +56,18 @@ export async function listClubTagsForCoach(coachId: string): Promise<CoachClubTa
   return tournamentCoachTagRepository.listTagsForCoach(coachId);
 }
 
-/** PlatformAdminTournamentScreen: platform_admin siembra un torneo con demanda conocida antes de
- * que algún club lo cree — ver decisión #36 en db/schema.sql. */
+/**
+ * PlatformAdminTournamentScreen: platform_admin siembra un torneo con demanda conocida antes de
+ * que algún club lo cree — ver decisión #36 en db/schema.sql. Dos extensiones de la decisión #55,
+ * independientes entre sí:
+ * - clubId: si viene, el torneo se crea YA asignado a ese club/federación (no queda "sin
+ *   reclamar" para que cualquiera lo tome) y se avisa a todos sus admins — a pedido de producto,
+ *   para que la federación se entere de inmediato y no termine creando el mismo torneo por su
+ *   cuenta sin saber que platform_admin ya lo hizo.
+ * - fulfillsRequestId + resolvedBy: si esta creación resuelve un pedido de
+ *   tournament_creation_requests, lo marca resuelto con el id del torneo recién creado —
+ *   trazabilidad de qué pedido generó qué torneo.
+ */
 export async function createUnclaimedTournament(params: {
   name: string;
   venue: string;
@@ -63,8 +75,35 @@ export async function createUnclaimedTournament(params: {
   country: CountryCode;
   startDate: string;
   endDate: string;
+  clubId?: string;
+  fulfillsRequestId?: string;
+  resolvedBy?: string;
 }): Promise<UnclaimedTournament> {
-  return tournamentRepository.createUnclaimed(params);
+  const tournament = await tournamentRepository.createUnclaimed(params);
+
+  if (params.clubId) {
+    await claimTournamentForClub(tournament.id, params.clubId);
+    const adminUserIds = await clubRepository.listAdminUserIds(params.clubId);
+    await Promise.all(
+      adminUserIds.flatMap((adminUserId) => [
+        notificationService.notifyUser(adminUserId, {
+          title: 'Se creó un torneo para tu club/federación',
+          body: `"${tournament.name}" ya está en la app — revísalo y completa lo que falte.`,
+          data: { tournamentId: tournament.id },
+        }),
+        notificationService.notifyUserByEmail(adminUserId, {
+          subject: 'Se creó un torneo para tu club/federación — Remote Coach',
+          html: `<p>Creamos <strong>${tournament.name}</strong> para tu club/federación — abre la app y revisa/completa los datos.</p>`,
+        }),
+      ]),
+    );
+  }
+
+  if (params.fulfillsRequestId && params.resolvedBy) {
+    await tournamentCreationRequestRepository.resolve(params.fulfillsRequestId, params.resolvedBy, tournament.id);
+  }
+
+  return tournament;
 }
 
 /** ClubTournamentListScreen, sección "Torneos disponibles para reclamar" — mismo país que el

@@ -498,6 +498,38 @@ FOR EACH ROW
 WHEN (NEW.status IS DISTINCT FROM OLD.status)
 EXECUTE FUNCTION fn_tournament_reports_guard_resolve();
 
+-- Un padre o entrenador pide que se agregue un torneo que buscó y no encontró (decisión #55) —
+-- a diferencia de tournament_reports (arriba), acá el torneo todavía no existe, así que no hay
+-- tournament_id al que colgar el pedido: platform_admin es el único destinatario posible (no hay
+-- club/federación identificado todavía). resolved_at nulo = pendiente; se resuelve creando el
+-- torneo (created_tournament_id queda seteado, ver tournamentService.createUnclaimedTournament)
+-- o descartándolo (created_tournament_id sigue NULL — duplicado, no es un torneo real, etc.).
+CREATE TABLE tournament_creation_requests (
+  id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  requested_by          UUID NOT NULL REFERENCES users (id),
+  tournament_name       TEXT NOT NULL,
+  city                  TEXT NOT NULL,
+  country               TEXT NOT NULL,
+  -- Fechas aproximadas, quién lo organiza si lo saben, etc. — texto libre porque el padre/coach
+  -- que busca un torneo que no existe rara vez tiene el dato exacto que sí exige crear uno.
+  note                  TEXT,
+  created_tournament_id UUID REFERENCES tournaments (id),
+  resolved_by           UUID REFERENCES users (id),
+  resolved_at           TIMESTAMPTZ,
+  created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  CONSTRAINT chk_tournament_creation_requests_resolved
+    CHECK ((resolved_at IS NULL) = (resolved_by IS NULL)),
+  -- created_tournament_id solo tiene sentido en un pedido ya resuelto (se creó el torneo) — nunca
+  -- en uno todavía pendiente, ni en uno descartado sin crear nada.
+  CONSTRAINT chk_tournament_creation_requests_created_tournament
+    CHECK (created_tournament_id IS NULL OR resolved_at IS NOT NULL)
+);
+
+-- Cola de platform_admin — el único que la consulta, siempre filtrando por pendientes.
+CREATE INDEX idx_tournament_creation_requests_pending
+  ON tournament_creation_requests (created_at) WHERE resolved_at IS NULL;
+
 -- ---------------------------------------------------------------------
 -- Trigger: un torneo en estado terminal ('completed'/'cancelled') no
 -- puede volver a cambiar de status — evita reabrir por error un torneo
@@ -2360,4 +2392,19 @@ CREATE INDEX idx_push_tokens_user_id ON push_tokens (user_id);
 --     ahora lee de acá en vez de config.ts — mismo contrato de respuesta, sin cambios del lado del
 --     padre. No hay ALTA/borrado de filas desde la app: los 5 proveedores están fijos en el CHECK
 --     y en el seed; platform_admin solo completa/corrige los datos de cobro de cada uno.
+-- 55. tournament_creation_requests: un padre o entrenador que busca un torneo y no lo encuentra
+--     puede pedir que se agregue (ParentHomeScreen/CoachTournamentSearchScreen, cuando la búsqueda
+--     da 0 resultados) — le llega a platform_admin por correo (no hay club/federación identificado
+--     todavía, así que no hay a quién más avisarle). PlatformAdminTournamentScreen suma una cola
+--     "Solicitudes de torneo": "Crear este torneo" precarga el formulario de siempre con esos
+--     datos, "Descartar" lo cierra sin crear nada (duplicado, no es real, etc.).
+--     De paso, POST /tournaments (createUnclaimedTournament) gana un clubId opcional: si viene, el
+--     torneo se crea YA asignado a ese club/federación (no queda "sin reclamar" para que cualquiera
+--     lo tome) y se avisa a todos sus admins (push + correo) — a pedido de producto, para que la
+--     federación se entere de inmediato y no termine creando el mismo torneo por su cuenta sin
+--     saber que platform_admin ya lo hizo. Sin clubId, el comportamiento es exactamente el de
+--     antes (torneo sin reclamar, decisión #36). fulfillsRequestId (opcional, distinto de clubId)
+--     resuelve la solicitud de origen y guarda created_tournament_id — trazabilidad de qué pedido
+--     generó qué torneo, sin acoplar creación de torneo y asignación de club (se puede crear sin
+--     club para una solicitud, o asignar un club sin que haya solicitud de por medio).
 -- =====================================================================

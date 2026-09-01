@@ -4,6 +4,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ClubTagBadge from '../../components/coach/ClubTagBadge';
 import ReportTournamentModal from '../../components/shared/ReportTournamentModal';
+import RequestTournamentModal from '../../components/shared/RequestTournamentModal';
 import { useAuth } from '../../context/AuthContext';
 import {
   ApiError,
@@ -55,6 +56,7 @@ export default function CoachTournamentSearchScreen({
   const [countryFilterOn, setCountryFilterOn] = useState(true);
   const [configuredFilterOn, setConfiguredFilterOn] = useState(!!initialConfiguredFilter);
   const [reportTarget, setReportTarget] = useState<{ id: string; name: string } | null>(null);
+  const [showTournamentRequestModal, setShowTournamentRequestModal] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -205,24 +207,41 @@ export default function CoachTournamentSearchScreen({
           ))}
 
           {visibleResults.length === 0 && (
-            <Text style={styles.emptyText}>
-              {configuredFilterOn
-                ? 'Todavía no configuraste disponibilidad en ningún torneo.'
-                : 'No encontramos torneos con ese nombre, sede o ciudad.'}
-            </Text>
+            <View style={styles.emptyStateWrap}>
+              <Text style={styles.emptyText}>
+                {configuredFilterOn
+                  ? 'Todavía no configuraste disponibilidad en ningún torneo.'
+                  : 'No encontramos torneos con ese nombre, sede o ciudad.'}
+              </Text>
+              {!configuredFilterOn && (
+                <Pressable style={styles.requestTournamentButton} onPress={() => setShowTournamentRequestModal(true)}>
+                  <Ionicons name="add-circle-outline" size={15} color={colors.courtBlue} />
+                  <Text style={styles.requestTournamentLabel}>Solicitar que agreguen este torneo</Text>
+                </Pressable>
+              )}
+            </View>
           )}
         </ScrollView>
       )}
       {tabBar}
 
       {token && (
-        <ReportTournamentModal
-          visible={reportTarget !== null}
-          tournamentId={reportTarget?.id ?? null}
-          tournamentName={reportTarget?.name ?? ''}
-          authToken={token}
-          onClose={() => setReportTarget(null)}
-        />
+        <>
+          <ReportTournamentModal
+            visible={reportTarget !== null}
+            tournamentId={reportTarget?.id ?? null}
+            tournamentName={reportTarget?.name ?? ''}
+            authToken={token}
+            onClose={() => setReportTarget(null)}
+          />
+          <RequestTournamentModal
+            visible={showTournamentRequestModal}
+            initialName={query}
+            defaultCountry={activeCountry}
+            authToken={token}
+            onClose={() => setShowTournamentRequestModal(false)}
+          />
+        </>
       )}
     </SafeAreaView>
   );
@@ -448,5 +467,24 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 20,
     lineHeight: 19,
+  },
+  emptyStateWrap: {
+    alignItems: 'center',
+    gap: 14,
+  },
+  requestTournamentButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderRadius: 14,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: withOpacity(colors.courtBlue, 0.35),
+  },
+  requestTournamentLabel: {
+    color: colors.courtBlue,
+    fontSize: 12,
+    fontWeight: '700',
   },
 });

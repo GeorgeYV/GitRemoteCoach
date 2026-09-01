@@ -4938,6 +4938,194 @@ console.log('\n=== Escenario 49: cuentas de cobro editables desde el admin (deci
   assertTrue(!!yapeRow, 'sanity check: la fila de Yape existe en el listado del admin');
 }
 
+console.log('\n=== Escenario 50: solicitar un torneo faltante + asignarlo directo a un club (decisión #55) ===');
+{
+  // --- Solo padre o entrenador puede pedir un torneo nuevo ---
+  const wrongRoleRequestRes = await app.inject({
+    method: 'POST',
+    url: '/tournament-requests',
+    headers: { authorization: `Bearer ${platformAdminToken}` },
+    payload: { tournamentName: 'No debería funcionar', city: 'Quito', country: 'EC' },
+  });
+  assertEqual(wrongRoleRequestRes.statusCode, 403, 'un platform_admin no puede pedir un torneo nuevo (rol equivocado)');
+
+  // --- Un padre pide un torneo — dispara un correo a platform_admin ---
+  emailState.sent.length = 0;
+  const parentRequestRes = await app.inject({
+    method: 'POST',
+    url: '/tournament-requests',
+    headers: { authorization: `Bearer ${parentToken}` },
+    payload: { tournamentName: 'Copa Faltante Padre', city: 'Guayaquil', country: 'EC', note: 'Se juega en marzo, creo' },
+  });
+  assertEqual(parentRequestRes.statusCode, 201, 'un padre puede pedir un torneo nuevo');
+  const parentRequest = parentRequestRes.json();
+  assertEqual(parentRequest.tournamentName, 'Copa Faltante Padre', 'la solicitud trae el nombre pedido');
+  assertEqual(parentRequest.resolvedAt, null, 'la solicitud arranca sin resolver');
+  assertEqual(emailState.sent.length, 1, 'pedir un torneo dispara exactamente un correo a platform_admin');
+  assertEqual(emailState.sent[0]?.to, 'admin@example.com', 'el correo va a la dirección del platform_admin sembrado');
+  assertTrue(
+    emailState.sent[0]?.subject.includes('Copa Faltante Padre') ?? false,
+    'el asunto del correo incluye el nombre del torneo pedido',
+  );
+
+  // --- Un entrenador también puede pedir (torneo distinto, para probar el flujo de asignación) ---
+  const coachRequestRes = await app.inject({
+    method: 'POST',
+    url: '/tournament-requests',
+    headers: { authorization: `Bearer ${coachAToken}` },
+    payload: { tournamentName: 'Copa Faltante Coach', city: 'Cuenca', country: 'EC' },
+  });
+  assertEqual(coachRequestRes.statusCode, 201, 'un entrenador también puede pedir un torneo nuevo');
+  const coachRequest = coachRequestRes.json();
+
+  // --- Solo platform_admin puede ver/descartar la cola ---
+  const wrongRolePendingRes = await app.inject({
+    method: 'GET',
+    url: '/tournament-requests/pending',
+    headers: { authorization: `Bearer ${coachAToken}` },
+  });
+  assertEqual(wrongRolePendingRes.statusCode, 403, 'un coach no puede ver la cola de solicitudes de torneo');
+
+  const pendingRes = await app.inject({
+    method: 'GET',
+    url: '/tournament-requests/pending',
+    headers: { authorization: `Bearer ${platformAdminToken}` },
+  });
+  assertEqual(pendingRes.statusCode, 200, 'platform_admin puede ver la cola de solicitudes de torneo');
+  const pendingIds = pendingRes.json().map((r: any) => r.id);
+  assertTrue(pendingIds.includes(parentRequest.id), 'la solicitud del padre aparece en la cola');
+  assertTrue(pendingIds.includes(coachRequest.id), 'la solicitud del entrenador aparece en la cola');
+
+  // --- Descartar la del padre: sin crear nada, no se puede volver a resolver ---
+  const dismissRes = await app.inject({
+    method: 'PUT',
+    url: `/tournament-requests/${parentRequest.id}/dismiss`,
+    headers: { authorization: `Bearer ${platformAdminToken}` },
+  });
+  assertEqual(dismissRes.statusCode, 200, 'descartar una solicitud devuelve 200');
+  assertEqual(dismissRes.json().createdTournamentId, null, 'descartar no deja ningún torneo asociado');
+
+  const pendingAfterDismissRes = await app.inject({
+    method: 'GET',
+    url: '/tournament-requests/pending',
+    headers: { authorization: `Bearer ${platformAdminToken}` },
+  });
+  assertTrue(
+    !pendingAfterDismissRes.json().some((r: any) => r.id === parentRequest.id),
+    'la solicitud descartada ya no aparece en la cola',
+  );
+
+  const redismissRes = await app.inject({
+    method: 'PUT',
+    url: `/tournament-requests/${parentRequest.id}/dismiss`,
+    headers: { authorization: `Bearer ${platformAdminToken}` },
+  });
+  assertEqual(redismissRes.statusCode, 404, 'descartar una solicitud ya resuelta devuelve 404');
+
+  // --- Club aprobado, con push token registrado, para recibir la asignación directa ---
+  const assignAdminReg = await app.inject({
+    method: 'POST',
+    url: '/auth/register',
+    payload: {
+      email: 'club.assign@example.com',
+      password: 'super-secreta-123',
+      fullName: 'Admin De Asignación',
+      primaryRole: 'club_admin',
+    },
+  });
+  const { token: assignAdminToken, user: assignAdmin } = assignAdminReg.json();
+
+  const assignClubRes = await app.inject({
+    method: 'POST',
+    url: '/clubs',
+    headers: { authorization: `Bearer ${assignAdminToken}` },
+    payload: {
+      name: 'Club De Asignación',
+      type: 'federation',
+      city: 'Quito',
+      country: 'EC',
+      identityDocumentUrl: 'placeholder://identity',
+    },
+  });
+  const assignClub = assignClubRes.json();
+  await app.inject({
+    method: 'PUT',
+    url: `/clubs/${assignClub.id}/review`,
+    headers: { authorization: `Bearer ${platformAdminToken}` },
+    payload: { status: 'approved' },
+  });
+
+  const assignAdminDeviceToken = 'ExponentPushToken[smoke-test-assign-admin]';
+  await app.inject({
+    method: 'POST',
+    url: '/push-tokens',
+    headers: { authorization: `Bearer ${assignAdminToken}` },
+    payload: { token: assignAdminDeviceToken },
+  });
+
+  // --- platform_admin crea el torneo de la solicitud del coach, YA asignado a ese club ---
+  const inDaysAssign = (n: number) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
+  pushState.sent.length = 0;
+  emailState.sent.length = 0;
+  const createAssignedRes = await app.inject({
+    method: 'POST',
+    url: '/tournaments',
+    headers: { authorization: `Bearer ${platformAdminToken}` },
+    payload: {
+      name: coachRequest.tournamentName,
+      venue: 'Cancha Central',
+      city: coachRequest.city,
+      country: coachRequest.country,
+      startDate: inDaysAssign(50),
+      endDate: inDaysAssign(52),
+      clubId: assignClub.id,
+      fulfillsRequestId: coachRequest.id,
+    },
+  });
+  assertEqual(createAssignedRes.statusCode, 201, 'crear el torneo asignado devuelve 201');
+  const assignedTournament = createAssignedRes.json();
+
+  // clubId no viaja en la respuesta del torneo (UnclaimedTournament no lo expone) — se confirma
+  // vía la propia lista de torneos del club.
+  const clubTournamentsRes = await app.inject({
+    method: 'GET',
+    url: `/clubs/${assignClub.id}/tournaments`,
+    headers: { authorization: `Bearer ${assignAdminToken}` },
+  });
+  assertTrue(
+    clubTournamentsRes.json().some((t: any) => t.id === assignedTournament.id),
+    'el torneo creado aparece entre los torneos del club asignado (no quedó sin reclamar)',
+  );
+
+  assertEqual(pushState.sent.length, 1, 'asignar el torneo a un club dispara exactamente un push a su admin');
+  assertEqual(pushState.sent[0]?.to, assignAdminDeviceToken, 'el push va al device token del admin del club asignado');
+  assertEqual(
+    pushState.sent[0]?.title,
+    'Se creó un torneo para tu club/federación',
+    'el título del push de asignación es el esperado',
+  );
+  assertEqual(emailState.sent.length, 1, 'asignar el torneo a un club también dispara un correo a su admin');
+  assertEqual(emailState.sent[0]?.to, 'club.assign@example.com', 'el correo de asignación va al admin del club');
+
+  // --- La solicitud del coach quedó resuelta, con el torneo recién creado ---
+  const pendingAfterFulfillRes = await app.inject({
+    method: 'GET',
+    url: '/tournament-requests/pending',
+    headers: { authorization: `Bearer ${platformAdminToken}` },
+  });
+  assertTrue(
+    !pendingAfterFulfillRes.json().some((r: any) => r.id === coachRequest.id),
+    'la solicitud resuelta con la creación del torneo ya no aparece en la cola',
+  );
+
+  const fulfillDismissRes = await app.inject({
+    method: 'PUT',
+    url: `/tournament-requests/${coachRequest.id}/dismiss`,
+    headers: { authorization: `Bearer ${platformAdminToken}` },
+  });
+  assertEqual(fulfillDismissRes.statusCode, 404, 'una solicitud ya resuelta por creación tampoco se puede descartar después');
+}
+
 console.log(`\n=== Resultado: ${passed} pasaron, ${failed} fallaron ===`);
 await app.close();
 process.exit(failed > 0 ? 1 : 0);

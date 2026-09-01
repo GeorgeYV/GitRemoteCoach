@@ -1,24 +1,31 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DatePickerField from '../../components/shared/DatePickerField';
 import IconTextInput from '../../components/shared/IconTextInput';
 import { useAuth } from '../../context/AuthContext';
 import {
   ApiError,
+  ClubSearchResult,
   CountryCode,
   createUnclaimedTournament,
+  dismissTournamentCreationRequest,
+  listPendingTournamentCreationRequests,
   listPendingTournamentReports,
   resolveTournamentReport,
+  searchClubs,
+  TournamentCreationRequest,
   TournamentReport,
 } from '../../lib/api';
+import { CLUB_TYPE_LABELS } from '../../lib/clubType';
 import { colors, radius, withOpacity } from '../../lib/theme';
 import { COUNTRY_LABELS, COUNTRY_OPTIONS } from '../../mock/coachFlow';
 
 /** Siembra un torneo sin club para que cualquier club de ese país lo pueda reclamar después
  * (ClubTournamentListScreen, sección "Torneos disponibles para reclamar" — ver decisión #36 en
- * db/schema.sql). No queda ligado a ningún club_admin; solo platform_admin puede crearlos. */
+ * db/schema.sql). También puede asignarlo directo a un club/federación (decisión #55) y/o
+ * resolver una solicitud de "Solicitar que agreguen este torneo" (decisión #55). */
 export default function PlatformAdminTournamentScreen() {
   const { token } = useAuth();
   const [name, setName] = useState('');
@@ -34,14 +41,43 @@ export default function PlatformAdminTournamentScreen() {
   const [resolvingReportId, setResolvingReportId] = useState<string | null>(null);
   const [resolveError, setResolveError] = useState<string | null>(null);
 
-  // Cola de respaldo (decisión #46) — todos los reportes abiertos de cualquier club, no solo del
-  // que corresponda, en caso de que el club dueño del torneo no reaccione.
+  // Cola de solicitudes "Solicitar que agreguen este torneo" (decisión #55) — el padre/entrenador
+  // buscó y no encontró nada, así que no hay club/federación al que avisarle; llega directo acá.
+  const [requests, setRequests] = useState<TournamentCreationRequest[]>([]);
+  const [dismissingRequestId, setDismissingRequestId] = useState<string | null>(null);
+  const [requestActionError, setRequestActionError] = useState<string | null>(null);
+  // Si viene de "Crear este torneo" en una solicitud, esta creación la resuelve (fulfillsRequestId).
+  const [fulfillingRequest, setFulfillingRequest] = useState<TournamentCreationRequest | null>(null);
+
+  // Asignar directo a un club/federación en vez de dejarlo sin reclamar (decisión #55) — opcional,
+  // búsqueda manual (mismo patrón que ClubJoinScreen "Buscar mi club") en vez de autocompletar en
+  // cada tecla, para no pegarle al backend por cada letra en una pantalla que ya tiene bastante.
+  const [clubQuery, setClubQuery] = useState('');
+  const [clubSearching, setClubSearching] = useState(false);
+  const [clubResults, setClubResults] = useState<ClubSearchResult[] | null>(null);
+  const [assignedClub, setAssignedClub] = useState<ClubSearchResult | null>(null);
+
+  // Cola de respaldo (decisión #46) — todos los reportes abiertos de cualquier club, en caso de
+  // que el club dueño del torneo no reaccione.
   useEffect(() => {
     if (!token) return;
     let cancelled = false;
     listPendingTournamentReports(token)
       .then((result) => {
         if (!cancelled) setReports(result);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
+
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+    listPendingTournamentCreationRequests(token)
+      .then((result) => {
+        if (!cancelled) setRequests(result);
       })
       .catch(() => {});
     return () => {
@@ -61,6 +97,50 @@ export default function PlatformAdminTournamentScreen() {
     } finally {
       setResolvingReportId(null);
     }
+  }
+
+  async function handleDismissRequest(requestId: string) {
+    if (!token) return;
+    setDismissingRequestId(requestId);
+    setRequestActionError(null);
+    try {
+      await dismissTournamentCreationRequest(token, requestId);
+      setRequests((prev) => prev.filter((r) => r.id !== requestId));
+      if (fulfillingRequest?.id === requestId) setFulfillingRequest(null);
+    } catch (err) {
+      setRequestActionError(err instanceof ApiError ? err.message : 'No se pudo descartar la solicitud. Intenta de nuevo.');
+    } finally {
+      setDismissingRequestId(null);
+    }
+  }
+
+  /** Precarga el formulario de abajo con los datos de la solicitud — el admin completa sede y
+   * fechas (la solicitud no las tiene, ver decisión #55) y decide si asignarla a un club o no. */
+  function handleFulfillRequest(req: TournamentCreationRequest) {
+    setFulfillingRequest(req);
+    setName(req.tournamentName);
+    setCity(req.city);
+    setCountry(req.country);
+    setSuccessMessage(null);
+    setError(null);
+  }
+
+  async function runClubSearch() {
+    if (!token || clubQuery.trim().length === 0) return;
+    setClubSearching(true);
+    try {
+      setClubResults(await searchClubs(token, clubQuery.trim()));
+    } catch {
+      setClubResults([]);
+    } finally {
+      setClubSearching(false);
+    }
+  }
+
+  function selectClub(club: ClubSearchResult) {
+    setAssignedClub(club);
+    setClubQuery('');
+    setClubResults(null);
   }
 
   const canSubmit =
@@ -95,13 +175,24 @@ export default function PlatformAdminTournamentScreen() {
         country,
         startDate,
         endDate,
+        clubId: assignedClub?.id,
+        fulfillsRequestId: fulfillingRequest?.id,
       });
-      setSuccessMessage(`"${tournament.name}" creado — visible para clubes y federaciones de ${COUNTRY_LABELS[country]} para reclamar.`);
+      setSuccessMessage(
+        assignedClub
+          ? `"${tournament.name}" creado y asignado a ${assignedClub.name} — le avisamos por push y correo.`
+          : `"${tournament.name}" creado — visible para clubes y federaciones de ${COUNTRY_LABELS[country]} para reclamar.`,
+      );
       setName('');
       setVenue('');
       setCity('');
       setStartDate('');
       setEndDate('');
+      setAssignedClub(null);
+      if (fulfillingRequest) {
+        setRequests((prev) => prev.filter((r) => r.id !== fulfillingRequest.id));
+        setFulfillingRequest(null);
+      }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'No se pudo crear el torneo. Intenta de nuevo.');
     } finally {
@@ -114,11 +205,30 @@ export default function PlatformAdminTournamentScreen() {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Crear torneo sin club/federación</Text>
         <Text style={styles.headerSubtitle}>
-          Para torneos con demanda conocida que ningún club o federación creó todavía — cualquiera de ese país podrá reclamarlo después.
+          Para torneos con demanda conocida que ningún club o federación creó todavía — cualquiera de ese país podrá reclamarlo después, o lo asignás vos mismo abajo.
         </Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
+        {requests.length > 0 && (
+          <Section label={requests.length === 1 ? 'Solicitud de torneo' : `${requests.length} solicitudes de torneo`}>
+            <Text style={styles.reportsHint}>
+              Un padre o entrenador buscó este torneo y no lo encontró — no hay club/federación identificado todavía.
+            </Text>
+            {requestActionError && <Text style={styles.errorText}>{requestActionError}</Text>}
+            {requests.map((req) => (
+              <RequestCard
+                key={req.id}
+                request={req}
+                fulfilling={fulfillingRequest?.id === req.id}
+                dismissing={dismissingRequestId === req.id}
+                onFulfill={() => handleFulfillRequest(req)}
+                onDismiss={() => handleDismissRequest(req.id)}
+              />
+            ))}
+          </Section>
+        )}
+
         {reports.length > 0 && (
           <Section label={reports.length === 1 ? 'Reporte abierto (respaldo)' : `${reports.length} reportes abiertos (respaldo)`}>
             <Text style={styles.reportsHint}>
@@ -134,6 +244,18 @@ export default function PlatformAdminTournamentScreen() {
               />
             ))}
           </Section>
+        )}
+
+        {fulfillingRequest && (
+          <View style={styles.fulfillingBanner}>
+            <Ionicons name="link-outline" size={14} color={colors.courtBlue} />
+            <Text style={styles.fulfillingBannerText}>
+              Completando la solicitud de {fulfillingRequest.requesterName}
+            </Text>
+            <Pressable onPress={() => setFulfillingRequest(null)} hitSlop={8}>
+              <Text style={styles.fulfillingBannerClear}>Quitar</Text>
+            </Pressable>
+          </View>
         )}
 
         {successMessage && <Text style={styles.successText}>{successMessage}</Text>}
@@ -181,6 +303,69 @@ export default function PlatformAdminTournamentScreen() {
             minDate={startDate || undefined}
           />
         </Section>
+
+        <Section label="Club o federación (opcional)">
+          {assignedClub ? (
+            <View style={styles.assignedClubCard}>
+              <View style={styles.assignedClubInfo}>
+                <Text style={styles.assignedClubName}>{assignedClub.name}</Text>
+                <Text style={styles.assignedClubMeta}>
+                  {CLUB_TYPE_LABELS[assignedClub.type]} · {assignedClub.city}
+                </Text>
+              </View>
+              <Pressable onPress={() => setAssignedClub(null)} hitSlop={8}>
+                <Ionicons name="close-circle" size={20} color={colors.textDim} />
+              </Pressable>
+            </View>
+          ) : (
+            <>
+              <Text style={styles.assignHint}>
+                Sin elegir uno, el torneo queda sin reclamar (cualquier club/federación del país puede tomarlo después).
+              </Text>
+              <View style={styles.clubSearchRow}>
+                <TextInput
+                  style={styles.clubSearchInput}
+                  placeholder="Buscar club o federación por nombre"
+                  placeholderTextColor={colors.textDim}
+                  value={clubQuery}
+                  onChangeText={setClubQuery}
+                  onSubmitEditing={runClubSearch}
+                  returnKeyType="search"
+                />
+                <Pressable
+                  style={styles.clubSearchButton}
+                  onPress={runClubSearch}
+                  disabled={clubSearching || clubQuery.trim().length === 0}
+                >
+                  {clubSearching ? (
+                    <ActivityIndicator color={colors.courtBlueDeep} size="small" />
+                  ) : (
+                    <Ionicons name="search" size={16} color={colors.courtBlueDeep} />
+                  )}
+                </Pressable>
+              </View>
+              {clubResults !== null && (
+                <View style={styles.clubResultsList}>
+                  {clubResults.length === 0 ? (
+                    <Text style={styles.reportsHint}>No encontramos ningún club o federación con ese nombre.</Text>
+                  ) : (
+                    clubResults.map((club) => (
+                      <Pressable key={club.id} style={styles.clubResultRow} onPress={() => selectClub(club)}>
+                        <View>
+                          <Text style={styles.assignedClubName}>{club.name}</Text>
+                          <Text style={styles.assignedClubMeta}>
+                            {CLUB_TYPE_LABELS[club.type]} · {club.city}
+                          </Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={16} color={colors.textDim} />
+                      </Pressable>
+                    ))
+                  )}
+                </View>
+              )}
+            </>
+          )}
+        </Section>
       </ScrollView>
 
       <View style={styles.footer}>
@@ -201,6 +386,48 @@ export default function PlatformAdminTournamentScreen() {
         </Pressable>
       </View>
     </SafeAreaView>
+  );
+}
+
+function RequestCard({
+  request,
+  fulfilling,
+  dismissing,
+  onFulfill,
+  onDismiss,
+}: {
+  request: TournamentCreationRequest;
+  fulfilling: boolean;
+  dismissing: boolean;
+  onFulfill: () => void;
+  onDismiss: () => void;
+}) {
+  return (
+    <View style={[styles.reportCard, fulfilling && styles.requestCardActive]}>
+      <View style={styles.reportTopRow}>
+        <Ionicons name="add-circle-outline" size={16} color={colors.courtBlue} />
+        <Text style={styles.reportTournamentName}>{request.tournamentName}</Text>
+      </View>
+      <Text style={styles.reportMeta}>
+        {request.city}, {request.country} · pedido por {request.requesterName}
+      </Text>
+      {request.note && <Text style={styles.reportMessage}>{request.note}</Text>}
+      <View style={styles.requestActionsRow}>
+        <Pressable style={styles.requestDismissButton} onPress={onDismiss} disabled={dismissing}>
+          {dismissing ? (
+            <ActivityIndicator color={colors.errorCoral} size="small" />
+          ) : (
+            <Text style={styles.requestDismissLabel}>Descartar</Text>
+          )}
+        </Pressable>
+        <Pressable style={styles.resolveButton} onPress={onFulfill} disabled={dismissing}>
+          <View style={styles.resolveButtonContent}>
+            <Ionicons name="create-outline" size={14} color={colors.courtBlueDeep} />
+            <Text style={styles.resolveButtonLabel}>{fulfilling ? 'Editando abajo' : 'Crear este torneo'}</Text>
+          </View>
+        </Pressable>
+      </View>
+    </View>
   );
 }
 
@@ -293,6 +520,10 @@ const styles = StyleSheet.create({
     borderColor: withOpacity(colors.amber, 0.4),
     marginBottom: 12,
   },
+  requestCardActive: {
+    borderColor: colors.ballLime,
+    backgroundColor: withOpacity(colors.ballLime, 0.06),
+  },
   reportTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -316,7 +547,25 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginBottom: 12,
   },
+  requestActionsRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  requestDismissButton: {
+    flex: 1,
+    borderRadius: 16,
+    paddingVertical: 9,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: withOpacity(colors.errorCoral, 0.4),
+  },
+  requestDismissLabel: {
+    color: colors.errorCoral,
+    fontSize: 12,
+    fontWeight: '700',
+  },
   resolveButton: {
+    flex: 1,
     backgroundColor: colors.ballLime,
     borderRadius: 16,
     paddingVertical: 9,
@@ -331,6 +580,30 @@ const styles = StyleSheet.create({
     color: colors.courtBlueDeep,
     fontSize: 12,
     fontWeight: '800',
+  },
+  fulfillingBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: withOpacity(colors.courtBlue, 0.1),
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: withOpacity(colors.courtBlue, 0.35),
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    marginBottom: 16,
+  },
+  fulfillingBannerText: {
+    flex: 1,
+    color: colors.courtBlue,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  fulfillingBannerClear: {
+    color: colors.textDim,
+    fontSize: 12,
+    fontWeight: '700',
+    textDecorationLine: 'underline',
   },
   section: {
     marginBottom: 24,
@@ -364,6 +637,72 @@ const styles = StyleSheet.create({
   },
   countryChipLabelActive: {
     color: colors.courtBlueDeep,
+  },
+  assignHint: {
+    color: colors.textDim,
+    fontSize: 12,
+    lineHeight: 17,
+    marginBottom: 12,
+  },
+  clubSearchRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  clubSearchInput: {
+    flex: 1,
+    backgroundColor: colors.panel,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    color: colors.lineWhite,
+    fontSize: 14,
+  },
+  clubSearchButton: {
+    width: 44,
+    borderRadius: 14,
+    backgroundColor: colors.ballLime,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  clubResultsList: {
+    gap: 8,
+    marginTop: 10,
+  },
+  clubResultRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.panel,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius,
+    padding: 12,
+  },
+  assignedClubCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: withOpacity(colors.ballLime, 0.1),
+    borderWidth: 1,
+    borderColor: withOpacity(colors.ballLime, 0.35),
+    borderRadius: radius,
+    padding: 14,
+  },
+  assignedClubInfo: {
+    flex: 1,
+    marginRight: 10,
+  },
+  assignedClubName: {
+    color: colors.lineWhite,
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  assignedClubMeta: {
+    color: colors.textDim,
+    fontSize: 12,
   },
   footer: {
     borderTopWidth: 1,

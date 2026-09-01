@@ -1520,10 +1520,20 @@ export interface UnclaimedTournament {
 }
 
 /** POST /tournaments — PlatformAdminTournamentScreen: solo platform_admin puede sembrar un
- * torneo sin club (ver decisión #36 en db/schema.sql). */
+ * torneo sin club (ver decisión #36 en db/schema.sql). clubId/fulfillsRequestId son de la
+ * decisión #55 — ver server/src/services/tournamentService.ts#createUnclaimedTournament. */
 export function createUnclaimedTournament(
   authToken: string,
-  params: { name: string; venue: string; city: string; country: CountryCode; startDate: string; endDate: string },
+  params: {
+    name: string;
+    venue: string;
+    city: string;
+    country: CountryCode;
+    startDate: string;
+    endDate: string;
+    clubId?: string;
+    fulfillsRequestId?: string;
+  },
 ): Promise<UnclaimedTournament> {
   return request('/tournaments', {
     method: 'POST',
@@ -1591,6 +1601,50 @@ export function listPendingTournamentReports(authToken: string): Promise<Tournam
  * propio club) o PlatformAdminTournamentScreen (cualquiera). */
 export function resolveTournamentReport(authToken: string, reportId: string): Promise<TournamentReport> {
   return request(`/tournament-reports/${reportId}/resolve`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${authToken}` },
+  });
+}
+
+/** Espeja server/src/types.ts#TournamentCreationRequest (decisión #55) — un padre o entrenador
+ * pidió que se agregue un torneo que buscó y no encontró. */
+export interface TournamentCreationRequest {
+  id: string;
+  requestedBy: string;
+  requesterName: string;
+  tournamentName: string;
+  city: string;
+  country: CountryCode;
+  note: string | null;
+  createdTournamentId: string | null;
+  resolvedBy: string | null;
+  resolvedAt: string | null;
+  createdAt: string;
+}
+
+/** POST /tournament-requests — ParentHomeScreen/CoachTournamentSearchScreen, cuando la búsqueda
+ * da 0 resultados. Solo padre o entrenador. */
+export function requestTournamentCreation(
+  authToken: string,
+  params: { tournamentName: string; city: string; country: CountryCode; note?: string },
+): Promise<TournamentCreationRequest> {
+  return request('/tournament-requests', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${authToken}` },
+    body: JSON.stringify(params),
+  });
+}
+
+/** GET /tournament-requests/pending — PlatformAdminTournamentScreen: cola de solicitudes. */
+export function listPendingTournamentCreationRequests(authToken: string): Promise<TournamentCreationRequest[]> {
+  return request('/tournament-requests/pending', {
+    headers: { Authorization: `Bearer ${authToken}` },
+  });
+}
+
+/** PUT /tournament-requests/:id/dismiss — descartar sin crear nada. */
+export function dismissTournamentCreationRequest(authToken: string, requestId: string): Promise<TournamentCreationRequest> {
+  return request(`/tournament-requests/${requestId}/dismiss`, {
     method: 'PUT',
     headers: { Authorization: `Bearer ${authToken}` },
   });

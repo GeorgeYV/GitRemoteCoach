@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import * as clubRepository from '../repositories/clubRepository.js';
+import * as tournamentCreationRequestService from '../services/tournamentCreationRequestService.js';
 import * as tournamentReportService from '../services/tournamentReportService.js';
 import * as tournamentService from '../services/tournamentService.js';
 import { ForbiddenError, ValidationError } from '../lib/errors.js';
@@ -16,6 +17,9 @@ const createUnclaimedTournamentSchema = z
     country: z.enum(COUNTRY_CODES),
     startDate: z.string().date(),
     endDate: z.string().date(),
+    // Decisión #55, ambos opcionales e independientes entre sí — ver tournamentService.createUnclaimedTournament.
+    clubId: z.string().uuid().optional(),
+    fulfillsRequestId: z.string().uuid().optional(),
   })
   .refine((data) => data.endDate >= data.startDate, {
     message: 'endDate debe ser igual o posterior a startDate',
@@ -23,6 +27,13 @@ const createUnclaimedTournamentSchema = z
   });
 
 const reportTournamentSchema = z.object({ message: z.string().min(1).max(1000) });
+
+const requestTournamentCreationSchema = z.object({
+  tournamentName: z.string().min(1),
+  city: z.string().min(1),
+  country: z.enum(COUNTRY_CODES),
+  note: z.string().max(1000).optional(),
+});
 
 export async function tournamentRoutes(app: FastifyInstance): Promise<void> {
   // CoachTournamentSearchScreen/ParentHomeScreen: descubrimiento público, igual que GET /coaches.
@@ -54,13 +65,13 @@ export async function tournamentRoutes(app: FastifyInstance): Promise<void> {
   // PlatformAdminTournamentScreen: siembra un torneo sin club (ver decisión #36 en db/schema.sql)
   // para que cualquier club de ese país lo pueda reclamar después.
   app.post('/tournaments', { preHandler: app.authenticate }, async (req, reply) => {
-    const { role } = req.user as { role: string };
+    const { sub, role } = req.user as { sub: string; role: string };
     if (role !== 'platform_admin') {
       throw new ForbiddenError('Solo un administrador de la plataforma puede crear torneos sin club/federación');
     }
     const parsed = createUnclaimedTournamentSchema.safeParse(req.body);
     if (!parsed.success) throw new ValidationError(parsed.error.message);
-    const tournament = await tournamentService.createUnclaimedTournament(parsed.data);
+    const tournament = await tournamentService.createUnclaimedTournament({ ...parsed.data, resolvedBy: sub });
     reply.code(201);
     return tournament;
   });
@@ -111,5 +122,44 @@ export async function tournamentRoutes(app: FastifyInstance): Promise<void> {
       return tournamentReportService.resolveReport(id, sub, clubId);
     }
     throw new ForbiddenError('Solo un administrador de club/federación o de la plataforma puede resolver reportes');
+  });
+
+  // ParentHomeScreen/CoachTournamentSearchScreen: la búsqueda dio 0 resultados y el padre/
+  // entrenador pide que se agregue el torneo (decisión #55) — no hay club/federación identificado
+  // todavía (el torneo ni existe), así que llega directo a platform_admin.
+  app.post('/tournament-requests', { preHandler: app.authenticate }, async (req, reply) => {
+    const { sub, role } = req.user as { sub: string; role: string };
+    if (role !== 'parent' && role !== 'coach') {
+      throw new ForbiddenError('Solo un padre o un entrenador puede solicitar un torneo nuevo');
+    }
+    const parsed = requestTournamentCreationSchema.safeParse(req.body);
+    if (!parsed.success) throw new ValidationError(parsed.error.message);
+    const request = await tournamentCreationRequestService.requestTournamentCreation({
+      requestedBy: sub,
+      ...parsed.data,
+    });
+    reply.code(201);
+    return request;
+  });
+
+  // PlatformAdminTournamentScreen: cola de solicitudes pendientes.
+  app.get('/tournament-requests/pending', { preHandler: app.authenticate }, async (req) => {
+    const { role } = req.user as { role: string };
+    if (role !== 'platform_admin') {
+      throw new ForbiddenError('Solo un administrador de la plataforma puede ver esta cola');
+    }
+    return tournamentCreationRequestService.listPendingRequests();
+  });
+
+  // PlatformAdminTournamentScreen: descartar una solicitud sin crear nada (duplicada, no es un
+  // torneo real, etc.) — crear el torneo desde la solicitud se resuelve vía POST /tournaments
+  // (fulfillsRequestId), no acá.
+  app.put('/tournament-requests/:id/dismiss', { preHandler: app.authenticate }, async (req) => {
+    const { id } = req.params as { id: string };
+    const { sub, role } = req.user as { sub: string; role: string };
+    if (role !== 'platform_admin') {
+      throw new ForbiddenError('Solo un administrador de la plataforma puede descartar solicitudes');
+    }
+    return tournamentCreationRequestService.dismissRequest(id, sub);
   });
 }
