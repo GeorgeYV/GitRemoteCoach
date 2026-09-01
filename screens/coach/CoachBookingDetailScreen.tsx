@@ -51,6 +51,15 @@ export default function CoachBookingDetailScreen({
         ? 'Continuar partido'
         : 'Iniciar partido';
   const startMatchIcon = booking.matchStatus === 'completed' ? 'document-text-outline' : 'play-outline';
+  // No tiene sentido arrancar la captura de un partido si el padre todavía no envió ni siquiera
+  // el comprobante de pago (rawStatus 'requested'/'accepted') — pero una vez que ya se está
+  // capturando (o ya terminó) no hay que trabar "Continuar partido"/"Ver resumen" por el estado
+  // del pago: el Escenario 30 del smoke test depende de que el partido pueda cerrarse antes de
+  // que el admin termine de verificar el pago.
+  const paymentSubmittedOrLater = booking.rawStatus === 'payment_submitted' || booking.rawStatus === 'paid';
+  const matchAlreadyStarted =
+    booking.matchStatus === 'in_progress' || booking.matchStatus === 'suspended' || booking.matchStatus === 'completed';
+  const canStartMatch = paymentSubmittedOrLater || matchAlreadyStarted;
 
   async function handleComplete() {
     if (!token) {
@@ -105,7 +114,9 @@ export default function CoachBookingDetailScreen({
         <Section label="Detalle de la reserva">
           <View style={styles.detailCard}>
             <DetailLine label="Torneo" value={booking.tournamentName} />
-            <DetailLine label="Día y horario" value={`${booking.date} · ${booking.time}`} />
+            {/* booking.time es null hasta que alguien reprograma con una hora real (decisión #53
+               en db/schema.sql) — sin este chequeo se mostraba literalmente "7 sep · null". */}
+            <DetailLine label="Día y horario" value={`${booking.date}${booking.time ? ` · ${booking.time}` : ''}`} />
             <DetailLine label="Sede" value={booking.venue} />
           </View>
         </Section>
@@ -141,13 +152,21 @@ export default function CoachBookingDetailScreen({
               )}
             </Pressable>
           )}
-          {onStartMatch && (
+          {onStartMatch && canStartMatch && (
             <Pressable style={styles.startMatchButton} onPress={onStartMatch}>
               <View style={styles.buttonContent}>
                 <Ionicons name={startMatchIcon} size={17} color={colors.courtBlueDeep} />
                 <Text style={styles.startMatchLabel}>{startMatchLabel}</Text>
               </View>
             </Pressable>
+          )}
+          {onStartMatch && !canStartMatch && (
+            <View style={styles.startMatchDisabledHint}>
+              <Ionicons name="lock-closed-outline" size={14} color={colors.textDim} />
+              <Text style={styles.startMatchDisabledText}>
+                Podrás iniciar el partido cuando el padre envíe el comprobante de pago
+              </Text>
+            </View>
           )}
           {onChat && (
             <Pressable style={styles.chatButton} onPress={onChat}>
@@ -343,6 +362,19 @@ const styles = StyleSheet.create({
     color: colors.courtBlueDeep,
     fontSize: 15,
     fontWeight: '800',
+  },
+  startMatchDisabledHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+  },
+  startMatchDisabledText: {
+    color: colors.textDim,
+    fontSize: 12,
+    textAlign: 'center',
+    flexShrink: 1,
   },
   chatButton: {
     borderRadius: radius,
