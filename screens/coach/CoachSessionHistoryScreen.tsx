@@ -14,6 +14,7 @@ import CoachChatScreen from './CoachChatScreen';
 /** 'requested' vive en el inbox de solicitudes, no en el historial de sesiones ya decididas. */
 const DECIDED_STATUSES: BookingWithParticipants['status'][] = [
   'accepted',
+  'payment_submitted',
   'paid',
   'completed',
   'cancelled',
