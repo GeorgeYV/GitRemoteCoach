@@ -81,14 +81,15 @@ autorización) vive en el propio archivo, no acá, para no volver a desactualiza
 ## Jobs (correr por cron externo — no hay scheduler embebido)
 
 ```bash
-npm run jobs:expire-bookings         # cada ~5 min: expira solicitudes y pagos vencidos
-npm run jobs:payment-reminders       # cada ~15-30 min: push antes de que venza el pago
-npm run jobs:settle-clubs            # diario: liquida comisiones de torneos ya finalizados
-npm run jobs:settle-coach-payouts    # diario: liquida pagos a entrenadores
-npm run jobs:transcribe-voice-notes  # cada ~5-10 min: transcribe notas de voz pendientes (Whisper)
+npm run jobs:expire-bookings           # cada ~5 min: expira solicitudes y pagos vencidos
+npm run jobs:payment-reminders         # cada ~15-30 min: push+correo antes de que venza el pago
+npm run jobs:coach-response-reminders  # cada ~15-30 min: push+correo antes de que venza la solicitud
+npm run jobs:settle-clubs              # diario: liquida comisiones de torneos ya finalizados
+npm run jobs:settle-coach-payouts      # diario: liquida pagos a entrenadores
+npm run jobs:transcribe-voice-notes    # cada ~5-10 min: transcribe notas de voz pendientes (Whisper)
 ```
 
-Ninguno de los cinco está scheduleado todavía en ningún lado (ni cron del sistema, ni un servicio
+Ninguno de los seis está scheduleado todavía en ningún lado (ni cron del sistema, ni un servicio
 tipo Render Cron Jobs) — hoy solo se pueden correr a mano. Hace falta resolver esto antes de un
 lanzamiento real.
 
@@ -117,7 +118,7 @@ npm run test:smoke  # server/test/smokeTestBody.ts — Postgres en memoria (pg-m
 
 - **Nada está deployado todavía** — el backend solo corre local, contra una base local. No hay
   CI/CD, hosting, ni dominio configurado.
-- **Los 5 jobs no están scheduleados** en ningún lado (ver arriba).
+- **Los 6 jobs no están scheduleados** en ningún lado (ver arriba).
 - **`flagged_for_coach_penalty`** se marca cuando un entrenador cancela tarde
   (`cancellationService.ts`), pero nada lo consume todavía — no impacta `rating_avg`/`rating_count`
   ni ningún otro lado. La penalización queda anotada, sin consecuencia real.

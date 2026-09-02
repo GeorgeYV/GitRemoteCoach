@@ -24,6 +24,13 @@ export async function runPaymentRemindersJob(): Promise<PaymentRemindersResult> 
       body: 'Todavía no confirmamos tu pago — complétalo antes de perder el cupo con el entrenador.',
       data: { bookingId: booking.id },
     });
+    // Respaldo por correo — mismo criterio que acceptBooking/rejectBooking/verifyPayment
+    // (bookingService.ts/paymentService.ts): el push depende de un token de dispositivo que hoy
+    // nunca se registra en el target web, así que sin esto el padre no se entera de nada.
+    await notificationService.notifyUserByEmail(parentUserId, {
+      subject: 'Tu pago está por vencer — Remote Coach',
+      html: '<p>Todavía no confirmamos tu pago — completa el pago desde la app antes de perder el cupo con el entrenador.</p>',
+    });
     await bookingRepository.markPaymentReminderSent(booking.id);
     remindedBookingIds.push(booking.id);
   }

@@ -1116,6 +1116,10 @@ CREATE TABLE bookings (
   -- (requested_at + ventana configurable, ej. 4h). El job de expiración
   -- pasa las reservas 'requested' vencidas a 'expired'.
   response_deadline             TIMESTAMPTZ NOT NULL,
+  -- Se setea la primera vez que jobs/coachResponseReminders le manda el push+correo de "responde
+  -- antes de que expire" a esta reserva — mismo criterio que payment_reminder_sent_at más abajo,
+  -- evita mandarlo de nuevo en cada corrida del job.
+  response_reminder_sent_at     TIMESTAMPTZ,
   -- Vencimiento para que el padre complete el pago tras la aceptación.
   -- Sin esto una reserva 'accepted' sin pagar quedaría viva indefinidamente.
   payment_deadline               TIMESTAMPTZ,

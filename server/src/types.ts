@@ -93,6 +93,7 @@ export interface Booking {
   courtLabel: string | null;
   meetingPointDetail: string | null;
   responseDeadline: string;
+  responseReminderSentAt: string | null;
   paymentDeadline: string | null;
   totalAmountPaid: string | null;
   coachNetAmount: string | null;

@@ -25,6 +25,7 @@ function mapRow(row: any): Booking {
     courtLabel: row.court_label,
     meetingPointDetail: row.meeting_point_detail,
     responseDeadline: row.response_deadline,
+    responseReminderSentAt: row.response_reminder_sent_at,
     paymentDeadline: row.payment_deadline,
     totalAmountPaid: row.total_amount_paid,
     coachNetAmount: row.coach_net_amount,
@@ -285,6 +286,30 @@ export async function findAcceptedBookingsNeedingPaymentReminder(
 
 export async function markPaymentReminderSent(bookingId: string, db: Queryable = pool): Promise<void> {
   await db.query(`UPDATE bookings SET payment_reminder_sent_at = now() WHERE id = $1`, [bookingId]);
+}
+
+/** jobs/coachResponseReminders: espejo exacto de findAcceptedBookingsNeedingPaymentReminder, pero
+ * para el lado del entrenador — solicitudes 'requested' cuyo response_deadline cae dentro del
+ * umbral (ver businessRules.coachResponseReminderHoursBeforeDeadline) y todavía no vencido, sin
+ * recordatorio ya mandado. response_deadline > now() la excluye a propósito, mismo motivo: si ya
+ * venció es el job de expiración (expireOverdueRequests) el que la mata. */
+export async function findRequestedBookingsNeedingResponseReminder(
+  reminderThreshold: Date,
+  db: Queryable = pool,
+): Promise<Booking[]> {
+  const { rows } = await db.query(
+    `SELECT * FROM bookings
+     WHERE status = 'requested'
+       AND response_reminder_sent_at IS NULL
+       AND response_deadline <= $1
+       AND response_deadline > now()`,
+    [reminderThreshold],
+  );
+  return rows.map(mapRow);
+}
+
+export async function markResponseReminderSent(bookingId: string, db: Queryable = pool): Promise<void> {
+  await db.query(`UPDATE bookings SET response_reminder_sent_at = now() WHERE id = $1`, [bookingId]);
 }
 
 /** TrainerProfileScreen: cuántos jugadores distintos tienen una reserva activa (no rechazada,

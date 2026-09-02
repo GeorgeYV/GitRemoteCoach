@@ -4,6 +4,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import InitialAvatar from '../../components/shared/InitialAvatar';
 import { ClubCoachInvitationWithNames } from '../../lib/api';
+import { formatHoursCountdown, useCountdown } from '../../lib/countdown';
 import { colors, radius, withOpacity } from '../../lib/theme';
 import { CoachBooking } from '../../mock/coachFlow';
 
@@ -35,6 +36,7 @@ export default function CoachHomeScreen({
   coachName,
   rating,
   pendingRequests,
+  nearestRequestDeadline,
   pendingEarnings,
   nextSessions,
   upcomingCount,
@@ -56,6 +58,9 @@ export default function CoachHomeScreen({
   coachName: string;
   rating: string;
   pendingRequests: number;
+  /** Response_deadline de la solicitud pendiente que vence primero, null si no hay ninguna —
+   * alimenta el cronómetro del banner de abajo. */
+  nearestRequestDeadline?: string | null;
   pendingEarnings: number;
   /** Sesiones confirmadas que caen en la fecha más próxima — puede ser más de una. */
   nextSessions?: CoachBooking[];
@@ -87,6 +92,7 @@ export default function CoachHomeScreen({
     reputation: onOpenReputation,
   };
   const firstName = coachName.split(' ')[0];
+  const requestCountdownSeconds = useCountdown(nearestRequestDeadline ?? null);
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -119,6 +125,23 @@ export default function CoachHomeScreen({
           <StatChip value={money(pendingEarnings)} label="Por liberar" onPress={onOpenEarnings} />
           <StatChip value={`★ ${rating}`} label="Reputación" onPress={onOpenReputation} />
         </View>
+
+        {pendingRequests > 0 && requestCountdownSeconds !== null && (
+          <Pressable style={styles.requestCountdownBanner} onPress={onOpenRequests}>
+            <View style={styles.guideTextWrap}>
+              <Text style={styles.requestCountdownTitle}>
+                {pendingRequests === 1
+                  ? 'Tienes 1 solicitud esperando tu respuesta'
+                  : `Tienes ${pendingRequests} solicitudes esperando tu respuesta`}
+              </Text>
+              <Text style={styles.guideMeta}>
+                {pendingRequests === 1 ? 'Vence' : 'La más próxima vence'} en{' '}
+                {formatHoursCountdown(requestCountdownSeconds)}
+              </Text>
+            </View>
+            <Text style={styles.chevron}>›</Text>
+          </Pressable>
+        )}
 
         {pendingRequests === 0 && onOpenAvailability && (
           <Pressable style={styles.guideBanner} onPress={onOpenAvailability}>
@@ -359,6 +382,22 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.8,
     marginBottom: 10,
+  },
+  requestCountdownBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: withOpacity(colors.amber, 0.14),
+    borderRadius: radius,
+    borderWidth: 1,
+    borderColor: withOpacity(colors.amber, 0.4),
+    padding: 16,
+    marginBottom: 24,
+  },
+  requestCountdownTitle: {
+    color: colors.amber,
+    fontSize: 14,
+    fontWeight: '800',
+    marginBottom: 2,
   },
   guideBanner: {
     flexDirection: 'row',

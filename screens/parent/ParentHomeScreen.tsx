@@ -19,6 +19,7 @@ import {
   searchTournaments,
   TournamentSearchResult,
 } from '../../lib/api';
+import { formatHoursCountdown, useCountdown } from '../../lib/countdown';
 import { dateRangeLabel } from '../../lib/dateSlots';
 import { STATUS_MAP } from '../../lib/parentBookingDisplay';
 import { colors, radius, withOpacity } from '../../lib/theme';
@@ -156,7 +157,16 @@ export default function ParentHomeScreen() {
     }, [user, token]),
   );
 
-  const pendingPaymentCount = bookings.filter((b) => b.status === 'accepted').length;
+  const pendingPaymentBookings = bookings.filter((b) => b.status === 'accepted');
+  const pendingPaymentCount = pendingPaymentBookings.length;
+  // La más urgente de todas — si hay varias reservas por pagar, el cronómetro del banner cuenta
+  // hacia la que vence primero, no un promedio ni la última creada.
+  const nearestPaymentDeadline =
+    pendingPaymentBookings
+      .map((b) => b.paymentDeadline)
+      .filter((d): d is string => d !== null)
+      .sort((a, b) => new Date(a).getTime() - new Date(b).getTime())[0] ?? null;
+  const paymentCountdownSeconds = useCountdown(nearestPaymentDeadline);
 
   useEffect(() => {
     if (!token) return;
@@ -244,6 +254,12 @@ export default function ParentHomeScreen() {
               <Text style={styles.paymentBannerMeta}>
                 Complétala{pendingPaymentCount === 1 ? '' : 's'} en Reservas antes de perder el cupo con el entrenador.
               </Text>
+              {paymentCountdownSeconds !== null && (
+                <Text style={styles.paymentBannerCountdown}>
+                  {pendingPaymentCount === 1 ? 'Vence' : 'La más próxima vence'} en{' '}
+                  {formatHoursCountdown(paymentCountdownSeconds)}
+                </Text>
+              )}
             </View>
             <Text style={styles.chevron}>›</Text>
           </Pressable>
@@ -460,6 +476,12 @@ const styles = StyleSheet.create({
     color: colors.textSoft,
     fontSize: 12,
     lineHeight: 17,
+  },
+  paymentBannerCountdown: {
+    color: colors.errorCoral,
+    fontSize: 12,
+    fontWeight: '800',
+    marginTop: 4,
   },
   sectionLabel: {
     color: colors.textDim,

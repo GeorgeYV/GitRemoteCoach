@@ -38,6 +38,9 @@ export const businessRules = {
   /** Cuánto antes de que venza payment_deadline se manda el recordatorio push (jobs/paymentReminders) —
    * a las 4h de una ventana de 6h, para que todavía haya margen real de reaccionar. */
   paymentReminderHoursBeforeDeadline: 2,
+  /** Idem para el entrenador (jobs/coachResponseReminders) sobre response_deadline — 1h de una
+   * ventana de 4h, misma proporción aproximada (2h de 6h) que el recordatorio de pago. */
+  coachResponseReminderHoursBeforeDeadline: 1,
   /** Bajo esta antelación, la cancelación del padre es "tardía". */
   lateCancellationWindowHours: 24,
   /** % del monto pagado que se reembolsa al padre en cancelación tardía. */

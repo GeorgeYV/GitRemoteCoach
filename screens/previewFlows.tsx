@@ -497,6 +497,13 @@ export function CoachHomeFlow({ coachId, coachName }: { coachId: string; coachNa
 
   const suspendedBookingRaw = suspendedMatch ? bookings?.find((b) => b.id === suspendedMatch.bookingId) ?? null : null;
   const pendingRequests = bookings?.filter((b) => b.status === 'requested').length ?? 0;
+  // La solicitud pendiente que vence primero — el cronómetro de Inicio cuenta hacia esta, no un
+  // promedio ni la más reciente (mismo criterio que nearestPaymentDeadline en ParentHomeScreen).
+  const nearestRequestDeadline =
+    bookings
+      ?.filter((b) => b.status === 'requested')
+      .map((b) => b.responseDeadline)
+      .sort((a, b) => new Date(a).getTime() - new Date(b).getTime())[0] ?? null;
   // 'paid' siempre está pendiente de liberar; 'completed' lo está hasta que el torneo cierre y
   // settleTournamentCoachPayouts le asigne un coach_payout_id (ver CoachEarningsScreen, mismo
   // criterio) — status==='paid' solo no alcanza, un partido ya completado sigue "por liberar".
@@ -697,6 +704,7 @@ export function CoachHomeFlow({ coachId, coachName }: { coachId: string; coachNa
       coachName={coachName}
       rating={rating}
       pendingRequests={pendingRequests}
+      nearestRequestDeadline={nearestRequestDeadline}
       pendingEarnings={pendingEarnings}
       nextSessions={nextSessions}
       upcomingCount={upcomingBookings.length}
