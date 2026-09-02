@@ -14,11 +14,17 @@ export default function PlayerRegistrationScreen({
   player,
   onSubmit,
   onBack,
+  onSkip,
 }: {
   /** Si viene seteado, la pantalla edita este jugador (PUT) en vez de crear uno nuevo (POST). */
   player?: Player;
   onSubmit: (player: Player) => void;
   onBack?: () => void;
+  /** Solo lo usa ParentPlayerOnboardingFlow (registro opcional justo después de verificar el
+   * correo, ver decisión de diseño en app/index.tsx#ParentRoleHome) — "Más tarde" salta este paso
+   * sin registrar a nadie. El resto de usos (forzoso al reservar sin hijos/as, editar desde
+   * Perfil) no pasan esta prop, así que no cambian. */
+  onSkip?: () => void;
 }) {
   const { token } = useAuth();
   const [fullName, setFullName] = useState(player?.fullName ?? '');
@@ -140,6 +146,11 @@ export default function PlayerRegistrationScreen({
             </View>
           )}
         </Pressable>
+        {onSkip && (
+          <Pressable style={styles.skipButton} onPress={onSkip} disabled={submitting}>
+            <Text style={styles.skipLabel}>Más tarde</Text>
+          </Pressable>
+        )}
       </View>
     </SafeAreaView>
   );
@@ -257,5 +268,14 @@ const styles = StyleSheet.create({
     color: colors.courtBlueDeep,
     fontSize: 15,
     fontWeight: '800',
+  },
+  skipButton: {
+    alignItems: 'center',
+    paddingVertical: 14,
+  },
+  skipLabel: {
+    color: colors.textSoft,
+    fontSize: 13,
+    fontWeight: '600',
   },
 });
