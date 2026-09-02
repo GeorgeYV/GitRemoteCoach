@@ -534,7 +534,21 @@ let manualBookingAId: string;
 
 console.log('\n=== Escenario 8b2: schedule_confirmed — nadie eligió hora hasta reprogramar (decisión #53) ===');
 {
-  const reqRes = await requestBooking(fixtures.coachAUserId, inFuture(6), 800);
+  // activeTournamentId (no fixtures.tournamentId, que tiene end_date en el pasado a propósito
+  // para el escenario de liquidación) — reprogramar ahora valida que la nueva fecha caiga dentro
+  // del torneo, así que este escenario necesita uno con rango futuro real (+14 a +18 días).
+  const reqRes = await app.inject({
+    method: 'POST',
+    url: '/bookings',
+    headers: { authorization: `Bearer ${parentToken}` },
+    payload: {
+      playerId: fixtures.playerId,
+      coachId: fixtures.coachAUserId,
+      tournamentId: fixtures.activeTournamentId,
+      matchDatetime: inFuture(340),
+      agreedRate: 800,
+    },
+  });
   const booking = reqRes.json();
   assertEqual(booking.scheduleConfirmed, false, 'una reserva recién solicitada arranca con scheduleConfirmed = false');
 
@@ -549,14 +563,24 @@ console.log('\n=== Escenario 8b2: schedule_confirmed — nadie eligió hora hast
     method: 'PATCH',
     url: `/bookings/${booking.id}/reschedule`,
     headers: { authorization: `Bearer ${coachBToken}` },
-    payload: { matchDatetime: inFuture(7) },
+    payload: { matchDatetime: inFuture(341) },
   });
   assertEqual(wrongActorRescheduleRes.statusCode, 403, 'reprogramar con el token de alguien ajeno a la reserva devuelve 403');
+
+  // Hallazgo de revisión: antes se podía reprogramar a cualquier fecha, sin relación al torneo —
+  // activeTournamentId termina a los +18 días, así que +1000 horas (~41 días) queda bien afuera.
+  const outOfRangeRescheduleRes = await app.inject({
+    method: 'PATCH',
+    url: `/bookings/${booking.id}/reschedule`,
+    headers: { authorization: `Bearer ${parentToken}` },
+    payload: { matchDatetime: inFuture(1000) },
+  });
+  assertEqual(outOfRangeRescheduleRes.statusCode, 422, 'reprogramar fuera de las fechas del torneo devuelve 422');
 
   // Reprogramar no tenía ninguna cobertura de notificación (ni push ni correo) — el padre reprograma,
   // así que el aviso le toca al coach (carlos@example.com, ver test/seed.ts).
   emailState.sent.length = 0;
-  const newDatetime = inFuture(7);
+  const newDatetime = inFuture(360);
   const rescheduleRes = await app.inject({
     method: 'PATCH',
     url: `/bookings/${booking.id}/reschedule`,
@@ -580,6 +604,15 @@ console.log('\n=== Escenario 8b2: schedule_confirmed — nadie eligió hora hast
     headers: { authorization: `Bearer ${coachAToken}` },
   });
   assertEqual(afterRes.json().scheduleConfirmed, true, 'scheduleConfirmed queda persistido como true tras releer la reserva');
+
+  // Limpieza: coachA + activeTournamentId lo dan por "arrancando limpio" escenarios más
+  // adelante (11c/11d) — sin cancelar acá, esta reserva quedaría contando como activa para esos.
+  await app.inject({
+    method: 'POST',
+    url: `/bookings/${booking.id}/cancel`,
+    headers: { authorization: `Bearer ${parentToken}` },
+    payload: { reason: 'Limpieza de escenario de prueba' },
+  });
 }
 
 console.log('\n=== Escenario 8c: reembolso al cancelar una reserva pagada manualmente ===');
@@ -1173,6 +1206,21 @@ console.log('\n=== Escenario 12: captura en vivo de un partido (matches / match_
   assertEqual(match.player1Id, fixtures.playerId, 'player1_id se deriva de la reserva, no del payload del cliente');
   assertEqual(match.status, 'in_progress', 'estado inicial = in_progress');
 
+  // Hallazgo de revisión de reprogramación: antes se podía reprogramar un partido ya en curso —
+  // matchStatus es independiente del status de la reserva (booking12 sigue 'requested' acá).
+  const rescheduleInProgressRes = await app.inject({
+    method: 'PATCH',
+    url: `/bookings/${booking12.id}/reschedule`,
+    headers: { authorization: `Bearer ${coachAToken}` },
+    payload: { matchDatetime: inFuture(121) },
+  });
+  assertEqual(rescheduleInProgressRes.statusCode, 409, 'reprogramar con el partido in_progress devuelve 409');
+  assertEqual(
+    rescheduleInProgressRes.json().error,
+    'match_already_started',
+    'el código de error es match_already_started',
+  );
+
   const createAgainRes = await app.inject({
     method: 'POST',
     url: '/matches',
@@ -1237,6 +1285,14 @@ console.log('\n=== Escenario 12: captura en vivo de un partido (matches / match_
   });
   assertEqual(completeRes.json().status, 'completed', 'PATCH status = completed');
   assertTrue(!!completeRes.json().completedAt, 'completed_at queda fijado al completar');
+
+  const rescheduleCompletedRes = await app.inject({
+    method: 'PATCH',
+    url: `/bookings/${booking12.id}/reschedule`,
+    headers: { authorization: `Bearer ${coachAToken}` },
+    payload: { matchDatetime: inFuture(122) },
+  });
+  assertEqual(rescheduleCompletedRes.statusCode, 409, 'reprogramar con el partido ya completo también devuelve 409');
 
   const obsRes = await app.inject({
     method: 'PATCH',

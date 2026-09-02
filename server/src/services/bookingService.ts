@@ -3,6 +3,8 @@ import { businessRules } from '../config.js';
 import { ConflictError, ValidationError } from '../lib/errors.js';
 import * as bookingRepository from '../repositories/bookingRepository.js';
 import * as bookingMessageRepository from '../repositories/bookingMessageRepository.js';
+import * as matchRepository from '../repositories/matchRepository.js';
+import * as tournamentRepository from '../repositories/tournamentRepository.js';
 import * as notificationService from './notificationService.js';
 import type { Booking, BookingForParent, BookingWithParticipants } from '../types.js';
 
@@ -118,17 +120,47 @@ export async function markBookingMessagesRead(bookingId: string, role: 'coach' |
 }
 
 /** Reprogramar horario — cualquiera de las dos partes puede hacerlo directamente (sin
- * aprobación de la otra), a pedido de producto. Notifica a la otra parte del cambio. */
+ * aprobación de la otra), a pedido de producto. Notifica a la otra parte del cambio.
+ *
+ * Dos validaciones agregadas tras una revisión de los escenarios de reprogramación (ninguna
+ * existía antes): no se puede reprogramar un partido que ya está en curso, suspendido o ya
+ * terminado (matchStatus es independiente del status de la reserva — un booking puede seguir
+ * 'payment_submitted' con el partido ya completo, ver decisión de Caso B en paymentService), y la
+ * nueva fecha tiene que caer dentro del rango del torneo (a diferencia de crear la reserva, donde
+ * BookingConfirmScreen ya solo deja elegir días de coach_tournament_availability — reprogramar es
+ * texto libre en el cliente, así que sin esto cualquiera podía tipear una fecha fuera del torneo). */
 export async function rescheduleBooking(params: {
   bookingId: string;
   matchDatetime: string;
   actorUserId: string;
   coachId: string;
   guardianUserId: string;
+  tournamentId: string;
 }): Promise<Booking> {
   if (new Date(params.matchDatetime).getTime() <= Date.now()) {
     throw new ValidationError('match_datetime debe ser en el futuro');
   }
+
+  const match = await matchRepository.findByBookingId(params.bookingId);
+  if (match && (match.status === 'in_progress' || match.status === 'suspended' || match.status === 'completed')) {
+    throw new ConflictError(
+      'No se puede reprogramar un partido que ya está en curso o que ya se jugó',
+      'match_already_started',
+    );
+  }
+
+  const tournamentRange = await tournamentRepository.getDateRange(params.tournamentId);
+  if (tournamentRange) {
+    // Comparación por día calendario, no por instante — mismo criterio que normalizeDate en
+    // tournamentRepository (evitar off-by-one contra columnas DATE sin hora).
+    const newDateOnly = params.matchDatetime.slice(0, 10);
+    if (newDateOnly < tournamentRange.startDate || newDateOnly > tournamentRange.endDate) {
+      throw new ValidationError(
+        `La nueva fecha debe estar dentro de las fechas del torneo (${tournamentRange.startDate} a ${tournamentRange.endDate})`,
+      );
+    }
+  }
+
   const updated = await bookingRepository.reschedule(params.bookingId, params.matchDatetime);
   if (!updated) {
     throw new ConflictError(

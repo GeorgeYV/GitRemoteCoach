@@ -236,6 +236,21 @@ export async function getBasicInfo(tournamentId: string, db: Queryable = pool): 
   return { id: rows[0].id, name: rows[0].name, clubId: rows[0].club_id };
 }
 
+export interface TournamentDateRange {
+  startDate: string;
+  endDate: string;
+}
+
+/** bookingService.rescheduleBooking: acotar la nueva fecha al rango del torneo — a diferencia de
+ * la reserva inicial (BookingConfirmScreen solo deja elegir días de coach_tournament_availability,
+ * ya acotados al torneo), reprogramar nunca validaba esto, así que cualquiera de las dos partes
+ * podía tipear una fecha fuera del torneo sin ningún aviso (hallazgo de revisión). */
+export async function getDateRange(tournamentId: string, db: Queryable = pool): Promise<TournamentDateRange | null> {
+  const { rows } = await db.query(`SELECT start_date, end_date FROM tournaments WHERE id = $1`, [tournamentId]);
+  if (rows.length === 0) return null;
+  return { startDate: normalizeDate(rows[0].start_date), endDate: normalizeDate(rows[0].end_date) };
+}
+
 export interface TournamentCommissionInfo {
   tournamentId: string;
   clubId: string | null;

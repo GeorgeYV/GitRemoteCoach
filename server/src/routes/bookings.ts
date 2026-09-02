@@ -184,7 +184,7 @@ export async function bookingRoutes(app: FastifyInstance): Promise<void> {
     const parsed = rescheduleBookingSchema.safeParse(req.body);
     if (!parsed.success) throw new ValidationError(parsed.error.message);
     const { sub } = req.user as { sub: string };
-    const { coachId, guardianUserId } = await bookingRepository.getBookingParticipants(id);
+    const { coachId, guardianUserId, tournamentId } = await bookingRepository.getBookingParticipants(id);
     if (sub !== coachId && sub !== guardianUserId) {
       throw new ForbiddenError('No eres parte de esta reserva');
     }
@@ -194,6 +194,7 @@ export async function bookingRoutes(app: FastifyInstance): Promise<void> {
       actorUserId: sub,
       coachId,
       guardianUserId,
+      tournamentId,
     });
   });
 
