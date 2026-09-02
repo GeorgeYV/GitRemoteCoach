@@ -96,6 +96,14 @@ export default function VerifyEmailGateScreen() {
             ? `Escribe el código de 6 dígitos que enviamos a ${user?.email}.`
             : 'Escribe tu correo correcto y te enviamos un código nuevo.'}
         </Text>
+        {step === 'verify' && (
+          <View style={styles.spamHint}>
+            <Ionicons name="alert-circle-outline" size={14} color={colors.textDim} />
+            <Text style={styles.spamHintText}>
+              Si no lo encuentras, revisa la carpeta de spam o correo no deseado.
+            </Text>
+          </View>
+        )}
       </View>
 
       <View style={styles.content}>
@@ -197,6 +205,18 @@ const styles = StyleSheet.create({
     color: colors.textSoft,
     fontSize: 13,
     lineHeight: 19,
+  },
+  spamHint: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    marginTop: 10,
+  },
+  spamHintText: {
+    flex: 1,
+    color: colors.textDim,
+    fontSize: 12,
+    lineHeight: 17,
   },
   content: {
     padding: 20,
